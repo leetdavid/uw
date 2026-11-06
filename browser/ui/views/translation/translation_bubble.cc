@@ -52,6 +52,31 @@ int CommandOf(TranslationEngine engine) {
   }
 }
 
+std::u16string ProblemTitle(TranslationEngine engine,
+                            const SegmentTranslator::Result& problem,
+                            bool selection) {
+  const std::u16string name = EngineName(engine);
+  switch (problem.problem) {
+    case SegmentTranslator::Result::Problem::kNone:
+      return std::u16string();
+    case SegmentTranslator::Result::Problem::kUnsupportedLanguage:
+      if (problem.language.empty() || problem.language == "auto" ||
+          problem.language == "und") {
+        return l10n_util::GetStringFUTF16(
+            selection ? IDS_UW_TRANSLATE_SELECTION_UNKNOWN_LANGUAGE
+                      : IDS_UW_TRANSLATE_ENGINE_UNKNOWN_LANGUAGE,
+            name);
+      }
+      return l10n_util::GetStringFUTF16(IDS_UW_TRANSLATE_ENGINE_LACKS_LANGUAGE,
+                                        name, LanguageName(problem.language));
+    case SegmentTranslator::Result::Problem::kFailed:
+      return l10n_util::GetStringFUTF16(selection
+                                            ? IDS_UW_TRANSLATE_SELECTION_FAILED
+                                            : IDS_UW_TRANSLATE_ENGINE_FAILED,
+                                        name);
+  }
+}
+
 }  // namespace
 
 std::u16string TranslationDownloadText(content::WebContents* web_contents) {
@@ -67,30 +92,28 @@ std::u16string TranslationDownloadText(content::WebContents* web_contents) {
 
 std::u16string TranslationProblemTitle(content::WebContents* web_contents) {
   PageTranslator* translator = PageTranslator::FromWebContents(web_contents);
-  if (!translator) {
-    return std::u16string();
-  }
-  const SegmentTranslator::Result& problem = translator->problem();
-  const std::u16string engine = EngineName(translator->engine());
-  switch (problem.problem) {
-    case SegmentTranslator::Result::Problem::kNone:
-      return std::u16string();
-    case SegmentTranslator::Result::Problem::kUnsupportedLanguage:
-      if (problem.language.empty() || problem.language == "auto" ||
-          problem.language == "und") {
-        return l10n_util::GetStringFUTF16(
-            IDS_UW_TRANSLATE_ENGINE_UNKNOWN_LANGUAGE, engine);
-      }
-      return l10n_util::GetStringFUTF16(IDS_UW_TRANSLATE_ENGINE_LACKS_LANGUAGE,
-                                        engine, LanguageName(problem.language));
-    case SegmentTranslator::Result::Problem::kFailed:
-      return l10n_util::GetStringFUTF16(IDS_UW_TRANSLATE_ENGINE_FAILED, engine);
-  }
+  return translator ? ProblemTitle(translator->engine(), translator->problem(),
+                                   /*selection=*/false)
+                    : std::u16string();
 }
 
 std::u16string TranslationProblemMessage(content::WebContents* web_contents) {
   PageTranslator* translator = PageTranslator::FromWebContents(web_contents);
   return translator ? base::UTF8ToUTF16(translator->problem().message)
+                    : std::u16string();
+}
+
+std::u16string SelectionProblemTitle(content::WebContents* web_contents) {
+  PageTranslator* translator = PageTranslator::FromWebContents(web_contents);
+  return translator ? ProblemTitle(translator->selection_engine(),
+                                   translator->selection_problem(),
+                                   /*selection=*/true)
+                    : std::u16string();
+}
+
+std::u16string SelectionProblemMessage(content::WebContents* web_contents) {
+  PageTranslator* translator = PageTranslator::FromWebContents(web_contents);
+  return translator ? base::UTF8ToUTF16(translator->selection_problem().message)
                     : std::u16string();
 }
 
@@ -115,7 +138,8 @@ bool AddOtherEngineButtons(content::WebContents* web_contents,
     }
     buttons->AddChildView(std::make_unique<views::MdTextButton>(
         base::BindRepeating(&ExecuteTranslateMenuCommand,
-                            base::Unretained(web_contents), CommandOf(engine)),
+                            base::Unretained(web_contents), CommandOf(engine),
+                            std::u16string()),
         l10n_util::GetStringFUTF16(IDS_UW_TRANSLATE_WITH_ENGINE,
                                    EngineName(engine))));
     added = true;

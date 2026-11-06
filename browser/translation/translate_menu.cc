@@ -7,8 +7,10 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/scoped_tabbed_browser_displayer.h"
+#include "chrome/browser/ui/translate/translate_controller.h"
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/tabs/public/tab_interface.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/translate/core/browser/translate_manager.h"
 #include "content/public/browser/web_contents.h"
@@ -22,14 +24,22 @@ namespace {
 TranslationEngine EngineOf(int command_id) {
   switch (command_id) {
     case kTranslateWithDevice:
+    case kTranslateSelectionWithDevice:
       return TranslationEngine::kDevice;
     case kTranslateWithGoogleCloud:
+    case kTranslateSelectionWithGoogleCloud:
       return TranslationEngine::kGoogleCloud;
     case kTranslateWithAi:
+    case kTranslateSelectionWithAi:
       return TranslationEngine::kAi;
     default:
       return TranslationEngine::kNone;
   }
+}
+
+bool IsSelectionCommand(int command_id) {
+  return command_id >= kTranslateSelectionWithDevice &&
+         command_id <= kTranslateSelectionWith;
 }
 
 Profile* ProfileOf(content::WebContents* web_contents) {
@@ -45,7 +55,8 @@ translate::TranslateManager* ManagerOf(content::WebContents* web_contents) {
 }  // namespace
 
 bool IsTranslateMenuCommand(int command_id) {
-  return command_id >= kSetUpTranslation && command_id <= kTranslateWith;
+  return command_id >= kSetUpTranslation &&
+         command_id <= kTranslateSelectionWith;
 }
 
 bool HasTranslationEngine(content::WebContents* web_contents) {
@@ -59,24 +70,31 @@ void AddTranslateMenuItems(content::WebContents* web_contents,
                            ui::SimpleMenuModel& menu,
                            ui::SimpleMenuModel::Delegate* delegate,
                            std::unique_ptr<ui::SimpleMenuModel>& submenu,
-                           bool with_submenu) {
+                           TranslateMenu kind) {
   if (!HasTranslationEngine(web_contents)) {
     menu.AddItemWithStringId(kSetUpTranslation, IDS_UW_TRANSLATE_SET_UP);
     return;
   }
-  if (!with_submenu) {
+  if (kind == TranslateMenu::kApp) {
     return;
   }
+  const bool selection = kind == TranslateMenu::kSelection;
   submenu = std::make_unique<ui::SimpleMenuModel>(delegate);
-  submenu->AddCheckItemWithStringId(kTranslateWithDevice,
-                                    IDS_UW_TRANSLATE_WITH_DEVICE);
-  submenu->AddCheckItemWithStringId(kTranslateWithGoogleCloud,
+  submenu->AddCheckItemWithStringId(
+      selection ? kTranslateSelectionWithDevice : kTranslateWithDevice,
+      IDS_UW_TRANSLATE_WITH_DEVICE);
+  submenu->AddCheckItemWithStringId(selection
+                                        ? kTranslateSelectionWithGoogleCloud
+                                        : kTranslateWithGoogleCloud,
                                     IDS_UW_TRANSLATE_WITH_GOOGLE_CLOUD);
-  submenu->AddCheckItemWithStringId(kTranslateWithAi, IDS_UW_TRANSLATE_WITH_AI);
+  submenu->AddCheckItemWithStringId(
+      selection ? kTranslateSelectionWithAi : kTranslateWithAi,
+      IDS_UW_TRANSLATE_WITH_AI);
   submenu->AddSeparator(ui::NORMAL_SEPARATOR);
   submenu->AddItemWithStringId(kSetUpTranslation, IDS_UW_TRANSLATE_SET_UP);
-  menu.AddSubMenuWithStringId(kTranslateWith, IDS_UW_TRANSLATE_WITH,
-                              submenu.get());
+  menu.AddSubMenuWithStringId(
+      selection ? kTranslateSelectionWith : kTranslateWith,
+      IDS_UW_TRANSLATE_WITH, submenu.get());
 }
 
 bool IsTranslateMenuCommandEnabled(content::WebContents* web_contents,
@@ -84,6 +102,9 @@ bool IsTranslateMenuCommandEnabled(content::WebContents* web_contents,
   TranslationEngine engine = EngineOf(command_id);
   if (engine == TranslationEngine::kNone) {
     return true;
+  }
+  if (IsSelectionCommand(command_id)) {
+    return IsTranslationEngineSetUp(ProfileOf(web_contents), engine);
   }
   translate::TranslateManager* manager = ManagerOf(web_contents);
   return manager && manager->CanManuallyTranslate() &&
@@ -100,7 +121,8 @@ bool IsTranslateMenuCommandChecked(content::WebContents* web_contents,
 }
 
 void ExecuteTranslateMenuCommand(content::WebContents* web_contents,
-                                 int command_id) {
+                                 int command_id,
+                                 const std::u16string& selection) {
   TranslationEngine engine = EngineOf(command_id);
   if (engine == TranslationEngine::kNone) {
     ShowTranslationSettings(web_contents);
@@ -109,6 +131,24 @@ void ExecuteTranslateMenuCommand(content::WebContents* web_contents,
   translate::TranslateManager* manager = ManagerOf(web_contents);
   PageTranslator* translator = PageTranslator::FromWebContents(web_contents);
   if (!manager || !translator) {
+    return;
+  }
+  if (IsSelectionCommand(command_id)) {
+    tabs::TabInterface* tab =
+        tabs::TabInterface::MaybeGetFromContents(web_contents);
+    TranslateController* controller =
+        tab ? TranslateController::From(tab->GetBrowserWindowInterface())
+            : nullptr;
+    if (!controller) {
+      return;
+    }
+    std::string source;
+    std::string target;
+    ChromeTranslateClient::FromWebContents(web_contents)
+        ->GetTranslateLanguages(web_contents, &source, &target,
+                                /*for_display=*/false);
+    translator->UseSelectionEngineOnce(engine);
+    controller->StartPartialTranslate(source, target, selection);
     return;
   }
   if (manager->GetLanguageState()->IsPageTranslated()) {

@@ -14,6 +14,9 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/translate/translate_controller.h"
+#include "chrome/browser/ui/views/translate/partial_translate_bubble_view.h"
+#include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/on_device_translation/features.h"
 #include "components/on_device_translation/service/test/test_util.h"
@@ -225,6 +228,23 @@ IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,
             problem.problem);
   EXPECT_EQ("sw", problem.language);
   EXPECT_FALSE(Translated("p"));
+}
+
+IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,
+                       ThisDeviceTranslatesASelectionAndLeavesThePage) {
+  UseEngine(TranslationEngine::kDevice);
+  Open("/en.html");
+  const std::string first = Text("#first");
+  TranslateController::From(browser())->StartPartialTranslate(
+      "en", "ja", u"Tea & coffee.\n\nKyoto has temples.");
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    PartialTranslateBubbleView* bubble =
+        TranslateBubbleController::From(browser())->GetPartialTranslateBubble();
+    return bubble && bubble->model()->GetTargetText() ==
+                         u"JA:Tea & coffee.\n\nJA:Kyoto has temples.";
+  }));
+  EXPECT_FALSE(manager()->GetLanguageState()->IsPageTranslated());
+  EXPECT_EQ(first, Text("#first"));
 }
 
 IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,

@@ -252,6 +252,10 @@ Then set `Translate pages with` to `Google Cloud Translation`, paste a Google Cl
 
 Expected result: the made-up key shows Google's reason under the field and isn't saved. The real one shows `A key is saved, and it works.`, and pages translate through Google, Swahili ones too. Set the engine to `AI provider` and pick a model from one of your providers: pages translate through it, more slowly. With one engine picked, `Translate With` › another engine translates the page with that one once, and the next page goes back to yours.
 
+Then select a sentence on the page, right-click it, and choose `Translate “…”`.
+
+Expected result: a bubble shows the sentence in English and the page stays as it was. `Translate With` under the item translates the selection with another engine once. With no engine picked, the item is grey with `Set Up Translation…` under it.
+
 ### Chats
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.

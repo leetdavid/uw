@@ -19,6 +19,9 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/translate/translate_controller.h"
+#include "chrome/browser/ui/views/translate/partial_translate_bubble_view.h"
+#include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/prefs/pref_service.h"
 #include "components/translate/core/browser/language_state.h"
@@ -208,6 +211,13 @@ class TranslationEnginesBrowserTest : public headless::HeadlessModeBrowserTest {
     SetTranslationModel(prefs(), choice);
   }
 
+  // The text in the partial translate bubble's translated tab.
+  std::u16string SelectionTranslation() {
+    PartialTranslateBubbleView* bubble =
+        TranslateBubbleController::From(browser())->GetPartialTranslateBubble();
+    return bubble ? bubble->model()->GetTargetText() : std::u16string();
+  }
+
   std::string Settings(const std::string& script) {
     return content::EvalJs(contents(), std::string(kFind) + script)
         .ExtractString();
@@ -248,7 +258,7 @@ IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,
       R"({"choices": [{"message": {"role": "assistant", "content":)"
       R"( "[\"AI: Hello everyone. Here is a <a i=0>sentence</a> in French.\",)"
       R"( \"AI: A page\"]"}}]})");
-  ExecuteTranslateMenuCommand(contents(), kTranslateWithAi);
+  ExecuteTranslateMenuCommand(contents(), kTranslateWithAi, u"");
   ASSERT_TRUE(base::test::RunUntil([&] {
     return manager()->GetLanguageState()->IsPageTranslated() &&
            First() == "AI: Hello everyone. Here is a sentence in French.";
@@ -283,6 +293,28 @@ IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,
       translate::TranslationType::kManualContextMenuInitialTranslation);
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return First() == "AI: Hello everyone. Here is a sentence."; }));
+}
+
+IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,
+                       TranslateSelectionWithAnAiProviderWorksOnce) {
+  SaveGoogleKey();
+  SetTranslationEngine(prefs(), TranslationEngine::kGoogleCloud);
+  AddAiProvider();
+  Open();
+  models_.Answer("/v1/ai/chat/completions",
+                 R"({"choices": [{"message": {"role": "assistant", "content":)"
+                 R"( "[\"AI: Hello everyone.\"]"}}]})");
+  ExecuteTranslateMenuCommand(contents(), kTranslateSelectionWithAi,
+                              u"Bonjour tout le monde.");
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return SelectionTranslation() == u"AI: Hello everyone."; }));
+  EXPECT_EQ(TranslationEngine::kAi,
+            PageTranslator::FromWebContents(contents())->selection_engine());
+  TranslateController::From(browser())->StartPartialTranslate("fr", "en",
+                                                              u"Merci.");
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return SelectionTranslation() == u"GC:Merci."; }));
+  EXPECT_FALSE(manager()->GetLanguageState()->IsPageTranslated());
 }
 
 IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,

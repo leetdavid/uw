@@ -31,6 +31,11 @@ std::u16string TranslationProblemTitle(content::WebContents* web_contents);
 // The engine's own words about the problem, or empty.
 std::u16string TranslationProblemMessage(content::WebContents* web_contents);
 
+// The same two for the selection's last translation problem, in the partial
+// translate bubble.
+std::u16string SelectionProblemTitle(content::WebContents* web_contents);
+std::u16string SelectionProblemMessage(content::WebContents* web_contents);
+
 // Fills `buttons` for the page's last translation problem: when the engine
 // lacks the page's language, a button per other engine that is set up, which
 // translates the page with it this once, or "Set up another engine…" when

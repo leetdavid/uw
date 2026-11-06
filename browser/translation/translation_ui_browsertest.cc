@@ -13,6 +13,8 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/translate/translate_controller.h"
+#include "chrome/browser/ui/views/translate/partial_translate_bubble_view.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -102,10 +104,13 @@ class TranslationUiBrowserTest : public headless::HeadlessModeBrowserTest {
     }));
   }
 
-  std::unique_ptr<TestRenderViewContextMenu> PageMenu() {
+  // The page's right-click menu, or the menu for `selection` when given.
+  std::unique_ptr<TestRenderViewContextMenu> PageMenu(
+      const std::u16string& selection = std::u16string()) {
     content::ContextMenuParams params;
     params.page_url = contents()->GetLastCommittedURL();
     params.frame_url = params.page_url;
+    params.selection_text = selection;
     params.edit_flags = blink::ContextMenuDataEditFlags::kCanTranslate;
     auto menu = std::make_unique<TestRenderViewContextMenu>(
         *contents()->GetPrimaryMainFrame(), params);
@@ -157,10 +162,34 @@ IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
+                       WithNoEngineTheSelectionMenuOffersToSetUpTranslation) {
+  OpenSwahili();
+  std::unique_ptr<TestRenderViewContextMenu> menu = PageMenu(u"Habari");
+  EXPECT_TRUE(menu->IsItemPresent(IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE));
+  EXPECT_FALSE(menu->IsItemEnabled(IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE));
+  EXPECT_TRUE(menu->IsItemEnabled(kSetUpTranslation));
+  EXPECT_FALSE(ItemOf(*menu, kTranslateSelectionWithDevice).present);
+}
+
+IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
+                       WithAnEngineTheSelectionMenuListsTheEngines) {
+  UseEngine(TranslationEngine::kDevice);
+  OpenSwahili();
+  std::unique_ptr<TestRenderViewContextMenu> menu = PageMenu(u"Habari");
+  EXPECT_TRUE(menu->IsItemEnabled(IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE));
+  EXPECT_TRUE(menu->IsItemPresent(kTranslateSelectionWith));
+  Item device = ItemOf(*menu, kTranslateSelectionWithDevice);
+  EXPECT_TRUE(device.enabled);
+  EXPECT_TRUE(device.checked);
+  EXPECT_FALSE(ItemOf(*menu, kTranslateSelectionWithAi).enabled);
+  EXPECT_FALSE(ItemOf(*menu, kTranslateWithDevice).present);
+}
+
+IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
                        SetUpTranslationOpensTheLanguageSettings) {
   OpenSwahili();
   ui_test_utils::TabAddedWaiter added(browser());
-  ExecuteTranslateMenuCommand(contents(), kSetUpTranslation);
+  ExecuteTranslateMenuCommand(contents(), kSetUpTranslation, u"");
   added.Wait();
   EXPECT_EQ(GURL("chrome://settings/languages"), contents()->GetVisibleURL());
 }
@@ -199,6 +228,27 @@ IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
       FindView<views::MdTextButton>(bubble, [](views::MdTextButton* button) {
         return button->GetText() == u"Set up another engine…";
       }));
+}
+
+IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
+                       TheSelectionBubbleNamesALanguageThisDeviceLacks) {
+  UseEngine(TranslationEngine::kDevice);
+  OpenSwahili();
+  TranslateController::From(browser())->StartPartialTranslate(
+      "sw", "en", u"Habari za asubuhi");
+  PartialTranslateBubbleView* bubble = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    bubble =
+        TranslateBubbleController::From(browser())->GetPartialTranslateBubble();
+    return bubble && bubble->GetViewState() ==
+                         PartialTranslateBubbleModel::VIEW_STATE_ERROR;
+  }));
+  views::Label* title = FindView<views::Label>(bubble, [](views::Label* l) {
+    return l->GetProperty(views::kElementIdentifierKey) ==
+           PartialTranslateBubbleView::kErrorMessage;
+  });
+  ASSERT_TRUE(title);
+  EXPECT_EQ(u"This device can't translate Swahili", title->GetText());
 }
 
 IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,

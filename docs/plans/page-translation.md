@@ -1,6 +1,6 @@
 # Page translation
 
-Status: scope agreed on 2026-11-06 in a grilling session. T363 to T366 on the [board](roadmap.md#board) build it. The user approved all four, and the designs, in advance. The designs are the frame "Page translation: every state (T363)" on the Doop canvas's "Page translation" page. T363, T364, and T365 were built on 2026-11-07; see the board for what each has been checked against.
+Status: scope agreed on 2026-11-06 in a grilling session. T363 to T366 on the [board](roadmap.md#board) build it. The user approved all four, and the designs, in advance. The designs are the frame "Page translation: every state (T363)" on the Doop canvas's "Page translation" page. T363 to T366 were built on 2026-11-07; see the board for what each has been checked against.
 
 Asked for on 2026-11-06: "i want the translate this page option back that is missing in chromium that is present in chrome."
 
@@ -28,6 +28,7 @@ Chromium turns translation off when the build has no Google API key (`TranslateM
 - uw never offers to translate by itself: the "Translate this page?" bubble never pops up. On a page in another language, the address-bar icon shows quietly.
 - Languages on the "Automatically translate these languages" list still translate by themselves, with the picked engine.
 - "Translate selection to English" comes back too, with the same rules, the same engines, and "Translate with ›". It shows the translation in Chromium's bubble and leaves the page alone.
+- Google Cloud and an AI provider tell the selection's language from its text. This device takes it to be in the page's language, which the bubble's "Selection not in…" changes.
 
 ### While a page is translated
 

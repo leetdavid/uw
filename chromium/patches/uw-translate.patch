@@ -36,10 +36,10 @@ index 68c3d83e553b053168dd5d3b9f56f53a2894d744..162fac264fb08449faf54166ed006165
      helper_name_suffix = alert_helper_params[2]
      helper_bundle_id_suffix = alert_helper_params[1]
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
-index 47206ed5ed68b38b984f5df2ac869c3bf4a140fd..7bdec42014c237f0e0e41daa3fb1a46a880ddd44 100644
+index 47206ed5ed68b38b984f5df2ac869c3bf4a140fd..df8fa065c727f39aef97af2ee821d8b416b884b8 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -503,6 +503,45 @@ are declared in tools/grit/grit_args.gni.
+@@ -503,6 +503,47 @@ are declared in tools/grit/grit_args.gni.
        <message name="IDS_UW_DELETE_PROFILE_TOO" desc="Button that deletes a workspace and its profile, with the profile's sign-ins, history, and pins.">Delete Profile Too</message>
        <message name="IDS_UW_KEEP_PROFILE" desc="Default button that deletes a profile's last workspace and keeps the profile.">Keep Profile</message>
        <message name="IDS_UW_MOVE_TO_WORKSPACE" desc="In Title Case: Item in a tab's menu that opens a list of workspaces to move the tab to.">Move to Workspace</message>
@@ -80,6 +80,8 @@ index 47206ed5ed68b38b984f5df2ac869c3bf4a140fd..7bdec42014c237f0e0e41daa3fb1a46a
 +      <message name="IDS_UW_TRANSLATE_ENGINE_LACKS_LANGUAGE" desc="Title of the translate bubble when the translation engine does not know the page's language."><ph name="ENGINE">$1<ex>This device</ex></ph> can't translate <ph name="LANGUAGE">$2<ex>Swahili</ex></ph></message>
 +      <message name="IDS_UW_TRANSLATE_ENGINE_UNKNOWN_LANGUAGE" desc="Title of the translate bubble when the translation engine cannot tell the page's language."><ph name="ENGINE">$1<ex>This device</ex></ph> can't tell what language this page is in</message>
 +      <message name="IDS_UW_TRANSLATE_ENGINE_FAILED" desc="Title of the translate bubble when the translation engine or its service failed."><ph name="ENGINE">$1<ex>This device</ex></ph> couldn't translate this page</message>
++      <message name="IDS_UW_TRANSLATE_SELECTION_UNKNOWN_LANGUAGE" desc="Title of the bubble that translates selected text when the translation engine cannot tell the selection's language."><ph name="ENGINE">$1<ex>This device</ex></ph> can't tell what language the selection is in</message>
++      <message name="IDS_UW_TRANSLATE_SELECTION_FAILED" desc="Title of the bubble that translates selected text when the translation engine or its service failed."><ph name="ENGINE">$1<ex>This device</ex></ph> couldn't translate the selection</message>
 +      <message name="IDS_UW_TRANSLATE_WITH_ENGINE" desc="Button in the translate bubble that translates the page with another engine this one time.">Translate with <ph name="ENGINE">$1<ex>Google Cloud</ex></ph></message>
 +      <message name="IDS_UW_TRANSLATE_SET_UP_ANOTHER" desc="Button in the translate bubble that opens the translation settings to set up another translation engine.">Set up another engine…</message>
        <message name="IDS_UW_REOPENS_IN_ANOTHER_PROFILE" desc="Heading over the workspaces of other profiles in the Move to Workspace list. Their tab reopens there from its address.">Reopens in another profile</message>
@@ -267,7 +269,7 @@ index db3ab9dae742191cb8138c5fb8d6f432a2199dbc..77b79d60f010af278a074376f40137ce
        "//chrome/browser/ui:chrome_pages",
        "//chrome/browser/ui:confirm_bubble",
 diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
-index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d62d981b8 100644
+index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..d63fbf13bf7b12711ab13c871597215450751cf1 100644
 --- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
 +++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
 @@ -284,6 +284,7 @@
@@ -278,26 +280,26 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d
  
  #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
      BUILDFLAG(IS_CHROMEOS)
-@@ -2593,6 +2594,9 @@ void RenderViewContextMenu::AppendPageItems() {
-     // Translate to language
-     if (CanTranslate(/*menu_logging=*/true)) {
-       AppendTranslateItem();
-+      uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
-+                                uw_translate_with_submenu_,
-+                                /*with_submenu=*/true);
-     }
- 
-     menu_model_.AddSeparator(ui::NORMAL_SEPARATOR);
-@@ -2677,6 +2681,9 @@ void RenderViewContextMenu::AppendPageItems() {
- 
-   if (CanTranslate(/*menu_logging=*/true)) {
-     AppendTranslateItem();
-+    uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
-+                              uw_translate_with_submenu_,
-+                              /*with_submenu=*/true);
+@@ -2806,6 +2807,9 @@ void RenderViewContextMenu::AppendPartialTranslateItem() {
+         ui::ImageModel::FromVectorIcon(vector_icons::kGTranslateIcon,
+                                        ui::kColorMenuIcon, kTabMenuIconSize));
    }
++  uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
++                            uw_translate_with_submenu_,
++                            uw::TranslateMenu::kSelection);
  }
  
+ void RenderViewContextMenu::AppendTranslateItem() {
+@@ -2820,6 +2824,9 @@ void RenderViewContextMenu::AppendTranslateItem() {
+           GetTargetLanguageDisplayName(/*is_full_page_translation=*/true)),
+       ui::ImageModel::FromVectorIcon(vector_icons::kGTranslateIcon,
+                                      ui::kColorMenuIcon, kTabMenuIconSize));
++  uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
++                            uw_translate_with_submenu_,
++                            uw::TranslateMenu::kPage);
+ }
+ 
+ void RenderViewContextMenu::AppendMediaRouterItem() {
 @@ -3313,6 +3320,9 @@ void RenderViewContextMenu::AppendLiveCaptionItem() {
  // Menu delegate functions -----------------------------------------------------
  
@@ -308,7 +310,7 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d
  #if BUILDFLAG(IS_CHROMEOS)
    // Disable context menu in locked fullscreen mode to prevent users from
    // exiting this mode (the menu is not really disabled as the user can still
-@@ -3429,7 +3439,8 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
+@@ -3429,10 +3439,12 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
        return IsDevCommandEnabled(id);
  
      case IDC_CONTENT_CONTEXT_TRANSLATE:
@@ -317,8 +319,13 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d
 +             uw::HasTranslationEngine(embedder_web_contents_);
  
      case IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE:
-       return navigation_allowed;
-@@ -3657,6 +3668,10 @@ bool RenderViewContextMenu::IsCommandIdChecked(int id) const {
+-      return navigation_allowed;
++      return navigation_allowed &&
++             uw::HasTranslationEngine(embedder_web_contents_);
+ 
+     case IDC_CONTENT_CONTEXT_OPENLINKBOOKMARKAPP:
+     case IDC_CONTENT_CONTEXT_OPENLINKINPROFILE:
+@@ -3657,6 +3669,10 @@ bool RenderViewContextMenu::IsCommandIdChecked(int id) const {
      return true;
    }
  
@@ -329,12 +336,13 @@ index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d
    // See if the video is set to looping.
    if (id == IDC_CONTENT_CONTEXT_LOOP) {
      return (params_.media_flags & ContextMenuData::kMediaLoop) != 0;
-@@ -3742,6 +3757,11 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+@@ -3742,6 +3758,12 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
    }
    command_executed_ = true;
  
 +  if (uw::IsTranslateMenuCommand(id)) {
-+    uw::ExecuteTranslateMenuCommand(embedder_web_contents_, id);
++    uw::ExecuteTranslateMenuCommand(embedder_web_contents_, id,
++                                    params_.selection_text);
 +    return;
 +  }
 +
@@ -917,7 +925,7 @@ index b7bd5b8d91e5814c3914835782fe94e0f8a39b42..1720e7c37e3d1129d756d43a89b335e7
                                  can_translate);
  
 diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
-index 14765d4d1540b399794897f761326d665c230500..024b2e99840e1929619cf8f62abf140cf194ed05 100644
+index 14765d4d1540b399794897f761326d665c230500..3441e0d6532f4437766cdf72f2b28cb83a2987df 100644
 --- a/chrome/browser/ui/toolbar/app_menu_model.cc
 +++ b/chrome/browser/ui/toolbar/app_menu_model.cc
 @@ -167,6 +167,7 @@
@@ -928,20 +936,21 @@ index 14765d4d1540b399794897f761326d665c230500..024b2e99840e1929619cf8f62abf140c
  
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING) || BUILDFLAG(IS_CHROMEOS)
  #include "base/feature_list.h"
-@@ -1362,6 +1363,12 @@ void AppMenuModel::ExecuteCommand(int command_id, int event_flags) {
+@@ -1362,6 +1363,13 @@ void AppMenuModel::ExecuteCommand(int command_id, int event_flags) {
      return;
    }
  
 +  if (uw::IsTranslateMenuCommand(command_id)) {
 +    uw::ExecuteTranslateMenuCommand(
-+        browser_->tab_strip_model()->GetActiveWebContents(), command_id);
++        browser_->tab_strip_model()->GetActiveWebContents(), command_id,
++        std::u16string());
 +    return;
 +  }
 +
    if (command_id == IDC_VIEW_PASSWORDS) {
      browser()->GetProfile()->GetPrefs()->SetBoolean(
          password_manager::prefs::kPasswordsPrefWithNewLabelUsed, true);
-@@ -2110,6 +2117,10 @@ bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
+@@ -2110,6 +2118,10 @@ bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
      return true;
    }
  
@@ -952,13 +961,13 @@ index 14765d4d1540b399794897f761326d665c230500..024b2e99840e1929619cf8f62abf140c
    switch (command_id) {
      case IDC_NEW_INCOGNITO_WINDOW:
        return IncognitoModePrefs::IsIncognitoAllowed(browser_->GetProfile());
-@@ -2354,6 +2365,9 @@ void AppMenuModel::Build() {
+@@ -2354,6 +2366,9 @@ void AppMenuModel::Build() {
  
    AddItemWithStringIdAndVectorIcon(this, IDC_SHOW_TRANSLATE, IDS_SHOW_TRANSLATE,
                                     vector_icons::kGTranslateIcon);
 +  std::unique_ptr<ui::SimpleMenuModel> no_submenu;
 +  uw::AddTranslateMenuItems(browser_->tab_strip_model()->GetActiveWebContents(),
-+                            *this, this, no_submenu, /*with_submenu=*/false);
++                            *this, this, no_submenu, uw::TranslateMenu::kApp);
  
    CreateFindAndEditSubMenu();
  
@@ -982,6 +991,101 @@ index 03364f38b69d463c1c0357e8b2f2e83dc85c5664..5a3fc921d3537956ec8ae067462f7a46
    ]
    public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  }
+diff --git a/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc b/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
+index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..620d0a4669d739774cbf1c3c877abf3ddf124b42 100644
+--- a/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
++++ b/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
+@@ -82,6 +82,7 @@
+ #include "ui/views/style/typography.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/views/translation/translation_bubble.h"
+ 
+ namespace {
+ 
+@@ -620,10 +621,18 @@ std::unique_ptr<views::View> PartialTranslateBubbleView::CreateViewErrorNoTitle(
+                                views::MinimumFlexSizeRule::kScaleToZero,
+                                views::MaximumFlexSizeRule::kUnbounded));
+ 
+-  title_row->AddChildView(std::move(error_message_label));
++  uw_error_title_ = title_row->AddChildView(std::move(error_message_label));
+   title_row->AddChildView(CreateCloseButton());
+   view->AddChildView(std::move(title_row));
+ 
++  auto uw_message = std::make_unique<views::Label>(
++      std::u16string(), views::style::CONTEXT_LABEL,
++      views::style::STYLE_SECONDARY);
++  uw_message->SetMultiLine(true);
++  uw_message->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
++  uw_message->SetVisible(false);
++  uw_error_message_ = view->AddChildView(std::move(uw_message));
++
+   // Button row
+   auto button_row = std::make_unique<views::BoxLayoutView>();
+   button_row->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
+@@ -1077,6 +1086,16 @@ void PartialTranslateBubbleView::SwitchToErrorView(
+     translate::TranslateErrors error_type) {
+   SwitchView(PartialTranslateBubbleModel::VIEW_STATE_ERROR);
+   model_->SetError(error_type);
++  if (uw_error_title_) {
++    const std::u16string title = uw::SelectionProblemTitle(web_contents_);
++    uw_error_title_->SetText(
++        title.empty() ? l10n_util::GetStringUTF16(
++                            IDS_PARTIAL_TRANSLATE_BUBBLE_COULD_NOT_TRANSLATE_TITLE)
++                      : title);
++    const std::u16string message = uw::SelectionProblemMessage(web_contents_);
++    uw_error_message_->SetText(message);
++    uw_error_message_->SetVisible(!message.empty());
++  }
+   // TODO(crbug.com/40221545): Record the error when Partial Translate-specific
+   // metrics are added.
+ }
+diff --git a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
+index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..19c765c6caaf95074025f719765a7851934eeeaf 100644
+--- a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
++++ b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
+@@ -271,6 +271,10 @@ class PartialTranslateBubbleView : public LocationBarBubbleDelegateView,
+   raw_ptr<views::TabbedPane, DanglingUntriaged> tabbed_pane_ = nullptr;
+   raw_ptr<views::View, DanglingUntriaged> tab_view_top_row_ = nullptr;
+   raw_ptr<views::Label, DanglingUntriaged> partial_text_label_ = nullptr;
++  // uw: the error view's title and the engine's own words, for the problem
++  // that stopped the selection's translation.
++  raw_ptr<views::Label> uw_error_title_ = nullptr;
++  raw_ptr<views::Label> uw_error_message_ = nullptr;
+ 
+   raw_ptr<views::LabelButton, DanglingUntriaged> advanced_reset_button_source_ =
+       nullptr;
+diff --git a/chrome/browser/ui/views/translate/translate_bubble_controller.cc b/chrome/browser/ui/views/translate/translate_bubble_controller.cc
+index 8391531447d67dfa58a04e4f176cd5c86f66d3cb..0e1a81437cd09f0de1981b2a1762bad31749bf80 100644
+--- a/chrome/browser/ui/views/translate/translate_bubble_controller.cc
++++ b/chrome/browser/ui/views/translate/translate_bubble_controller.cc
+@@ -40,6 +40,7 @@
+ #include "ui/actions/actions.h"
+ #include "ui/gfx/text_constants.h"
+ #include "ui/gfx/text_elider.h"
++#include "uw/browser/translation/page_translator.h"
+ 
+ namespace {
+ 
+@@ -182,6 +183,9 @@ void TranslateBubbleController::StartPartialTranslate(
+     client->GetTranslateManager()->GetLanguageState()->SetTranslateEnabled(
+         true);
+   }
++  if (auto* translator = uw::PageTranslator::FromWebContents(web_contents)) {
++    translator->OnSelectionTranslationStarted();
++  }
+ 
+   views::BubbleAnchor anchor;
+   std::optional<ui::ElementIdentifier> highlighted_element;
+@@ -321,6 +325,8 @@ void TranslateBubbleController::CreatePartialTranslateBubble(
+             TemplateURLServiceFactory::GetForProfile(profile)),
+         std::make_unique<ContextualTranslateDelegate>(
+             profile->GetURLLoaderFactory()));
++    partial_translate_manager->set_translator(
++        base::BindRepeating(&uw::PageTranslator::TranslateSelectionIn));
+ 
+     model = std::make_unique<PartialTranslateBubbleModelImpl>(
+         view_state, error_type, truncated_source_text, target_text,
 diff --git a/chrome/browser/ui/views/translate/translate_bubble_view.cc b/chrome/browser/ui/views/translate/translate_bubble_view.cc
 index 7c12096ea734f9ddf3127b052159e88d29d7113e..1bc330d5108e95a33a5bd2ba03ff4f4c04a7e0ff 100644
 --- a/chrome/browser/ui/views/translate/translate_bubble_view.cc
@@ -1469,6 +1573,70 @@ index c2f8aeff61f37d4a0d665ee047c6106af779186b..c9e720b3dfeb448d71291cae7e51c56a
  
    base::ObserverList<TranslationObserver, true> translation_observers_;
  
+diff --git a/components/translate/content/browser/partial_translate_manager.cc b/components/translate/content/browser/partial_translate_manager.cc
+index ee19c23a9274a885d723819133ffefe6ec8f92a8..a41d7cd6c085823c990fdaccc886916c30b7f632 100644
+--- a/components/translate/content/browser/partial_translate_manager.cc
++++ b/components/translate/content/browser/partial_translate_manager.cc
+@@ -44,6 +44,14 @@ void PartialTranslateManager::StartPartialTranslate(
+   weak_ptr_factory_.InvalidateWeakPtrs();
+   callback_ = std::move(callback);
+ 
++  if (translator_) {
++    translator_.Run(
++        web_contents, request,
++        base::BindOnce(&PartialTranslateManager::OnPartialTranslateResponse,
++                       weak_ptr_factory_.GetWeakPtr()));
++    return;
++  }
++
+   if (contextual_translate_delegate_ &&
+       base::FeatureList::IsEnabled(
+           translate::kPartialTranslateUseOnePlatformApi)) {
+diff --git a/components/translate/content/browser/partial_translate_manager.h b/components/translate/content/browser/partial_translate_manager.h
+index f644c0fa60c7981e057863dd4ead40eb0acba046..3bfe1e7b5d26d39b3ec544726e4196b6e7f2bb8f 100644
+--- a/components/translate/content/browser/partial_translate_manager.h
++++ b/components/translate/content/browser/partial_translate_manager.h
+@@ -9,6 +9,7 @@
+ 
+ #include <memory>
+ #include <string>
++#include <utility>
+ #include <vector>
+ 
+ #include "base/functional/callback.h"
+@@ -78,6 +79,12 @@ class PartialTranslateManager {
+  public:
+   typedef base::OnceCallback<void(const PartialTranslateResponse&)>
+       PartialTranslateCallback;
++  // uw: translates with the translation engine the user picked instead of
++  // Google's service. See docs/plans/page-translation.md.
++  using Translator =
++      base::RepeatingCallback<void(content::WebContents*,
++                                   const PartialTranslateRequest&,
++                                   PartialTranslateCallback)>;
+ 
+   PartialTranslateManager(std::unique_ptr<ContextualSearchDelegate> delegate,
+                           std::unique_ptr<ContextualTranslateDelegate>
+@@ -95,6 +102,10 @@ class PartialTranslateManager {
+                              const PartialTranslateRequest& request,
+                              PartialTranslateCallback callback);
+ 
++  void set_translator(Translator translator) {
++    translator_ = std::move(translator);
++  }
++
+  private:
+   // Creates a ContextualSearchContext given a PartialTranslateRequest.
+   std::unique_ptr<ContextualSearchContext> MakeContext(
+@@ -125,6 +136,8 @@ class PartialTranslateManager {
+   // The delegate used when kPartialTranslateUseOnePlatformApi is enabled.
+   std::unique_ptr<ContextualTranslateDelegate> contextual_translate_delegate_;
+ 
++  Translator translator_;
++
+   // Use a WeakPtrFactory so we can cancel in-flight Partial Translate requests.
+   base::WeakPtrFactory<PartialTranslateManager> weak_ptr_factory_{this};
+ };
 diff --git a/components/translate/content/common/translate.mojom b/components/translate/content/common/translate.mojom
 index 472870508bb28930a50bde98d822f8bdd5dfa0e8..30589ff3a9564f84f478bf46846437f1302419ad 100644
 --- a/components/translate/content/common/translate.mojom
