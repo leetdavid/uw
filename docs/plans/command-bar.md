@@ -27,7 +27,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 ### What it finds
 
 - Commands, from the list the [keyboard and mouse plan](keyboard-and-mouse.md#design) defines, and Chromium's own browser commands.
-- Tasks, to go to one or to move a tab there.
+- Tasks, to go to one or to move a tab there. Option+Cmd+M opens it with only the tasks, per [Move to Task…](keyboard-and-mouse.md#move-to-task).
 - Open tabs, history, bookmarks, and past searches, from the same suggestion engine as Chromium's address bar. Chromium's site search shortcuts, such as `gh` and Tab, work as they do there. An address being typed is completed inline, as the address bar does.
 - Only results that are ready at once. The list changes only when the user types, never because a result arrived late. Changed on 2026-10-15:
   - Live suggestions from the search engine are left out, so nothing typed leaves the Mac until the user picks a row.
@@ -177,7 +177,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 8. T156: the arrow keys put a row's text in the field, and filled text is muted. Added on 2026-10-22.
 9. T213: the command bar keeps its text when it loses focus, and Escape empties the field first. Added on 2026-10-26.
 10. T112: translation. Split from T66 on 2026-10-17.
-11. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16.
+11. T61: command and task rows, with their keys and tab counts, and the task of each tab row. Split on 2026-10-16. Taken off hold on 2026-11-07, when the user asked to run commands and find their keys in the command bar. T356, [Move to Task…](keyboard-and-mouse.md#move-to-task), builds on it.
 12. T111: one list ranked by picks, and the most-picked items before typing. Split from T61 on 2026-10-16.
 13. T62: Cmd+L and the address click open it.
 14. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.

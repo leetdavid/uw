@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The [close button on a task's row](#close-button-on-a-tasks-row), T284, was agreed on 2026-10-31. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The [close button on a task's row](#close-button-on-a-tasks-row), T284, was agreed on 2026-10-31. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. [Keys by scope](#keys-by-scope), the [key card](#key-card), [Move to the previous or next task](#move-to-the-previous-or-next-task), and [Move to Task…](#move-to-task) were agreed on 2026-11-07 in a grilling, as T352 to T356, and the user asked to start building them, Windows included. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -11,36 +11,88 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 - Every uw command has a menu bar entry with its key. Tab and branch commands go in Chromium's Tab menu. Task and organizer commands go in a new Tasks menu. Context menus show the same keys.
 - Help → Search finds any of them by name. The [Keyboard shortcuts](#keyboard-shortcuts) section lists every key and changes uw's.
 - Every key includes Cmd, so it still works while a [terminal tab](../CONTEXT.md#language) has focus. A page that handles a key itself keeps it, as Chromium does for its own keys.
+- The key held with Cmd says what a command acts on: see [Keys by scope](#keys-by-scope).
 - Tasks do not nest. A [tab branch](../CONTEXT.md#language) is the only level below a task. [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) stands.
 
 ### Keys
 
-| Command | Key | Today |
+| Command | Key | Windows | Today |
+| --- | --- | --- | --- |
+| Nest under previous tab | Ctrl+Cmd+→ | Alt+Shift+→ | menu only |
+| Move up one level | Ctrl+Cmd+← | Alt+Shift+← | menu only |
+| New child tab | Option+Cmd+T | Ctrl+Alt+T | changes. Was Ctrl+Cmd+T. |
+| Move branch up or down among its siblings | Ctrl+Cmd+↑ / ↓ | Alt+Shift+↑ / ↓ | Chromium's Ctrl+Shift+PgUp/PgDn, which a terminal tab takes |
+| Collapse or expand branch | Option+Cmd+. | Ctrl+Alt+. | changes. Was Ctrl+Cmd+. |
+| Close branch | Option+Cmd+W | Ctrl+Alt+W | menu only |
+| New task | Ctrl+Cmd+N | Alt+Shift+N | changes. Was Chromium's Ctrl+Cmd+P, and Alt+Shift+P on Windows, which are removed. |
+| Move to new task | Option+Cmd+N | Ctrl+Alt+N | changes. Was Shift+Ctrl+Cmd+N. |
+| Move to task… | Option+Cmd+M | Ctrl+Alt+M | new. See [Move to Task…](#move-to-task). |
+| Move to the previous or next task | Option+Cmd+[ / ] | Ctrl+Alt+[ / ] | new. See [Move to the previous or next task](#move-to-the-previous-or-next-task). |
+| Move to Scratchpad | Option+Cmd+S | Ctrl+Alt+S | changes. Was Ctrl+Cmd+S. |
+| Keep here | Option+Cmd+K | Ctrl+Alt+K | changes. Was Ctrl+Cmd+K. Makes a [kept tab](../CONTEXT.md#language), or lets it go. See [Automatic organization](automatic-organization.md#agreed-scope). |
+| Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | Alt+Shift+1 to 9 | new. Selects the tab last used in that task. |
+| Go to the Scratchpad | Ctrl+Cmd+0 | Alt+Shift+0 | new |
+| Rename task | Ctrl+Cmd+R | Alt+Shift+R | new. Turns the name on the task's row into a field. On Windows it takes the key from reading mode. |
+| Close task, next task, previous task | Ctrl+Cmd+W, X, Z | Alt+Shift+W, X, Z | Chromium's, unchanged |
+| Confirm the organizer's suggestion | Ctrl+Cmd+Return | Alt+Shift+Enter | button on the activity card |
+| Undo tab organization | Option+Cmd+Z | Ctrl+Alt+Z | exists |
+| Focus the sidebar | Ctrl+Cmd+L | | new |
+| Hide or show the sidebar | Cmd+S | Ctrl+S | changes. Was Chromium's Cmd+Shift+L. Save Page As loses Cmd+S. See [Hidden sidebar](hidden-sidebar.md). |
+| Go to this task's terminal, and back | Ctrl+\` | | changes. Today it opens a new terminal. |
+| New terminal | Ctrl+Shift+\` | | new |
+| Run a shell command from the command bar | Cmd+Shift+P | | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
+| Split right, split down | Cmd+D, Cmd+Shift+D | Ctrl+D, Ctrl+Shift+D | new, per the [split view plan](split-view.md#keys). Chromium's Bookmark This Tab and Bookmark All Tabs lost them, and Cmd+Option+N, Chromium's New Split View, is gone. |
+| Maximize the pane, or restore the panes | Cmd+Shift+Return | Ctrl+Shift+Enter | new, per [Maximizing a pane](split-view.md#maximizing-a-pane). |
+| Pause, organizer activity, Name Task, [Tidy and Clear Scratchpad](scratchpad-buttons.md) | menu, and the command bar later | | no key |
+
+A blank Windows key is left to the [Windows plan](windows.md).
+
+### Keys by scope
+
+Agreed on 2026-11-07 as T352, after the user found the keys hard to learn: "It's not clear or potentially consistent on how the hotkeys are organized." See [ADR 0032](../adr/0032-uws-keys-say-their-scope-with-the-second-modifier.md).
+
+| Held with the letter | Mac | Windows |
 | --- | --- | --- |
-| Nest under previous tab | Ctrl+Cmd+→ | menu only |
-| Move up one level | Ctrl+Cmd+← | menu only |
-| New child tab | Ctrl+Cmd+T | new |
-| Move branch up or down among its siblings | Ctrl+Cmd+↑ / ↓ | Chromium's Ctrl+Shift+PgUp/PgDn, which a terminal tab takes |
-| Collapse or expand branch | Ctrl+Cmd+. | new |
-| Close branch | Option+Cmd+W | menu only |
-| New task | Ctrl+Cmd+N | changes. Was Chromium's Ctrl+Cmd+P, which is removed. |
-| Move to new task | Shift+Ctrl+Cmd+N | changes. Was Ctrl+Cmd+N. |
-| Move to Scratchpad | Ctrl+Cmd+S | menu only |
-| Keep here | Ctrl+Cmd+K | new. Makes a [kept tab](../CONTEXT.md#language), or lets it go. See [Automatic organization](automatic-organization.md#agreed-scope). |
-| Go to task 1 to 9 | Ctrl+Cmd+1 to 9 | new. Selects the tab last used in that task. |
-| Go to the Scratchpad | Ctrl+Cmd+0 | new |
-| Rename task | Ctrl+Cmd+R | new. Turns the name on the task's row into a field. |
-| Close task, next task, previous task | Ctrl+Cmd+W, X, Z | Chromium's, unchanged |
-| Confirm the organizer's suggestion | Ctrl+Cmd+Return | button on the activity card |
-| Undo tab organization | Option+Cmd+Z | exists |
-| Focus the sidebar | Ctrl+Cmd+L | new |
-| Hide or show the sidebar | Cmd+S | changes. Was Chromium's Cmd+Shift+L. Save Page As loses Cmd+S. See [Hidden sidebar](hidden-sidebar.md). |
-| Go to this task's terminal, and back | Ctrl+\` | changes. Today it opens a new terminal. |
-| New terminal | Ctrl+Shift+\` | new |
-| Run a shell command from the command bar | Cmd+Shift+P | new. Opens the [command bar](command-bar.md#sending-the-text-to-a-chat-or-a-terminal) with `>`. |
-| Split right, split down | Cmd+D, Cmd+Shift+D | new, per the [split view plan](split-view.md#keys). Chromium's Bookmark This Tab and Bookmark All Tabs lost them, and Cmd+Option+N, Chromium's New Split View, is gone. |
-| Maximize the pane, or restore the panes | Cmd+Shift+Return, Ctrl+Shift+Enter on Windows | new, per [Maximizing a pane](split-view.md#maximizing-a-pane). |
-| Move to task, pause, organizer activity, Name Task, [Tidy and Clear Scratchpad](scratchpad-buttons.md) | menu, and the command bar later | no key |
+| The tab, as in Chromium | Cmd | Ctrl |
+| The selected tab and the tabs under it | Option+Cmd | Ctrl+Alt |
+| Its task | Ctrl+Cmd | Alt+Shift |
+
+- The letter says what the command does, the same at each scope: Cmd+W closes the tab, Option+Cmd+W the branch, and Ctrl+Cmd+W the task.
+- Two keys break the rule. The arrows move the selected tab and the tabs under it with Ctrl+Cmd, since Option+Cmd with an arrow switches workspaces and moves focus between panes. Undo tab organization stays Option+Cmd+Z, since Ctrl+Cmd+Z goes to the previous task.
+- The old keys stop working. No second keys are kept.
+- A key the user changed in [Keyboard shortcuts](#keyboard-shortcuts) stays theirs. If it is a new default, such as Option+Cmd+M, theirs wins and the command that has it by default shows "No key".
+- On Windows, Chromium's Alt+Shift keys for tab groups become the task keys: Alt+Shift+W, X, and Z keep their commands, and Alt+Shift+P is removed for Alt+Shift+N.
+- The release notes and Help name the keys that moved.
+
+### Move to the previous or next task
+
+Agreed on 2026-11-07 as T353.
+
+- Option+Cmd+] moves the selected tab and the tabs under it to the top of the next task, and Option+Cmd+[ to the bottom of the previous one, so it moves as little as it can. Each press steps one task. The Scratchpad is the last stop.
+- It lands at the task's top level, keeping its own nesting, and the task opens if it was collapsed. At the first task, or in the Scratchpad, the key that would go past the end does nothing.
+- Several selected tabs move together, each with the tabs under it.
+- It is a manual move, as Move to Task is, so a kept tab is let go and a tab nested by hand leaves its parent.
+- The Tab menu lists Move to Previous Task and Move to Next Task under Move to New Task.
+
+### Move to Task…
+
+Agreed on 2026-11-07 as T356. It needs the command bar's task rows, T61.
+
+- Option+Cmd+M opens the [command bar](command-bar.md) with "Move to task…" in the field. It lists Move to New Task first, then the workspace's other tasks in sidebar order, then the Scratchpad. The selected tab's own task is left out.
+- Typing filters by name. Return moves the selected tab and the tabs under it to the end of that task, as Move to Task in the tab's menu does. Esc closes it and moves nothing.
+- With the command bar switched off, the key opens the tab's Move to Task menu beside its row in the sidebar.
+
+### Key card
+
+Agreed on 2026-11-07 as T355, when the user asked for "a button to hold to see the hotkeys".
+
+- Holding Option+Cmd or Ctrl+Cmd for half a second, with no other key, shows the [key card](../CONTEXT.md#language) for that scope. On Windows the keys are Ctrl+Alt and Alt+Shift.
+- The card lists every key of that scope with the command's menu name, the keys as they are now. A command that can't run now is dimmed, such as Close Task on a Scratchpad tab. Keys that use the scope's modifiers but break the rule are listed under "Also".
+- The sidebar outlines what the keys act on: the selected tab and the tabs under it, or its task. With Ctrl+Cmd, the first nine tasks show their numbers and the Scratchpad shows 0. With the sidebar hidden, the Ctrl+Cmd card lists those tasks by number instead.
+- Letting go of either key, any other key joining, or switching apps or windows hides it at once. A letter pressed runs its command, and the card goes. A key pressed within half a second never shows it.
+- Cmd alone never shows a card, so a Cmd-click on a chat link or a terminal address stays a [key hint](#key-hints).
+- The card takes no clicks and no focus, and shows over a terminal tab too.
+- The design is the frames "Hold for keys: Option+Cmd", "Hold for keys: Ctrl+Cmd", and "Hold for keys: every state" on the canvas page "Keyboard and mouse", drawn on 2026-11-07. Not signed off yet.
 
 ### Terminal key
 
@@ -98,6 +150,7 @@ Agreed on 2026-10-15.
 - A split button, "+" and "▾", sits at the right end of the sidebar's foot, with the Organize button at the left. The "+" under the tab list goes away.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
 - A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and Split Right, which took New split view's place per the [split view plan](split-view.md#splitting).
+- Move to New Task sits under New Task, with its key, here and in the Tasks menu of the sidebar's [top buttons](hidden-sidebar.md). It is the same command as in the tab's menu, with the same name. Agreed on 2026-11-07 as T354, when the user asked for a button for a new task from an existing tab.
 - The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user signed off the same day once the button moved from beside Organize to the right end.
 
 ### Branches with the mouse
@@ -260,6 +313,13 @@ Each stage is a ticket on the [board](roadmap.md#board). Stages with a visible c
 15. T275: key hints in the sidebar and on the window buttons, with the key watcher. Implementability 5/10: the × is Chromium's, and one row's hover tints other rows.
 16. T276: key hints in the chat page and terminal tabs. Implementability 7/10.
 17. T284: the [close button on a task's row](#close-button-on-a-tasks-row), with T36, the busy terminal warning. Design first. Implementability 8/10 for the button; T36 is 5/10.
+18. T352: [keys by scope](#keys-by-scope), on the Mac and Windows. Implementability 8/10.
+19. T353: [Move to the previous or next task](#move-to-the-previous-or-next-task). Implementability 7/10.
+20. T354: Move to New Task in the ▾ and Tasks menus, per the [new button](#new-button). Implementability 9/10.
+21. T355: the [key card](#key-card). Design first. Implementability 6/10: uw's key watcher sees only Option and Cmd today, and the card must not show during a quick key press.
+22. T356: [Move to Task…](#move-to-task), after T61. Implementability 6/10.
+
+T352, T353, and T354 are built first, then T355 once its design is signed off, then T61 and T356. Agreed on 2026-11-07. Together they rate 6/10.
 
 T73, T74, and the command bar are built next, then the other stages. Changed on 2026-10-15. T54 is built in the command bar's order, before T82, which needs it.
 
@@ -296,10 +356,17 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 
 16. [Key hints](#key-hints): with Option held on a parent's ×, the branch's rows tint and the tooltip names the count. Releasing Option clears it without moving the pointer, and so does switching apps. A tab with no children, and an action switched off, show nothing. The rows under a parent fade with Option held elsewhere on its row. The floating green button shows a + with Option held. A chat link shows "Open in the background" with Cmd held, and a terminal address underlines only with Cmd held.
 17. [Close button on a task's row](#close-button-on-a-tasks-row): with a Scratchpad tab selected, the pointer on a task's row shows its ×, and a click closes the task and its tabs. With the pointer on the ×, the task's rows tint and the tooltip counts its tabs. Cmd+Shift+T brings the task back. A task with a busy terminal asks first.
+18. [Keys by scope](#keys-by-scope): each key in the [table](#keys) runs its command through a real key event, on the Mac and in a Windows test build. Shift+Ctrl+Cmd+N, Ctrl+Cmd+T, S, K, and period do nothing, and neither do Alt+Shift+P and reading mode's Alt+Shift+R on Windows. A key the user set before the change keeps its command, and a new default it holds shows "No key".
+19. [Move to the previous or next task](#move-to-the-previous-or-next-task): Option+Cmd+] moves a parent and its children from the middle of one task to the top of the next with their nesting, and a second press to the top of the Scratchpad. Option+Cmd+[ from the Scratchpad puts them at the bottom of the last task. At either end nothing moves. A collapsed task they move into opens. `PageTreeTest` checks the places and `TaskKeysBrowserTest` presses the keys.
+20. The ▾ menu and the Tasks menu list Move to New Task under New Task with Option+Cmd+N, and a click moves the selected tab and the tabs under it to a new task.
+21. [Key card](#key-card): holding Option+Cmd shows the branch's keys and outlines the branch, holding Ctrl+Cmd shows the task's keys, outlines the task, and numbers the tasks. A key pressed at once shows nothing, letting go hides it, and Shift joining hides it. A window screenshot matches the signed-off frames.
+22. [Move to Task…](#move-to-task): Option+Cmd+M opens the command bar with the tasks, typing filters them, and Return moves the tab and the tabs under it to the end of the task picked.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
 ## Open questions
 
 - Whether window manager apps on the user's Mac already take Ctrl+Cmd with the arrows. Check by hand before T53 ships.
+- Whether anything on the Mac takes Option+Cmd+M. macOS names it Minimize All in its own apps, and Chromium's Window menu has no such item. Press it in a real window before T356 ships.
+- Ctrl+Alt is AltGr on many Windows keyboard layouts, which types characters there. Chromium tells AltGr apart from Ctrl+Alt, so AltGr should not run the branch keys. Check with a German layout in the Windows VM.
 - Where Ctrl+\` returns to when the tab selected before the terminal has closed. Proposal: the tab above the terminal.

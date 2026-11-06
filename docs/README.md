@@ -90,6 +90,7 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [New tab page plan](plans/new-tab-page.md): uw's page in a blank tab, with a box to search or ask and the state of uw's features, replacing Chromium's.
 - [ADR 0005: the command bar replaces typing in the address bar](adr/0005-the-command-bar-replaces-typing-in-the-address-bar.md): why Cmd+T, Cmd+L, and the address open uw's own panel.
 - [ADR 0011: uw keeps its own key list](adr/0011-uw-keeps-its-own-key-list.md): why keys are changed in uw's settings and not through macOS App Shortcuts.
+- [ADR 0032: uw's keys say their scope with the second modifier](adr/0032-uws-keys-say-their-scope-with-the-second-modifier.md): why Option+Cmd keys act on a tab and the tabs under it, Ctrl+Cmd keys on its task, and what they are on Windows.
 - [ADR 0017: the theme's light or dark rides in Chromium's color key](adr/0017-the-themes-light-or-dark-rides-in-chromiums-color-key.md): why page mode drives all of Chromium's colors and the sidebar keeps its own. Replaced by ADR 0030.
 - [Arc pinned tabs research](research/arc-pinned-tabs-research.md): Favorites, home URLs, reset behavior, and the limits of documented cross-window sharing.
 - [Logo](logo.md): the mark, its colors and files, and what is still undecided.
