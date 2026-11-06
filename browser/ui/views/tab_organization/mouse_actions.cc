@@ -138,14 +138,15 @@ bool CloseTaskOnMiddleClick(views::View* row,
 }
 
 bool TakesDoubleClickBelowTabs(BrowserWindowInterface* window) {
-  return IsOn(window, kDoubleClickOpensTabPref) && IsSecondClick();
+  return IsOn(window, kDoubleClickOpensTabPref) && IsSecondClick(nullptr);
 }
 
 bool OpenTabOnDoubleClick(BrowserWindowInterface* window,
                           const ui::MouseEvent& event) {
-  // The views never saw the first click, which dragged the window, so they
-  // count this one as a single click. macOS's count says otherwise.
-  if (!event.IsOnlyLeftMouseButton() || !TakesDoubleClickBelowTabs(window)) {
+  // No view took the first click, which dragged the window, so the views
+  // count this one as a single click. The platform's count says otherwise.
+  if (!event.IsOnlyLeftMouseButton() ||
+      !IsOn(window, kDoubleClickOpensTabPref) || !IsSecondClick(&event)) {
     return false;
   }
   chrome::ExecuteCommand(window, IDC_NEW_TAB);

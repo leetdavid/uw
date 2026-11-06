@@ -9,6 +9,12 @@ import {
   type ReactNode,
 } from "react";
 
+// Cmd is Ctrl on Windows.
+const isMac = navigator.userAgent.includes("Mac");
+const cmdName = isMac ? "Cmd" : "Ctrl";
+const isCmdDown = (event: KeyboardEvent | PointerEvent) =>
+  isMac ? event.metaKey : event.ctrlKey;
+
 let cmdHeld = false;
 const listeners = new Set<() => void>();
 
@@ -19,9 +25,11 @@ function setCmdHeld(held: boolean) {
   }
 }
 
-window.addEventListener("keydown", (event) => setCmdHeld(event.metaKey));
-window.addEventListener("keyup", (event) => setCmdHeld(event.metaKey));
-window.addEventListener("pointermove", (event) => setCmdHeld(event.metaKey));
+window.addEventListener("keydown", (event) => setCmdHeld(isCmdDown(event)));
+window.addEventListener("keyup", (event) => setCmdHeld(isCmdDown(event)));
+window.addEventListener("pointermove", (event) =>
+  setCmdHeld(isCmdDown(event)),
+);
 // Switching to another app or window lets go of the key.
 window.addEventListener("blur", () => setCmdHeld(false));
 
@@ -50,7 +58,7 @@ export function AnswerLink({
       href={href}
       target="_blank"
       data-answer-link=""
-      title={held ? undefined : "Cmd-click to open in the background"}
+      title={held ? undefined : `${cmdName}-click to open in the background`}
     >
       {children}
     </a>

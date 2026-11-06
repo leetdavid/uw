@@ -8,7 +8,7 @@ namespace uw {
 
 // Only the event macOS is handing out says so: the window asks where the
 // click goes before any view sees it.
-bool IsSecondClick() {
+bool IsSecondClick(const ui::MouseEvent*) {
   NSEvent* event = NSApp.currentEvent;
   return (event.type == NSEventTypeLeftMouseDown ||
           event.type == NSEventTypeLeftMouseUp) &&

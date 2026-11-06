@@ -69,7 +69,7 @@ On Windows: a named pipe limited to the user, a `uw.exe` beside `chrome.exe` and
 | Shortcuts | No | No | `chrome/browser/ui/accelerator_table.cc`, `BrowserView` accelerators, the app menu. Ctrl+letter belongs to programs in a terminal | Medium to large |
 | Glass | Link fails: `glass.h` functions exist only in `glass_mac.mm` | No | A stub first. DWM Mica or Acrylic later, which needs a translucent frame | Small stub, large parity |
 | Window buttons and floating sidebar | No: `IDS_ENTER_FULLSCREEN_MAC`, mac-only calls | No | Chromium's caption buttons on the right; the floating card needs a Windows design | Small to medium |
-| Modifier keys and mouse actions | No: `modifier_keys.mm`, `mouse_actions.mm` | | `views::EventMonitor`, `ui::MouseEvent::GetClickCount()` | Small |
+| Modifier keys and mouse actions | No: `modifier_keys.mm`, `mouse_actions.mm` | | `views::EventMonitor`, `ui::MouseEvent::GetClickCount()`. Done in T351 with the monitor and `WM_ACTIVATEAPP`; the click count misses a double-click below the tabs, so its message says instead | Small |
 | Mini player | Link fails | Floats, but the dock-or-float choice doesn't work | Foreground tracking with `WM_ACTIVATEAPP`, cover from `EnumWindows` and DWM bounds | Medium |
 | Workspaces | No: `workspace_window_mac.mm`, `workspace_swipe_mac.mm` | The swipe never fires | `SetWindowPos` and DWM cloaking for hidden partners; DirectManipulation or wheel events for the swipe | Medium |
 | Command bar page | No: CoreFoundation in `.cc` files | | `base::GetHourClockType()` and ICU | Small |

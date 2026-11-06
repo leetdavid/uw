@@ -45,7 +45,8 @@ bool CloseTaskOnMiddleClick(views::View* row,
 // A double-click on the empty space below the wide sidebar's tabs does what
 // the foot's "+" does. That space drags the window, and macOS acts on a
 // double-click there, so while the second click is down or coming up, the
-// space is the views' instead.
+// space is the views' instead. Windows asks the views about both clicks
+// there.
 bool TakesDoubleClickBelowTabs(BrowserWindowInterface* window);
 bool OpenTabOnDoubleClick(BrowserWindowInterface* window,
                           const ui::MouseEvent& event);

@@ -1133,7 +1133,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AWideTableScrollsOnItsOwn) {
 
 // A key hint: while Cmd is held on a link in an answer, a label by the
 // pointer says a click opens it in the background. Otherwise the link's
-// tooltip names Cmd.
+// tooltip names Cmd. Cmd is Ctrl on Windows.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
                        CmdOnAnAnswersLinkShowsWhatAClickDoes) {
   UseAgentModel();
@@ -1150,14 +1150,20 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
                            "    ?.textContent ?? ''")
         .ExtractString();
   };
+#if BUILDFLAG(IS_MAC)
+  const std::string key = "key: 'Meta', metaKey: ";
+  const std::string tooltip = "Cmd-click to open in the background";
+#else
+  const std::string key = "key: 'Control', ctrlKey: ";
+  const std::string tooltip = "Ctrl-click to open in the background";
+#endif
   const auto cmd = [&](bool held) {
     ASSERT_TRUE(content::ExecJs(
-        chat,
-        base::StrCat({"window.dispatchEvent(new KeyboardEvent('",
-                      held ? "keydown" : "keyup", "', {key: 'Meta', metaKey: ",
-                      held ? "true" : "false", "}));"})));
+        chat, base::StrCat({"window.dispatchEvent(new KeyboardEvent('",
+                            held ? "keydown" : "keyup", "', {", key,
+                            held ? "true" : "false", "}));"})));
   };
-  EXPECT_EQ(title(), "Cmd-click to open in the background");
+  EXPECT_EQ(title(), tooltip);
 
   // The pointer on the link, in the page's own coordinates.
   const gfx::Point link =
@@ -1181,7 +1187,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest,
 
   cmd(false);
   EXPECT_TRUE(base::test::RunUntil([&] { return hint().empty(); }));
-  EXPECT_EQ(title(), "Cmd-click to open in the background");
+  EXPECT_EQ(title(), tooltip);
 
   // Switching to another window lets go of the key.
   cmd(true);

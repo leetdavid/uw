@@ -168,7 +168,7 @@ source_set("browser_tests") {
     ]
   }
   if (is_win) {
-    sources += [ "key_hint_win_browsertest.cc" ]
+    sources += [ "mouse_actions_win_browsertest.cc" ]
     deps += [
       "//ui/aura",
       "//ui/display",

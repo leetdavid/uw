@@ -20,7 +20,7 @@ index 63c989a76dadc13953e35513998e83326ee3612b..65dde02a880f72e1e98ab804bf38dd09
      </message>
      <message name="IDS_SETTINGS_CHANGE_PICTURE_PROFILE_PHOTO" desc="The text on the Google profile photo of the user.">
        Google Profile photo
-@@ -3904,6 +3904,190 @@
+@@ -3904,6 +3904,199 @@
          System
        </message>
      </if>
@@ -120,9 +120,18 @@ index 63c989a76dadc13953e35513998e83326ee3612b..65dde02a880f72e1e98ab804bf38dd09
 +      <message name="IDS_UW_SETTINGS_MOUSE_TITLE" desc="Heading of the settings for clicks in the tab list.">
 +        Mouse
 +      </message>
-+      <message name="IDS_UW_SETTINGS_MOUSE_OPTION_CLICK" desc="Label of the switch that makes an Option-click on a tab's close button close the tab and every tab nested under it, its branch.">
-+        Option-click a tab's close button to close its branch
-+      </message>
++      <if expr="is_win">
++        <then>
++          <message name="IDS_UW_SETTINGS_MOUSE_OPTION_CLICK" desc="Label of the switch that makes an Alt-click on a tab's close button close the tab and every tab nested under it, its branch.">
++            Alt-click a tab's close button to close its branch
++          </message>
++        </then>
++        <else>
++          <message name="IDS_UW_SETTINGS_MOUSE_OPTION_CLICK" desc="Label of the switch that makes an Option-click on a tab's close button close the tab and every tab nested under it, its branch.">
++            Option-click a tab's close button to close its branch
++          </message>
++        </else>
++      </if>
 +      <message name="IDS_UW_SETTINGS_MOUSE_TASK_ROW_PLUS" desc="Label of the switch that shows a plus button on a task's row in the tab sidebar. A task is a group of tabs.">
 +        Show a "+" on a task's row to open a tab in it
 +      </message>

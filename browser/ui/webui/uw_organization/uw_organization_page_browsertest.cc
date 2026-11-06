@@ -7,6 +7,7 @@
 #include "base/strings/string_util.h"
 #include "base/test/run_until.h"
 #include "base/values.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -270,6 +271,14 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                       "await until(() => toggle.checked);"
                       "toggle.scrollIntoView({block: 'center'});"
                       "return true;"));
+  // Option is Alt on Windows.
+#if BUILDFLAG(IS_WIN)
+  EXPECT_EQ("Alt-click a tab's close button to close its branch",
+            Run("return text('optionClickLabel');"));
+#else
+  EXPECT_EQ("Option-click a tab's close button to close its branch",
+            Run("return text('optionClickLabel');"));
+#endif
   SaveWindowScreenshot(browser(), "settings-mouse");
   for (const auto& [toggle, pref] : switches) {
     ASSERT_EQ(true,
