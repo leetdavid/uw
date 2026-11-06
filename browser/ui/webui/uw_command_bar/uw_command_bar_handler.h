@@ -6,14 +6,16 @@
 #include <optional>
 
 #include "chrome/browser/ui/webui/searchbox/realbox_handler.h"
+#include "third_party/metrics_proto/omnibox_event.pb.h"
 #include "ui/base/window_open_disposition.h"
 
 namespace uw {
 
 // Chromium's searchbox handler, changed for the command bar: it asks for
-// instant results only, opens a picked row in a new tab, switches to a row's
-// open tab, and tells the page which kind of row each one is. Opened with Cmd
-// it asks uw the typed text, and with Option it runs the text in a terminal.
+// instant results only, ranked as in the address bar, opens a picked row in a
+// new tab, switches to a row's open tab, and tells the page which kind of row
+// each one is. Opened with Cmd it asks uw the typed text, and with Option it
+// runs the text in a terminal.
 class UwCommandBarHandler : public RealboxHandler {
  public:
   using RealboxHandler::RealboxHandler;
@@ -55,6 +57,8 @@ class UwCommandBarHandler : public RealboxHandler {
       bool shift_key,
       bool via_keyboard) override;
   bool OmitsAsynchronousMatches() const override;
+  metrics::OmniboxEventProto::PageClassification QueryPageClassification()
+      const override;
 
  private:
   WindowOpenDisposition disposition_ = WindowOpenDisposition::NEW_FOREGROUND_TAB;

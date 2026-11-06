@@ -1070,6 +1070,27 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
   EXPECT_EQ(whole + "|", Ink());
 }
 
+// An address's first letters complete it, as in Chromium's address bar,
+// though letters such as `loc` read as words to search for.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, FirstLettersCompleteAnAddress) {
+  ASSERT_TRUE(embedded_test_server()->Start());
+  const GURL page = embedded_test_server()->GetURL("localhost", "/title2.html");
+  VisitTyped(page);
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  const std::string rest =
+      base::StrCat({"alhost:", page.port(), "/title2.html"});
+  EXPECT_TRUE(Eventually(
+      [&] {
+        Type("loc");
+        Wait(base::Milliseconds(100));
+        return Ink() == "loc|" + rest;
+      },
+      base::Seconds(5)))
+      << Ink() << " The rows are: " << Kinds();
+}
+
 // The arrow keys put a row's address in the field, muted until it is edited.
 // Going back to the first row brings back what was typed.
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,

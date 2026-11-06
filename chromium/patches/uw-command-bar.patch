@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-index c7559e14368d7185912434a1ac1b195ba653393b..c87443897e9c37a54fe62d03fa19021cc8c22ccf 100644
+index c7559e14368d7185912434a1ac1b195ba653393b..dfd09a18b888d55773d388f4eb36670d8d4da613 100644
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-@@ -1060,6 +1060,10 @@ WindowOpenDisposition SearchboxHandler::ComputeWindowOpenDisposition(
+@@ -1060,6 +1060,16 @@ WindowOpenDisposition SearchboxHandler::ComputeWindowOpenDisposition(
        shift_key);
  }
  
@@ -10,10 +10,27 @@ index c7559e14368d7185912434a1ac1b195ba653393b..c87443897e9c37a54fe62d03fa19021c
 +  return false;
 +}
 +
++metrics::OmniboxEventProto::PageClassification
++SearchboxHandler::QueryPageClassification() const {
++  // RealboxOmniboxClient::GetPageClassification() ignores the arguments.
++  return client()->GetPageClassification(/*is_prefetch=*/false);
++}
++
  SearchboxHandler::SearchboxHandler(
      mojo::PendingReceiver<searchbox::mojom::PageHandler> pending_page_handler,
      mojo::PendingRemote<searchbox::mojom::Page> pending_page,
-@@ -1231,6 +1235,8 @@ void SearchboxHandler::QueryAutocomplete(
+@@ -1219,9 +1229,7 @@ void SearchboxHandler::QueryAutocomplete(
+         base::TimeTicks::Now());
+   }
+ 
+-  // RealboxOmniboxClient::GetPageClassification() ignores the arguments.
+-  const auto page_classification =
+-      client()->GetPageClassification(/*is_prefetch=*/false);
++  const auto page_classification = QueryPageClassification();
+   AutocompleteInput autocomplete_input(
+       input_with_keyword, cursor_position, page_classification,
+       ChromeAutocompleteSchemeClassifier(profile_));
+@@ -1231,6 +1239,8 @@ void SearchboxHandler::QueryAutocomplete(
                    : metrics::OmniboxFocusType::INTERACTION_DEFAULT);
    autocomplete_input.set_prevent_inline_autocomplete(
        prevent_inline_autocomplete);
@@ -23,16 +40,19 @@ index c7559e14368d7185912434a1ac1b195ba653393b..c87443897e9c37a54fe62d03fa19021c
    //   when not in keyword mode.
    autocomplete_input.set_allow_exact_keyword_match(is_keyword_selected);
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.h b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.h
-index ff629f2ef073dbdb9355dae3cc8cf45c865ad69e..2941512279167a705583d6f37a8ce935ebb39743 100644
+index ff629f2ef073dbdb9355dae3cc8cf45c865ad69e..b18a36efad48b05e917d9c343c04da4873c4fd6f 100644
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.h
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.h
-@@ -302,6 +302,9 @@ class SearchboxHandler : public searchbox::mojom::PageHandler,
+@@ -302,6 +302,12 @@ class SearchboxHandler : public searchbox::mojom::PageHandler,
        bool meta_key,
        bool shift_key,
        bool via_keyboard);
 +  // uw: true asks only for results that are ready at once, so typed text is
 +  // not sent to the search engine for suggestions.
 +  virtual bool OmitsAsynchronousMatches() const;
++  // uw: the page a query is asked from, which decides how its rows rank.
++  virtual metrics::OmniboxEventProto::PageClassification
++  QueryPageClassification() const;
  };
  
  #endif  // CHROME_BROWSER_UI_WEBUI_CR_COMPONENTS_SEARCHBOX_SEARCHBOX_HANDLER_H_

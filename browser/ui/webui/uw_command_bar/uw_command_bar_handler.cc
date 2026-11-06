@@ -118,4 +118,11 @@ bool UwCommandBarHandler::OmitsAsynchronousMatches() const {
   return true;
 }
 
+// As the address bar on a page asks: as the new tab page's search box, history
+// scores a tenth and a search stays first unless the text is an address.
+metrics::OmniboxEventProto::PageClassification
+UwCommandBarHandler::QueryPageClassification() const {
+  return metrics::OmniboxEventProto::OTHER;
+}
+
 }  // namespace uw
