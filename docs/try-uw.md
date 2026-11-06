@@ -238,6 +238,16 @@ Then give an AI provider a wrong key on its page, and open a new tab.
 
 Expected result: Setup lists `<provider> rejected the key` with Fix, which opens the provider. Put the right key back: once a request with it works, the row goes. A connector that needs you to sign in shows with Sign in. In a profile with no AI provider, Setup shows Add an AI provider.
 
+### Translate a page
+
+Right-click a page in another language, such as a Japanese news site.
+
+Expected result: the menu shows `Translate to English` greyed, with `Set Up Translation…` under it, and no translate icon shows in the address bar. `Set Up Translation…` opens Settings › Languages. Under Translate, set `Translate pages with` to `This device`.
+
+Then reload the page and right-click it again.
+
+Expected result: the translate icon shows at the end of the address, and no bubble pops up. `Translate to English` works, and `Translate With` lists This Device ticked, with Google Cloud and AI Provider grey. The first page in a language downloads it, about 80 MB, with progress in the bubble. The page's text turns English in place: links stay links and still work, and text the page adds later is translated too. Show original in the bubble puts the page back. Settings › Languages lists the downloaded language with its size, and its bin deletes it. A Swahili page shows `This device can't translate Swahili` in the bubble, with `Set up another engine…`.
+
 ### Chats
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.

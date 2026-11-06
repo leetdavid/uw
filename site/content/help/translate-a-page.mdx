@@ -1,0 +1,80 @@
+---
+title: Translate a page
+description: Translate a page on this device, so its text never leaves your Mac. Pick the engine once in Settings, then right-click a page.
+---
+
+uw translates pages with the engine you pick. Until you pick one, nothing translates, and uw never offers to translate by itself.
+
+## Pick *an engine*
+
+1. Right-click a page and choose **Set Up Translation…**, or open **Settings › Languages**.
+2. Under **Translate pages with**, pick **This device**.
+
+**This device** translates on your Mac. The page's text isn't sent anywhere. It knows about 40 languages, from Arabic to Vietnamese, and translates between any two of them.
+
+## Translate *a page*
+
+Right-click the page and choose **Translate to English**. The page's text changes in place, links and buttons keep working, and text that appears later, such as new posts in a feed, is translated as it shows up.
+
+<Figure caption="A page's right-click menu once an engine is picked. Translate With translates the page with another engine, this one time.">
+  <Window height={370} cut>
+    <Sidebar>
+      <Scratchpad>
+        <TabRow selected>Mainichi, today's news</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="mainichi.jp" />
+    <Menu top={70} left={300}>
+      <MenuItem>Back</MenuItem>
+      <MenuItem>Reload</MenuItem>
+      <MenuLine />
+      <MenuItem>Save As…</MenuItem>
+      <MenuItem>Print…</MenuItem>
+      <MenuItem>Translate to English</MenuItem>
+      <MenuItem detail="Another engine, this one time">Translate With</MenuItem>
+      <MenuLine />
+      <MenuItem>View Page Source</MenuItem>
+    </Menu>
+  </Window>
+</Figure>
+
+On a page in another language, the translate icon shows at the right of the address. Click it to translate the page or to pick another language. **Translate…** in the ⋮ menu does the same.
+
+The first page in a language downloads that language to your Mac, about 80 MB. The translate bubble shows how far the download has got, and the page translates once it's done.
+
+To see the page as it was, click the translate icon and choose **Show original**.
+
+## Translate *a language every time*
+
+Click the translate icon, then the bubble's ⋮ menu, and choose **Always translate Japanese**, or whichever language the page is in. Pages in that language then translate by themselves in normal windows. **Settings › Languages** lists these languages under **Automatically translate these languages**, and the languages uw never translates under **Never offer to translate these languages**.
+
+## When this device *lacks a language*
+
+If the page is in a language this device doesn't know, the bubble says so, for example "This device can't translate Swahili". It offers **Set up another engine…**.
+
+<Figure caption="The bubble on a Swahili page.">
+  <Window height={200} cut>
+    <Sidebar>
+      <Scratchpad>
+        <TabRow selected>HabariLeo</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="habarileo.co.tz" />
+    <Popup top={14} right={14} width={330}>
+      <Title>This device can't translate Swahili</Title>
+      <Buttons>
+        <Button>Set up another engine…</Button>
+        <Button>Try again</Button>
+      </Buttons>
+    </Popup>
+  </Window>
+</Figure>
+
+## Remove *a downloaded language*
+
+**Settings › Languages** lists the languages this device has downloaded, with their size, under **Downloaded languages**. Click the bin beside one to delete it. It downloads again the next time a page needs it.
+
+## Private *windows*
+
+Private windows translate with the same engine. Languages you always translate don't translate by themselves there.
