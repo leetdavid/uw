@@ -86,6 +86,7 @@ source_set("browser_tests") {
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   sources = [
     "automatic_organizer_browsertest.cc",
+    "key_card_browsertest.cc",
     "shared_tabs_browsertest.cc",
     "tab_organization_controller_browsertest.cc",
     "top_buttons_browsertest.cc",

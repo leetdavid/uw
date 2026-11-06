@@ -6,25 +6,22 @@
 
 namespace uw {
 
-namespace {
-
-bool HasOption(NSEventModifierFlags flags) {
-  return flags & NSEventModifierFlagOption;
-}
-
-bool HasCommand(NSEventModifierFlags flags) {
-  return flags & NSEventModifierFlagCommand;
-}
-
-}  // namespace
-
 ModifierKeys::ModifierKeys() {
   ModifierKeys* self = this;
+  const auto set = [self](NSEventModifierFlags flags) {
+    self->Set(
+        flags & NSEventModifierFlagOption, flags & NSEventModifierFlagCommand,
+        flags & NSEventModifierFlagControl, flags & NSEventModifierFlagShift);
+  };
   [NSEvent
-      addLocalMonitorForEventsMatchingMask:NSEventMaskFlagsChanged
+      addLocalMonitorForEventsMatchingMask:NSEventMaskFlagsChanged |
+                                           NSEventMaskKeyDown
                                    handler:^NSEvent*(NSEvent* event) {
-                                     self->Set(HasOption(event.modifierFlags),
-                                               HasCommand(event.modifierFlags));
+                                     if (event.type == NSEventTypeKeyDown) {
+                                       self->Press();
+                                     } else {
+                                       set(event.modifierFlags);
+                                     }
                                      return event;
                                    }];
   NSNotificationCenter* center = NSNotificationCenter.defaultCenter;
@@ -32,17 +29,16 @@ ModifierKeys::ModifierKeys() {
                       object:nil
                        queue:nil
                   usingBlock:^(NSNotification*) {
-                    self->Set(false, false);
+                    set(0);
                   }];
   [center addObserverForName:NSApplicationDidBecomeActiveNotification
                       object:nil
                        queue:nil
                   usingBlock:^(NSNotification*) {
-                    self->Set(HasOption(NSEvent.modifierFlags),
-                              HasCommand(NSEvent.modifierFlags));
+                    set(NSEvent.modifierFlags);
                   }];
   if (NSApp.active) {
-    Set(HasOption(NSEvent.modifierFlags), HasCommand(NSEvent.modifierFlags));
+    set(NSEvent.modifierFlags);
   }
 }
 

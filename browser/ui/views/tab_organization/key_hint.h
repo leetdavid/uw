@@ -78,6 +78,7 @@ class KeyHint : public views::View {
   base::CallbackListSubscription tree_;
   base::CallbackListSubscription drags_;
   base::CallbackListSubscription close_state_;
+  base::CallbackListSubscription card_;
 };
 
 // The close color, for the hint's tint and the ×: red on a light sidebar,

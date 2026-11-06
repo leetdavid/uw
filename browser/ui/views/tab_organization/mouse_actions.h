@@ -111,6 +111,7 @@ class TaskRowCloseButton : public views::LabelButton {
 
   const tab_groups::TabGroupId task_;
   base::CallbackListSubscription hints_;
+  base::CallbackListSubscription card_;
 };
 
 }  // namespace uw

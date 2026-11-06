@@ -43,6 +43,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
+#include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/tab_organization/second_click.h"
 
@@ -177,9 +178,11 @@ void ShowTaskRowButtons(views::View* row, bool menu_shown) {
 SkColor TaskRowFill(const views::View* row) {
   const TaskRowCloseButton* close = ChildOfClass<TaskRowCloseButton>(row);
   BrowserView* window = WindowOf(row);
-  return close && window && IsTaskCloseHinted(window->browser(), close->task())
-             ? SkColorSetA(CloseHintColor(row), kRowTint)
-             : SK_ColorTRANSPARENT;
+  if (close && window && IsTaskCloseHinted(window->browser(), close->task())) {
+    return SkColorSetA(CloseHintColor(row), kRowTint);
+  }
+  return close ? KeyScopeTint(row, nullptr, close->task())
+               : SK_ColorTRANSPARENT;
 }
 
 void TaskRowNewTabButton::OnThemeChanged() {
@@ -221,10 +224,13 @@ void TaskRowCloseButton::AddedToWidget() {
   LabelButton::AddedToWidget();
   hints_ = ObserveCloseHints(base::BindRepeating(&TaskRowCloseButton::UpdateRow,
                                                  base::Unretained(this)));
+  card_ = KeyCard::Observe(base::BindRepeating(&TaskRowCloseButton::UpdateRow,
+                                               base::Unretained(this)));
 }
 
 void TaskRowCloseButton::RemovedFromWidget() {
   hints_ = {};
+  card_ = {};
   if (BrowserView* window = WindowOf(this)) {
     SetTaskCloseHint(false, window->browser(), task_, false);
   }

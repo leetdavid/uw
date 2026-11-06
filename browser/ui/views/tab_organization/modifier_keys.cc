@@ -19,16 +19,31 @@ base::CallbackListSubscription ModifierKeys::Observe(
   return observers_.Add(std::move(changed));
 }
 
-void ModifierKeys::SetForTesting(bool option, bool command) {
-  Set(option, command);
+void ModifierKeys::SetForTesting(bool option,
+                                 bool command,
+                                 bool control,
+                                 bool shift) {
+  Set(option, command, control, shift);
 }
 
-void ModifierKeys::Set(bool option, bool command) {
-  if (option == option_ && command == command_) {
+void ModifierKeys::PressForTesting() {
+  Press();
+}
+
+void ModifierKeys::Set(bool option, bool command, bool control, bool shift) {
+  if (option == option_ && command == command_ && control == control_ &&
+      shift == shift_) {
     return;
   }
   option_ = option;
   command_ = command;
+  control_ = control;
+  shift_ = shift;
+  observers_.Notify();
+}
+
+void ModifierKeys::Press() {
+  ++presses_;
   observers_.Notify();
 }
 

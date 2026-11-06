@@ -27,12 +27,14 @@
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/tint_style.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 
@@ -139,6 +141,9 @@ ScratchpadHeading::ScratchpadHeading() {
   clear_ = AddChildView(std::make_unique<HeadingButton>(
       base::BindRepeating(&ScratchpadHeading::Clear, base::Unretained(this)),
       IDS_UW_SCRATCHPAD_CLEAR, kArrowDownIcon));
+  // 0 while the task keys' card shows: the key that goes to the Scratchpad.
+  AddChildView(std::make_unique<TaskKeyNumber>(std::nullopt))
+      ->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 0, 8));
 
   SetNotifyEnterExitOnChild(true);
 }

@@ -94,6 +94,7 @@ Agreed on 2026-11-07 as T355, when the user asked for "a button to hold to see t
 - Cmd alone never shows a card, so a Cmd-click on a chat link or a terminal address stays a [key hint](#key-hints).
 - The card takes no clicks and no focus, and shows over a terminal tab too.
 - The design is the frames "Hold for keys: Option+Cmd", "Hold for keys: Ctrl+Cmd", and "Hold for keys: every state" on the canvas page "Keyboard and mouse", drawn on 2026-11-07 and signed off by the user the same day. They draw Option+Cmd+N as Move to New Task, which went to the little window afterwards.
+- Built differently from the design on 2026-11-07: the rows the keys act on are tinted in the accent color instead of outlined, since one outline around rows nested at different depths needs a hook in Chromium's tab layout. The tint is the one the close hints use, in the accent color.
 
 ### Terminal key
 
@@ -292,6 +293,7 @@ Right-clicking empty space in the sidebar shows a menu with `Theme…`, which op
 - Key hints: macOS sends a lone Option or Cmd press as a modifier change, not a key event, so `ModifierKeys` watches modifier changes with one AppKit event monitor for the app and lets go of both keys when uw leaves the front. Each tab row has a `KeyHint` view over it, added by `tab-tree.patch`'s hooks, which tints or fades the row and keeps the tooltips. It fades the row's parts, since Chromium's layout gives a row a layer of its own to animate it and then destroys it. Chromium's row shows hover cards, not tooltips, so the parent row's Option tooltip is the hint view's. The floating window buttons repaint their glyph. The chat page and terminal tabs read Cmd from their own key and mouse events.
 - uw's key list lives in local state, beside the glass frame switch. The key lookup, the menus, and the command bar read it.
 - `TabOrganizationController` keeps which children were nested by hand and saves it with the parent links. `PlaceBranch` takes them along with their parent.
+- The key card: `ModifierKeys` also reports Ctrl, Shift, and every other key pressed, so a key pressed with the modifiers hides the card until they are let go. `KeyCard` in `key_card.cc` shows a menu card bubble anchored 16px into the page card, which takes no clicks and no focus, and builds its rows from the window's keys, so changed keys show and keys moved off the scope don't. The tab rows' `KeyHint` and the task row's `TaskRowFill` paint the tint. `TaskKeyNumber` sits on each task's row, added by `uw-look.patch` before the "+", and on the Scratchpad's heading.
 - The task row's × is `TaskRowCloseButton` in `mouse_actions`, added after the menu button by `uw-look.patch` and shown with it. It runs `TabOrganizationController::CloseTask`, as the task's menu and middle-click do, and Ctrl+Cmd+W does through `CloseSelectedTask`. Under the pointer it sets the task's close hint in `key_hint`: each tab row's `KeyHint` paints the tint, and the row's fill comes from `TaskRowFill`, which the patch also asks when Chromium repaints the row.
 
 ## Stages

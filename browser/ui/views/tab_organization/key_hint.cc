@@ -13,6 +13,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "build/build_config.h"
+#include "cc/paint/paint_flags.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
@@ -30,6 +31,7 @@
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/branch_toggle.h"
+#include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/modifier_keys.h"
 
 namespace uw {
@@ -39,6 +41,8 @@ namespace {
 constexpr SkAlpha kTintAlpha = 0x1A;
 // The rows an Option-drag leaves behind.
 constexpr float kFaded = 0.5f;
+// The corners of a row, for the key card's tint.
+constexpr float kRowRadius = 10.0f;
 
 // Option is Alt on Windows.
 #if BUILDFLAG(IS_MAC)
@@ -173,6 +177,8 @@ KeyHint::KeyHint(tabs::TabHandle tab,
   GetViewAccessibility().SetIsIgnored(true);
   close_state_ = close_->AddStateChangedCallback(
       base::BindRepeating(&KeyHint::OnCloseState, base::Unretained(this)));
+  card_ = KeyCard::Observe(
+      base::BindRepeating(&KeyHint::SchedulePaint, base::Unretained(this)));
 }
 
 KeyHint::~KeyHint() = default;
@@ -242,6 +248,14 @@ void KeyHint::OnPaint(gfx::Canvas* canvas) {
   if (shown_ == Shown::kCloses || in_closing_task_) {
     canvas->FillRect(GetLocalBounds(),
                      SkColorSetA(CloseHintColor(this), kTintAlpha));
+  }
+  // The rows the key card's keys act on.
+  if (const SkColor tint = KeyScopeTint(this, tab_.Get(), std::nullopt);
+      SkColorGetA(tint)) {
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(tint);
+    canvas->DrawRoundRect(GetLocalBounds(), kRowRadius, flags);
   }
 }
 

@@ -9,10 +9,12 @@
 
 namespace uw {
 
-// Whether Option or Cmd is held down while uw is the app in front, for key
-// hints. macOS sends a lone Option or Cmd press as a modifier change, not as
-// a key event a view would get. Switching to another app lets go of both. See
-// docs/plans/keyboard-and-mouse.md#key-hints.
+// Which modifier keys are held down while uw is the app in front, for key
+// hints and the key card, and how many other keys went down. macOS sends a
+// lone modifier press as a modifier change, not as a key event a view would
+// get. Switching to another app lets go of every key. On Windows, Option is
+// Alt and Cmd is Ctrl, and Control is never held. See
+// docs/plans/keyboard-and-mouse.md#key-hints and #key-card.
 class ModifierKeys {
  public:
   static ModifierKeys& Get();
@@ -22,11 +24,20 @@ class ModifierKeys {
 
   bool option() const { return option_; }
   bool command() const { return command_; }
+  bool control() const { return control_; }
+  bool shift() const { return shift_; }
+  // Counts the keys other than modifiers that went down.
+  int presses() const { return presses_; }
 
-  // Runs `changed` each time either key goes down or up.
+  // Runs `changed` each time a modifier goes down or up, or another key goes
+  // down.
   base::CallbackListSubscription Observe(base::RepeatingClosure changed);
 
-  void SetForTesting(bool option, bool command);
+  void SetForTesting(bool option,
+                     bool command,
+                     bool control = false,
+                     bool shift = false);
+  void PressForTesting();
 
  private:
   friend class base::NoDestructor<ModifierKeys>;
@@ -34,10 +45,14 @@ class ModifierKeys {
   ModifierKeys();
   ~ModifierKeys();
 
-  void Set(bool option, bool command);
+  void Set(bool option, bool command, bool control, bool shift);
+  void Press();
 
   bool option_ = false;
   bool command_ = false;
+  bool control_ = false;
+  bool shift_ = false;
+  int presses_ = 0;
   base::RepeatingClosureList observers_;
 };
 
