@@ -137,6 +137,8 @@ Agreed: previews use the same `chromium/args.gn` as daily builds, plus `symbol_l
 
 Decided on 2026-10-29: Chromium's dump-only checks (`DUMP_WILL_BE_CHECK`, `DUMP_WILL_BE_NOTREACHED`, and `CHECK`s that are not fatal until a later milestone) log and send a crash report without crashing, as they do in Chrome, though uw's builds are not official builds. Outside official builds Chromium makes them fatal, and 0.1.0 crashed at every start on a profile an earlier build had left, in such a check about search engine data. `uw-checks.patch` changes `GetDumpSeverity` in `base/check.cc` (T247).
 
+Decided on 2026-11-06: in a preview, a JavaScript error on a Chromium page that asks development builds to crash on one, chiefly the address bar's list (`chrome://omnibox-popup.top-chrome`), no longer crashes uw, as in Chrome. uw dev and browser tests keep the crash, so such an error is found before a preview ships. After a Yes to "Help fix uw?", Sentry gets a report without a crash: the page's address, the line, the stack, and the message after Chrome's own redaction, cut to 1,000 characters. Chromium's own error reporter, which sends these errors to Google, exists only in Google Chrome builds; `uw-checks.patch` installs uw's in its place (T350).
+
 ## Website content
 
 Agreed: one calm page that sells uw, "dawn at night". The approved design is frame `XS-shfv_9t` on the Doop canvas, chosen on 2026-10-28 over a louder poster direction because uw should feel zen. It shows only uw's own interface, never real or made-up websites, and only features that are built.
