@@ -1,5 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
+#include "uw/browser/little_window/little_window.h"
+
 #include <string>
 #include <string_view>
 
@@ -9,13 +11,13 @@
 #include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
-#include "components/prefs/pref_service.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
@@ -25,6 +27,8 @@
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/omnibox/browser/location_bar_model.h"
+#include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -33,7 +37,6 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
-#include "uw/browser/little_window/little_window.h"
 #include "uw/browser/little_window/little_window_key.h"
 #include "uw/browser/little_window/little_window_mark.h"
 #include "uw/browser/little_window/little_window_prefs.h"
@@ -121,6 +124,9 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
                   ->GetActiveWebContents()
                   ->GetVisibleURL()
                   .IsAboutBlank());
+  // Its address is empty, as a new tab's is.
+  EXPECT_EQ(u"",
+            little->GetFeatures().location_bar_model()->GetURLForDisplay());
   ASSERT_TRUE(CommandBar::From(little));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return CommandBar::From(little)->IsShowing(); }));
@@ -139,6 +145,8 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   EXPECT_TRUE(view->toolbar()->reload_button());
   ASSERT_TRUE(view->GetLocationBarView());
   EXPECT_FALSE(view->ShouldDrawVerticalTabStrip());
+  EXPECT_NE(u"",
+            little->GetFeatures().location_bar_model()->GetURLForDisplay());
   SaveWindowScreenshot(little->GetBrowserForMigrationOnly(),
                        "little-window-page");
 }
@@ -232,8 +240,10 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   EXPECT_EQ(workspace, LittleWindowWorkspace(Little()));
   EXPECT_EQ(BrowserWindowInterface::TYPE_POPUP, Little()->GetType());
   EXPECT_TRUE(base::test::RunUntil([&] {
-    return Little()->GetTabStripModel()->GetActiveWebContents()->GetVisibleURL() ==
-           url;
+    return Little()
+               ->GetTabStripModel()
+               ->GetActiveWebContents()
+               ->GetVisibleURL() == url;
   }));
 }
 
@@ -251,9 +261,9 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest, ItDoesNotComeBackAfterAQuit) {
   for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
     TabStripModel* tabs = window->GetTabStripModel();
     for (int i = 0; i < tabs->count(); ++i) {
-      EXPECT_EQ(std::string::npos,
-                tabs->GetWebContentsAt(i)->GetVisibleURL().spec().find(
-                    "little"));
+      EXPECT_EQ(
+          std::string::npos,
+          tabs->GetWebContentsAt(i)->GetVisibleURL().spec().find("little"));
     }
   }
 }
@@ -262,8 +272,7 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
                        AnUnusedLittleWindowClosesAfterTheSetTime) {
   BrowserWindowInterface* little = OpenWithPage(Page("/title1.html"));
   ASSERT_TRUE(little);
-  g_browser_process->local_state()->SetInteger(kLittleWindowCloseAfterPref,
-                                               60);
+  g_browser_process->local_state()->SetInteger(kLittleWindowCloseAfterPref, 60);
   LittleWindow* window = LittleWindow::From(little);
   window->SetInFrontForTesting(false);
 
@@ -288,8 +297,7 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return page->NeedToFireBeforeUnloadOrUnloadEvents(); }));
   LittleWindow::From(little)->SetInFrontForTesting(false);
-  g_browser_process->local_state()->SetInteger(kLittleWindowCloseAfterPref,
-                                               60);
+  g_browser_process->local_state()->SetInteger(kLittleWindowCloseAfterPref, 60);
   LittleWindow::From(little)->SetLastActiveForTesting(base::TimeTicks::Now() -
                                                       base::Hours(5));
 
@@ -310,10 +318,13 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   g_browser_process->local_state()->SetBoolean(kLittleWindowLinksPref, true);
   EXPECT_TRUE(OpenLinkFromAnotherAppInLittleWindow(url));
   ASSERT_TRUE(base::test::RunUntil([&] { return Little(); }));
-  EXPECT_EQ(url, Little()->GetTabStripModel()->GetActiveWebContents()->GetVisibleURL());
+  EXPECT_EQ(
+      url,
+      Little()->GetTabStripModel()->GetActiveWebContents()->GetVisibleURL());
 }
 
-IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest, TheMenuOpensOneWhateverTheKeySwitch) {
+IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
+                       TheMenuOpensOneWhateverTheKeySwitch) {
   g_browser_process->local_state()->SetBoolean(kLittleWindowKeyInUwPref, false);
   RunNewLittleWindowCommand();
   EXPECT_TRUE(base::test::RunUntil([&] { return Little(); }));
