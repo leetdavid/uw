@@ -91,7 +91,11 @@ With both key switches off, the key does nothing. The key itself is changed in [
 
 ## Design
 
-T357, pre-approved by the user on 2026-11-07, is drawn on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), page "Little windows".
+Drawn on 2026-11-07 as T357, on the "Little windows" page of the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), with the rules in the "Little windows" section of the canvas guide `uw-hidden-sidebar`. The user pre-approved the design.
+
+- "Little window: the command bar": Option+Cmd+N pressed in Mail, the little window over it with the command bar.
+- "Little window: Move to Workspace": a page in a little window, with the workspace menu open.
+- "Little windows: every state": the menus that open one, a link's menu, light, dark, and behind another window, the command bar before typing, a Cmd-click, the page after Move to Workspace, over a full-screen app, the settings, Keyboard shortcuts, and Windows with the AltGr note.
 
 ## Stages
 
