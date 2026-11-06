@@ -104,6 +104,19 @@ TasksCard::TasksCard(BrowserWindowInterface* window) : window_(window) {
   }
   AddChildView(std::move(new_task));
 
+  if (CanRunWindowCommand(window, TabOrganizationController::kNewTask)) {
+    auto move = std::make_unique<MenuCardRow>(
+        base::BindRepeating(&TasksCard::MoveToNewTask, base::Unretained(this)),
+        kFolderInputIcon,
+        l10n_util::GetStringUTF16(IDS_UW_MOVE_TO_NEW_TASK_MAC));
+    move->SetID(kMoveToNewTaskId);
+    if (GetCommandAccelerator(window, TabOrganizationController::kNewTask,
+                              &accelerator)) {
+      move->SetEnd(MakeMenuCardKey(accelerator));
+    }
+    AddChildView(std::move(move));
+  }
+
   const TabOrganizationController* controller =
       TabOrganizationController::From(window);
   if (!controller) {
@@ -141,6 +154,12 @@ void TasksCard::NewTask() {
   BrowserWindowInterface* window = window_;
   GetWidget()->Close();
   chrome::ExecuteCommand(window, IDC_CREATE_NEW_TAB_GROUP);
+}
+
+void TasksCard::MoveToNewTask() {
+  BrowserWindowInterface* window = window_;
+  GetWidget()->Close();
+  chrome::ExecuteCommand(window, TabOrganizationController::kNewTask);
 }
 
 // A collapsed task opens, then the tab used last in it is selected.

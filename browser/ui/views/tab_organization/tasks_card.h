@@ -30,6 +30,7 @@ class TasksCard : public views::View {
   // sidebar's order.
   enum Id {
     kNewTaskId = 1,
+    kMoveToNewTaskId,
     kFirstTaskId,
   };
 
@@ -47,6 +48,7 @@ class TasksCard : public views::View {
 
  private:
   void NewTask();
+  void MoveToNewTask();
   void GoToTask(const std::string& task);
 
   const raw_ptr<BrowserWindowInterface> window_;

@@ -77,7 +77,7 @@ IN_PROC_BROWSER_TEST_F(UwShortcutsPageBrowserTest,
             Run("return text(row('New Tab').querySelector('.uw-key'));"));
   EXPECT_EQ(true, Run("return !row('New Tab').querySelector("
                       "'cr-shortcut-input');"));
-  EXPECT_EQ("Command+Ctrl+K", Run("return row('Keep Here').querySelector("
+  EXPECT_EQ("Command+Alt+K", Run("return row('Keep Here').querySelector("
                                   "'cr-shortcut-input').shortcut;"));
   EXPECT_EQ(true, Run("return page().shadowRoot.getElementById('resetAll')"
                       ".disabled;"));

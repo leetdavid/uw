@@ -12,7 +12,7 @@ diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources
 index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..9cd3125d77f6a7bc2389f076018aaccc20ff65c3 100644
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -277,6 +277,196 @@ are declared in tools/grit/grit_args.gni.
+@@ -277,6 +277,215 @@ are declared in tools/grit/grit_args.gni.
    <release seq="1">
      <!-- IMPORTANT: .grdp files must be in the same directory as this file -->
      <messages fallback_to_english="true">
@@ -46,6 +46,25 @@ index 0cc3df52b0bcc6e31fc3691979bdae703b74f137..9cd3125d77f6a7bc2389f076018aaccc
 +      <message name="IDS_UW_TASKS_MENU_MAC" desc="In Title Case: The title of the Mac menu that holds the task commands. A task is a group of tabs for one piece of work.">Tasks</message>
 +      <message name="IDS_UW_NEW_TASK_MAC" desc="In Title Case: Opens a new tab in a new task of its own.">New Task</message>
 +      <message name="IDS_UW_MOVE_TO_NEW_TASK_MAC" desc="In Title Case: Moves the selected tab branches to a new task.">Move to New Task</message>
++      <message name="IDS_UW_MOVE_TO_PREVIOUS_TASK_MAC" desc="In Title Case: Moves the selected tab branches to the bottom of the task above theirs.">Move to Previous Task</message>
++      <message name="IDS_UW_MOVE_TO_NEXT_TASK_MAC" desc="In Title Case: Moves the selected tab branches to the top of the task below theirs, or of the Scratchpad after the last task.">Move to Next Task</message>
++      <message name="IDS_UW_MOVE_TO_TASK_PICKER_MAC" desc="In Title Case: Opens the command bar with the tasks, to move the selected tab branches to one of them.">Move to Task…</message>
++      <message name="IDS_UW_KEY_CARD_BRANCH" desc="Heading of the key card shown while two modifier keys are held: the keys it lists act on the selected tab and the tabs nested under it.">The tab and the tabs under it</message>
++      <message name="IDS_UW_KEY_CARD_TASK" desc="Heading of the key card shown while two modifier keys are held: the keys it lists act on the selected tab's task, a group of tabs for one piece of work.">The task</message>
++      <message name="IDS_UW_KEY_CARD_UNDER_IT" desc="On the key card, after the selected tab's title: how many tabs are nested under it.">+ <ph name="COUNT">$1<ex>2</ex></ph> under it</message>
++      <message name="IDS_UW_KEY_CARD_NOTHING_UNDER_IT" desc="On the key card, after the selected tab's title, when no tabs are nested under it.">no tabs under it</message>
++      <message name="IDS_UW_KEY_CARD_TABS" desc="On the key card, after the task's name: how many tabs the task holds.">{COUNT, plural, =1 {1 tab} other {# tabs}}</message>
++      <message name="IDS_UW_KEY_CARD_ALSO" desc="Label over the key card's last rows: keys that use the held modifier keys but act on something else.">Also</message>
++      <message name="IDS_UW_KEY_CARD_GO_TO" desc="Label over the key card's numbered list of tasks, shown while the sidebar is hidden.">Go to</message>
++      <message name="IDS_UW_KEY_CARD_ARROWS" desc="Label over the key card's arrow keys, which move the selected tab and the tabs nested under it.">Arrows move the selected tab and the tabs under it</message>
++      <message name="IDS_UW_KEY_CARD_PREVIOUS_NEXT_TASK" desc="In Title Case: Key card row for the two keys that move the selected tab and the tabs under it to the previous or the next task.">Move to Previous, Next Task</message>
++      <message name="IDS_UW_KEY_CARD_NEXT_PREVIOUS_TASK" desc="In Title Case: Key card row for the two keys that go to the next or the previous task.">Next, Previous Task</message>
++      <message name="IDS_UW_KEY_CARD_GO_TO_SCRATCHPAD" desc="In Title Case: Key card row for the key that selects the tab used last in the Scratchpad, the tabs outside every task.">Go to Scratchpad</message>
++      <message name="IDS_UW_KEY_CARD_MOVE_UP_DOWN" desc="In Title Case: Key card row for the arrow keys that move the selected tab and the tabs under it up or down among the tabs beside it.">Move Up, Down</message>
++      <message name="IDS_UW_KEY_CARD_NEST_OUTDENT" desc="In Title Case: Key card row for the arrow keys that nest the selected tab under the tab above it, or move it up one level.">Nest, Move Up a Level</message>
++      <message name="IDS_UW_KEY_CARD_CMD" desc="The Command key's name on a key cap of the key card, as Mac users say it.">Cmd</message>
++      <message name="IDS_UW_KEY_CARD_OPTION" desc="The Option key's name on a key cap of the key card.">Option</message>
++      <message name="IDS_UW_KEY_CARD_RETURN" desc="The Return key's name on a key cap of the key card on the Mac.">Return</message>
 +      <message name="IDS_UW_MOVE_TO_SCRATCHPAD_MAC" desc="In Title Case: Removes the selected tab branches from their task.">Move to Scratchpad</message>
 +      <message name="IDS_UW_KEEP_HERE_MAC" desc="In Title Case: Keeps the selected tabs where they are, so automatic organization neither asks about them nor moves them.">Keep Here</message>
 +      <message name="IDS_UW_STOP_KEEPING_HERE_MAC" desc="In Title Case: Lets automatic organization file the selected kept tabs again.">Stop Keeping Here</message>

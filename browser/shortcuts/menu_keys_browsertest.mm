@@ -34,6 +34,8 @@ namespace {
 constexpr NSEventModifierFlags kCmd = NSEventModifierFlagCommand;
 constexpr NSEventModifierFlags kCtrlCmd =
     NSEventModifierFlagControl | NSEventModifierFlagCommand;
+constexpr NSEventModifierFlags kOptionCmd =
+    NSEventModifierFlagOption | NSEventModifierFlagCommand;
 
 class MenuKeysBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -87,10 +89,10 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TheSectionListsEveryMenuOfTheBar) {
   const MenuKey keep = Row("Keep Here");
   EXPECT_EQ("Tasks", keep.menu);
   EXPECT_EQ("keep_here", keep.name);
-  EXPECT_EQ("Command+Ctrl+K", keep.key);
+  EXPECT_EQ("Command+Alt+K", keep.key);
   EXPECT_EQ(keep.key, keep.default_key);
 
-  EXPECT_EQ("Command+Ctrl+Shift+N", Row("Move to New Task").key);
+  EXPECT_EQ("", Row("Move to New Task").key);
   EXPECT_EQ("go_to_task_3", Row("Task 3").name);
   EXPECT_EQ("Tasks › Go to Task", Row("Task 3").menu);
   EXPECT_EQ("keyboard_shortcuts", Row("Keyboard Shortcuts…").name);
@@ -142,7 +144,7 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, ANewKeyRunsItsCommandInTheWindow) {
   EXPECT_EQ(TabOrganizationController::kKeepHere,
             CommandFor(ui::VKEY_J, kCtrlCmd));
   EXPECT_NE(TabOrganizationController::kKeepHere,
-            CommandFor(ui::VKEY_K, kCtrlCmd));
+            CommandFor(ui::VKEY_K, kOptionCmd));
 
   ASSERT_FALSE(SelectedTabIsKept());
   Press(ui::VKEY_J, kCtrlCmd);
@@ -161,7 +163,7 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, AKeyWithoutCommandIsRefused) {
   EXPECT_FALSE(SetMenuKey(local_state(), "keep_here", "Command+Return"));
   EXPECT_FALSE(SetMenuKey(local_state(), "no_such_command", "Command+J"));
   EXPECT_TRUE(local_state().GetDict(kMenuKeysPref).empty());
-  EXPECT_EQ("Command+Ctrl+K", Row("Keep Here").key);
+  EXPECT_EQ("Command+Alt+K", Row("Keep Here").key);
 }
 
 IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TakingAKeyFromChromiumAndBack) {
@@ -183,15 +185,15 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TakingAKeyFromChromiumAndBack) {
   EXPECT_EQ("", Row("Move to New Task").key);
 
   ResetMenuKey(local_state(), "move_to_new_task");
-  EXPECT_EQ("Command+Ctrl+Shift+N", Row("Move to New Task").key);
+  EXPECT_EQ("", Row("Move to New Task").key);
   EXPECT_TRUE(local_state().GetDict(kMenuKeysPref).empty());
 }
 
 IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TakingAKeyFromAnotherUwCommand) {
-  ASSERT_TRUE(SetMenuKey(local_state(), "keep_here", "Command+Ctrl+S"));
+  ASSERT_TRUE(SetMenuKey(local_state(), "keep_here", "Command+Alt+S"));
 
   EXPECT_EQ(TabOrganizationController::kKeepHere,
-            CommandFor(ui::VKEY_S, kCtrlCmd));
+            CommandFor(ui::VKEY_S, kOptionCmd));
   const MenuKey scratchpad = Row("Move to Scratchpad");
   EXPECT_EQ("", scratchpad.key);
   EXPECT_EQ("Keep Here", scratchpad.taken_by);
@@ -199,12 +201,28 @@ IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, TakingAKeyFromAnotherUwCommand) {
   // Its Reset takes the key back, and Keep Here is left with none.
   ResetMenuKey(local_state(), "move_to_scratchpad");
   EXPECT_EQ(TabOrganizationController::kScratchpad,
-            CommandFor(ui::VKEY_S, kCtrlCmd));
+            CommandFor(ui::VKEY_S, kOptionCmd));
   EXPECT_EQ("", Row("Keep Here").key);
 
   ResetMenuKeys(local_state());
-  EXPECT_EQ("Command+Ctrl+K", Row("Keep Here").key);
-  EXPECT_EQ("Command+Ctrl+S", Row("Move to Scratchpad").key);
+  EXPECT_EQ("Command+Alt+K", Row("Keep Here").key);
+  EXPECT_EQ("Command+Alt+S", Row("Move to Scratchpad").key);
+}
+
+// A key the user gave a command before the keys moved to their scopes stays
+// theirs, even where it is now another command's default.
+IN_PROC_BROWSER_TEST_F(MenuKeysBrowserTest, AKeyTheUserSetKeepsItsCommand) {
+  local_state().SetDict(kMenuKeysPref,
+                        base::DictValue().Set("keep_here", "Command+Alt+T"));
+  ApplyMenuKeys(local_state());
+
+  EXPECT_EQ(TabOrganizationController::kKeepHere,
+            CommandFor(ui::VKEY_T, kOptionCmd));
+  const MenuKey child = Row("New Child Tab");
+  EXPECT_EQ("", child.key);
+  EXPECT_EQ("Command+Alt+T", child.default_key);
+  EXPECT_EQ("Keep Here", child.taken_by);
+  ResetMenuKeys(local_state());
 }
 
 // New Task's key is also one of Chromium's keys outside the menu bar, which

@@ -326,6 +326,35 @@ bool PageTree::MoveToNewTask(const PageId& id, const std::string& task) {
   return true;
 }
 
+bool PageTree::MoveToNextTask(const PageId& id) {
+  const Page* page = Find(id);
+  if (!page || page->task.empty()) {
+    return false;
+  }
+  const std::vector<std::string> tasks = Tasks();
+  const auto at = std::ranges::find(tasks, page->task);
+  const std::string next = at + 1 == tasks.end() ? std::string() : *(at + 1);
+  std::vector<Page> branch = Detach(id);
+  const size_t top =
+      std::ranges::find(pages_, next, &Page::task) - pages_.begin();
+  Attach(std::move(branch), next, PageId(), top);
+  return true;
+}
+
+bool PageTree::MoveToPreviousTask(const PageId& id) {
+  const Page* page = Find(id);
+  const std::vector<std::string> tasks = Tasks();
+  if (!page || tasks.empty() || page->task == tasks.front()) {
+    return false;
+  }
+  const std::string previous =
+      page->task.empty() ? tasks.back()
+                         : *(std::ranges::find(tasks, page->task) - 1);
+  std::vector<Page> branch = Detach(id);
+  Attach(std::move(branch), previous, PageId(), EndOfTask(previous));
+  return true;
+}
+
 bool PageTree::Nest(const PageId& id) {
   const Page* previous = PreviousSibling(id);
   if (!previous) {

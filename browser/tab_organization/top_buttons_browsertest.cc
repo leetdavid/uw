@@ -260,6 +260,23 @@ IN_PROC_BROWSER_TEST_F(TopButtonsBrowserTest, NewTaskStartsATask) {
   }));
 }
 
+// Move to New Task sits under New Task and moves the selected tab and the tabs
+// under it to a new task.
+IN_PROC_BROWSER_TEST_F(TopButtonsBrowserTest,
+                       MoveToNewTaskMovesTheSelectedTab) {
+  tabs::TabInterface* flights = tabs()->GetActiveTab();
+  AddTab();
+  Select(flights);
+
+  views::Widget* card = OpenTasks();
+  ASSERT_TRUE(card);
+  Click(RowOf(card, TasksCard::kMoveToNewTaskId));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return tabs()->group_model()->ListTabGroups().size() == 1u &&
+           flights->GetGroup().has_value();
+  }));
+}
+
 IN_PROC_BROWSER_TEST_F(TopButtonsBrowserTest, APrivateWindowHasTasks) {
   Browser* private_window = CreateIncognitoBrowser();
   EXPECT_TRUE(TasksOf(private_window));

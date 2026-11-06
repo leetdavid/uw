@@ -25,7 +25,8 @@ Designs go on the Doop canvas named in [AGENTS.md](../../AGENTS.md#designs), pag
 | Collapse or expand branch | Option+Cmd+. | Ctrl+Alt+. | changes. Was Ctrl+Cmd+. |
 | Close branch | Option+Cmd+W | Ctrl+Alt+W | menu only |
 | New task | Ctrl+Cmd+N | Alt+Shift+N | changes. Was Chromium's Ctrl+Cmd+P, and Alt+Shift+P on Windows, which are removed. |
-| Move to new task | Option+Cmd+N | Ctrl+Alt+N | changes. Was Shift+Ctrl+Cmd+N. |
+| Move to new task | | | changes. Was Shift+Ctrl+Cmd+N. Option+Cmd+M, then Return, once [Move to Task…](#move-to-task) is built. |
+| New little window | Option+Cmd+N | Ctrl+Alt+N | new. See [Little windows](little-window.md). |
 | Move to task… | Option+Cmd+M | Ctrl+Alt+M | new. See [Move to Task…](#move-to-task). |
 | Move to the previous or next task | Option+Cmd+[ / ] | Ctrl+Alt+[ / ] | new. See [Move to the previous or next task](#move-to-the-previous-or-next-task). |
 | Move to Scratchpad | Option+Cmd+S | Ctrl+Alt+S | changes. Was Ctrl+Cmd+S. |
@@ -58,7 +59,7 @@ Agreed on 2026-11-07 as T352, after the user found the keys hard to learn: "It's
 | Its task | Ctrl+Cmd | Alt+Shift |
 
 - The letter says what the command does, the same at each scope: Cmd+W closes the tab, Option+Cmd+W the branch, and Ctrl+Cmd+W the task.
-- Two keys break the rule. The arrows move the selected tab and the tabs under it with Ctrl+Cmd, since Option+Cmd with an arrow switches workspaces and moves focus between panes. Undo tab organization stays Option+Cmd+Z, since Ctrl+Cmd+Z goes to the previous task.
+- Three keys break the rule. The arrows move the selected tab and the tabs under it with Ctrl+Cmd, since Option+Cmd with an arrow switches workspaces and moves focus between panes. Undo tab organization stays Option+Cmd+Z, since Ctrl+Cmd+Z goes to the previous task. Option+Cmd+N opens a [little window](little-window.md), as in Arc, so Move to New Task has no key of its own. Agreed on 2026-11-07 in a second grilling.
 - The old keys stop working. No second keys are kept.
 - A key the user changed in [Keyboard shortcuts](#keyboard-shortcuts) stays theirs. If it is a new default, such as Option+Cmd+M, theirs wins and the command that has it by default shows "No key".
 - On Windows, Chromium's Alt+Shift keys for tab groups become the task keys: Alt+Shift+W, X, and Z keep their commands, and Alt+Shift+P is removed for Alt+Shift+N.
@@ -72,7 +73,7 @@ Agreed on 2026-11-07 as T353.
 - It lands at the task's top level, keeping its own nesting, and the task opens if it was collapsed. At the first task, or in the Scratchpad, the key that would go past the end does nothing.
 - Several selected tabs move together, each with the tabs under it.
 - It is a manual move, as Move to Task is, so a kept tab is let go and a tab nested by hand leaves its parent.
-- The Tab menu lists Move to Previous Task and Move to Next Task under Move to New Task.
+- The Tasks menu lists Move to Previous Task and Move to Next Task under Move to New Task.
 
 ### Move to Task…
 
@@ -87,12 +88,12 @@ Agreed on 2026-11-07 as T356. It needs the command bar's task rows, T61.
 Agreed on 2026-11-07 as T355, when the user asked for "a button to hold to see the hotkeys".
 
 - Holding Option+Cmd or Ctrl+Cmd for half a second, with no other key, shows the [key card](../CONTEXT.md#language) for that scope. On Windows the keys are Ctrl+Alt and Alt+Shift.
-- The card lists every key of that scope with the command's menu name, the keys as they are now. A command that can't run now is dimmed, such as Close Task on a Scratchpad tab. Keys that use the scope's modifiers but break the rule are listed under "Also".
+- The card lists every key of that scope with the command's menu name, the keys as they are now. A command that can't run now is dimmed, such as Close Task on a Scratchpad tab. Keys that use the scope's modifiers but act on something else, such as Undo tab organization and New Little Window, are listed under "Also".
 - The sidebar outlines what the keys act on: the selected tab and the tabs under it, or its task. With Ctrl+Cmd, the first nine tasks show their numbers and the Scratchpad shows 0. With the sidebar hidden, the Ctrl+Cmd card lists those tasks by number instead.
 - Letting go of either key, any other key joining, or switching apps or windows hides it at once. A letter pressed runs its command, and the card goes. A key pressed within half a second never shows it.
 - Cmd alone never shows a card, so a Cmd-click on a chat link or a terminal address stays a [key hint](#key-hints).
 - The card takes no clicks and no focus, and shows over a terminal tab too.
-- The design is the frames "Hold for keys: Option+Cmd", "Hold for keys: Ctrl+Cmd", and "Hold for keys: every state" on the canvas page "Keyboard and mouse", drawn on 2026-11-07. Not signed off yet.
+- The design is the frames "Hold for keys: Option+Cmd", "Hold for keys: Ctrl+Cmd", and "Hold for keys: every state" on the canvas page "Keyboard and mouse", drawn on 2026-11-07 and signed off by the user the same day. They draw Option+Cmd+N as Move to New Task, which went to the little window afterwards.
 
 ### Terminal key
 
@@ -150,7 +151,8 @@ Agreed on 2026-10-15.
 - A split button, "+" and "▾", sits at the right end of the sidebar's foot, with the Organize button at the left. The "+" under the tab list goes away.
 - A click on "+" does what Cmd+T does: a new tab below the current one, in its task, or the command bar when that is on.
 - A click on "▾" opens a menu above the button, over the page, with each item's key: New tab, New task, New chat, New terminal, and Split Right, which took New split view's place per the [split view plan](split-view.md#splitting).
-- Move to New Task sits under New Task, with its key, here and in the Tasks menu of the sidebar's [top buttons](hidden-sidebar.md). It is the same command as in the tab's menu, with the same name. Agreed on 2026-11-07 as T354, when the user asked for a button for a new task from an existing tab.
+- Move to New Task sits under New Task here and in the Tasks menu of the sidebar's [top buttons](hidden-sidebar.md). It is the same command as in the tab's menu, with the same name, and has no key. Agreed on 2026-11-07 as T354, when the user asked for a button for a new task from an existing tab.
+- New Little Window, with its key, opens a [little window](little-window.md).
 - The design is the frames "New button: the sidebar foot" and "New button: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-15. The user signed off the same day once the button moved from beside Organize to the right end.
 
 ### Branches with the mouse
@@ -358,7 +360,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 17. [Close button on a task's row](#close-button-on-a-tasks-row): with a Scratchpad tab selected, the pointer on a task's row shows its ×, and a click closes the task and its tabs. With the pointer on the ×, the task's rows tint and the tooltip counts its tabs. Cmd+Shift+T brings the task back. A task with a busy terminal asks first.
 18. [Keys by scope](#keys-by-scope): each key in the [table](#keys) runs its command through a real key event, on the Mac and in a Windows test build. Shift+Ctrl+Cmd+N, Ctrl+Cmd+T, S, K, and period do nothing, and neither do Alt+Shift+P and reading mode's Alt+Shift+R on Windows. A key the user set before the change keeps its command, and a new default it holds shows "No key".
 19. [Move to the previous or next task](#move-to-the-previous-or-next-task): Option+Cmd+] moves a parent and its children from the middle of one task to the top of the next with their nesting, and a second press to the top of the Scratchpad. Option+Cmd+[ from the Scratchpad puts them at the bottom of the last task. At either end nothing moves. A collapsed task they move into opens. `PageTreeTest` checks the places and `TaskKeysBrowserTest` presses the keys.
-20. The ▾ menu and the Tasks menu list Move to New Task under New Task with Option+Cmd+N, and a click moves the selected tab and the tabs under it to a new task.
+20. The ▾ menu and the Tasks menu list Move to New Task under New Task, without a key, and a click moves the selected tab and the tabs under it to a new task.
 21. [Key card](#key-card): holding Option+Cmd shows the branch's keys and outlines the branch, holding Ctrl+Cmd shows the task's keys, outlines the task, and numbers the tasks. A key pressed at once shows nothing, letting go hides it, and Shift joining hides it. A window screenshot matches the signed-off frames.
 22. [Move to Task…](#move-to-task): Option+Cmd+M opens the command bar with the tasks, typing filters them, and Return moves the tab and the tabs under it to the end of the task picked.
 

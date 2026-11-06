@@ -75,6 +75,7 @@ if (is_win) {
       "//ui/base",
       "//ui/events",
       "//ui/views",
+      "//uw/browser/tab_organization",
     ]
   }
 }

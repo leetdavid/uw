@@ -101,6 +101,12 @@ class PageTree {
   // Moves a branch into the unused key `task`, placed after every other
   // task.
   bool MoveToNewTask(const PageId& id, const std::string& task);
+  // Moves a branch to the top level of the next task, at its top, or of the
+  // Scratchpad after the last task. False from the Scratchpad.
+  bool MoveToNextTask(const PageId& id);
+  // Moves a branch to the top level of the previous task, at its bottom. The
+  // Scratchpad's previous task is the last one. False from the first task.
+  bool MoveToPreviousTask(const PageId& id);
   // Makes a branch the last child of its previous sibling.
   bool Nest(const PageId& id);
   // Moves a branch up one level, directly below its old parent's branch.

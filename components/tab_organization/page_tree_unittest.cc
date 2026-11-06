@@ -210,6 +210,52 @@ TEST(PageTreeTest, MoveToTaskAppendsTheBranchAndDetachesIt) {
   EXPECT_FALSE(tree.MoveToTask(Id("unknown"), "trip"));
 }
 
+TEST(PageTreeTest, MoveToNextTaskPutsTheBranchAtTheTopOfTheNextTask) {
+  PageTree tree = Seed();
+  EXPECT_TRUE(tree.MoveToNextTask(Id("flights")));
+  EXPECT_EQ(
+      Render(tree),
+      (Lines{"hotels@trip", "flights@models", "  fare@models", "gliner@models",
+             "ollama@models", "news@-", "  show@-", "weather@-"}));
+  // After the last task comes the Scratchpad, then nothing.
+  EXPECT_TRUE(tree.MoveToNextTask(Id("flights")));
+  EXPECT_EQ(Render(tree),
+            (Lines{"hotels@trip", "gliner@models", "ollama@models", "flights@-",
+                   "  fare@-", "news@-", "  show@-", "weather@-"}));
+  EXPECT_FALSE(tree.MoveToNextTask(Id("flights")));
+  EXPECT_FALSE(tree.MoveToNextTask(Id("unknown")));
+}
+
+TEST(PageTreeTest, MoveToNextTaskTakesAChildToTheTopLevel) {
+  PageTree tree = Seed();
+  EXPECT_TRUE(tree.MoveToNextTask(Id("fare")));
+  EXPECT_EQ(Render(tree)[2], "fare@models");
+  EXPECT_EQ(tree.Find(Id("fare"))->parent, PageId());
+}
+
+TEST(PageTreeTest, MoveToPreviousTaskPutsTheBranchAtTheBottomOfIt) {
+  PageTree tree = Seed();
+  EXPECT_TRUE(tree.MoveToPreviousTask(Id("news")));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "gliner@models", "ollama@models",
+                                 "news@models", "  show@models", "weather@-"}));
+  EXPECT_TRUE(tree.MoveToPreviousTask(Id("news")));
+  EXPECT_EQ(Render(tree), (Lines{"flights@trip", "  fare@trip", "hotels@trip",
+                                 "news@trip", "  show@trip", "gliner@models",
+                                 "ollama@models", "weather@-"}));
+  EXPECT_FALSE(tree.MoveToPreviousTask(Id("news")));
+  EXPECT_FALSE(tree.MoveToPreviousTask(Id("unknown")));
+}
+
+TEST(PageTreeTest, AStepFromATaskItFillsLeavesNoTaskBehind) {
+  PageTree tree({P("x", "one"), P("y", "two"), P("z", "three")});
+  EXPECT_TRUE(tree.MoveToNextTask(Id("y")));
+  EXPECT_EQ(tree.Tasks(), (std::vector<std::string>{"one", "three"}));
+  EXPECT_EQ(Render(tree), (Lines{"x@one", "y@three", "z@three"}));
+  EXPECT_TRUE(tree.MoveToPreviousTask(Id("y")));
+  EXPECT_EQ(Render(tree), (Lines{"x@one", "y@one", "z@three"}));
+}
+
 TEST(PageTreeTest, NestAndOutdentMoveABranchOneLevel) {
   PageTree tree = Seed();
   EXPECT_TRUE(tree.Nest(Id("hotels")));

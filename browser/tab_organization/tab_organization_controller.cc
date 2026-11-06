@@ -835,6 +835,9 @@ bool TabOrganizationController::CanExecute(
       return !Parents(ids).empty();
     case kToggleBranch:
       return !Parents(ids).empty();
+    case kMoveToPreviousTask:
+    case kMoveToNextTask:
+      return AdjacentTask(ids, command == kMoveToNextTask).has_value();
     default:
       return false;
   }
@@ -875,6 +878,10 @@ void TabOrganizationController::Execute(int command,
       break;
     case kKeepHere:
       ToggleKept(ids);
+      break;
+    case kMoveToPreviousTask:
+    case kMoveToNextTask:
+      MoveToAdjacentTask(ids, command == kMoveToNextTask);
       break;
     case kUndo:
       Undo();
@@ -948,6 +955,59 @@ bool TabOrganizationController::MoveToScratchpad(
     NotifyManualMove(roots);
   }
   return true;
+}
+
+bool TabOrganizationController::MoveToAdjacentTask(
+    const std::vector<PageId>& ids,
+    bool next) {
+  const std::optional<std::string> task = AdjacentTask(ids, next);
+  if (!task) {
+    return false;
+  }
+  std::vector<PageId> roots = Roots(ids);
+  Record(roots, *task);
+  // Each lands at the top of the next task, so the last goes first and the
+  // branches keep their order.
+  if (next) {
+    std::ranges::reverse(roots);
+  }
+  for (const PageId& root : roots) {
+    if (next) {
+      shared_->tree().MoveToNextTask(root);
+    } else {
+      shared_->tree().MoveToPreviousTask(root);
+    }
+  }
+  Apply();
+  NotifyManualMove(Roots(ids));
+  return true;
+}
+
+std::optional<std::string> TabOrganizationController::AdjacentTask(
+    const std::vector<PageId>& ids,
+    bool next) const {
+  const std::vector<PageId> roots = Roots(ids);
+  if (roots.empty() || !tabs_->SupportsTabGroups()) {
+    return std::nullopt;
+  }
+  const std::string task = shared_->tree().Find(roots.front())->task;
+  if (!std::ranges::all_of(roots, [&](const PageId& id) {
+        return shared_->tree().Find(id)->task == task;
+      })) {
+    return std::nullopt;
+  }
+  const std::vector<std::string> tasks = shared_->tree().Tasks();
+  if (next) {
+    if (task.empty()) {
+      return std::nullopt;
+    }
+    const auto at = std::ranges::find(tasks, task);
+    return at + 1 == tasks.end() ? std::string() : *(at + 1);
+  }
+  if (tasks.empty() || task == tasks.front()) {
+    return std::nullopt;
+  }
+  return task.empty() ? tasks.back() : *(std::ranges::find(tasks, task) - 1);
 }
 
 bool TabOrganizationController::ApplyTidy(const std::vector<TidyMove>& moves) {

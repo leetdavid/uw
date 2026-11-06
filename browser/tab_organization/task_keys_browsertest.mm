@@ -157,11 +157,14 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
       {TabOrganizationController::kMoveUp, up, kCtrlCmd},
       {TabOrganizationController::kMoveDown, down, kCtrlCmd},
       {TabOrganizationController::kCloseBranch, @"w", kOptionCmd},
-      {TabOrganizationController::kToggleBranch, @".", kCtrlCmd},
-      {TabOrganizationController::kNewChildTab, @"t", kCtrlCmd},
+      {TabOrganizationController::kToggleBranch, @".", kOptionCmd},
+      {TabOrganizationController::kNewChildTab, @"t", kOptionCmd},
       {IDC_CREATE_NEW_TAB_GROUP, @"n", kCtrlCmd},
-      {TabOrganizationController::kNewTask, @"N", kCtrlCmd},
-      {TabOrganizationController::kScratchpad, @"s", kCtrlCmd},
+      {TabOrganizationController::kNewTask, @"", 0},
+      {TabOrganizationController::kMoveToPreviousTask, @"[", kOptionCmd},
+      {TabOrganizationController::kMoveToNextTask, @"]", kOptionCmd},
+      {TabOrganizationController::kScratchpad, @"s", kOptionCmd},
+      {TabOrganizationController::kKeepHere, @"k", kOptionCmd},
       {kGoToTask1, @"1", kCtrlCmd},
       {kGoToTask9, @"9", kCtrlCmd},
       {kGoToScratchpad, @"0", kCtrlCmd},
@@ -227,7 +230,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, ArrowKeysNestAndMoveBranches) {
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
-                       CtrlCmdTOpensAChildFirstUnderTheSelectedTab) {
+                       OptionCmdTOpensAChildFirstUnderTheSelectedTab) {
   tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* link = OpenLinkFrom(parent);
   tabs::TabInterface* other = NewTab();
@@ -236,7 +239,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   const std::string o = Id(other).value();
   Select(parent);
 
-  Press(ui::VKEY_T, kCtrlCmd);
+  Press(ui::VKEY_T, kOptionCmd);
   ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 4; }));
   tabs::TabInterface* child = tabs()->GetActiveTab();
   const std::string c = Id(child).value();
@@ -248,7 +251,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
-                       CtrlCmdPeriodCollapsesAndExpandsTheBranch) {
+                       OptionCmdPeriodCollapsesAndExpandsTheBranch) {
   tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* child = OpenLinkFrom(parent);
   Select(parent);
@@ -256,7 +259,7 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
                                   TabOrganizationController::kToggleBranch),
             u"Collapse Branch");
 
-  Press(ui::VKEY_OEM_PERIOD, kCtrlCmd);
+  Press(ui::VKEY_OEM_PERIOD, kOptionCmd);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return controller()->IsCollapsed(Id(parent)); }));
   EXPECT_TRUE(controller()->IsHidden(Id(child)));
@@ -264,27 +267,32 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
                                   TabOrganizationController::kToggleBranch),
             u"Expand Branch");
 
-  Press(ui::VKEY_OEM_PERIOD, kCtrlCmd);
+  Press(ui::VKEY_OEM_PERIOD, kOptionCmd);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return !controller()->IsCollapsed(Id(parent)); }));
   EXPECT_FALSE(controller()->IsHidden(Id(child)));
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
-                       KeysMoveToANewTaskToTheScratchpadAndCloseABranch) {
+                       KeysMoveToTheScratchpadKeepAndCloseABranch) {
   tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* child = OpenLinkFrom(parent);
   NewTab();
   Select(parent);
 
-  Press(ui::VKEY_N, kCtrlCmd | NSEventModifierFlagShift);
+  // Move to New Task has no key: Option+Cmd+N opens a little window.
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kNewTask);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return parent->GetGroup().has_value(); }));
   EXPECT_EQ(child->GetGroup(), parent->GetGroup());
 
-  Press(ui::VKEY_S, kCtrlCmd);
+  Press(ui::VKEY_S, kOptionCmd);
   ASSERT_TRUE(base::test::RunUntil([&] { return !parent->GetGroup(); }));
   EXPECT_FALSE(child->GetGroup());
+
+  Press(ui::VKEY_K, kOptionCmd);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return controller()->IsKept(Id(parent)); }));
 
   const int before = tabs()->count();
   Press(ui::VKEY_W, kOptionCmd);
@@ -294,7 +302,8 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
 
 // Ctrl+Cmd+N is New task in the menu bar, which a headless window never
 // reaches, so the test asks which command each key runs. Chromium's
-// Ctrl+Cmd+P for a new tab group runs nothing.
+// Ctrl+Cmd+P for a new tab group, and the keys that moved to Option+Cmd,
+// Shift+Ctrl+Cmd+N for Move to New Task among them, run nothing.
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdNIsNewTask) {
   NSWindow* window =
       browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
@@ -305,9 +314,74 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, CtrlCmdNIsNewTask) {
         .chrome_command;
   };
   EXPECT_EQ(command(ui::VKEY_N, kCtrlCmd), IDC_CREATE_NEW_TAB_GROUP);
-  EXPECT_EQ(command(ui::VKEY_N, kCtrlCmd | NSEventModifierFlagShift),
-            TabOrganizationController::kNewTask);
   EXPECT_EQ(command(ui::VKEY_P, kCtrlCmd), NO_COMMAND);
+  for (ui::KeyboardCode key :
+       {ui::VKEY_T, ui::VKEY_S, ui::VKEY_K, ui::VKEY_OEM_PERIOD}) {
+    SCOPED_TRACE(key);
+    EXPECT_EQ(command(key, kCtrlCmd), NO_COMMAND);
+  }
+  EXPECT_EQ(command(ui::VKEY_N, kCtrlCmd | NSEventModifierFlagShift),
+            NO_COMMAND);
+}
+
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
+                       OptionCmdBracketsStepTheBranchThroughTheTasks) {
+  tabs::TabInterface* loose = tabs()->GetTabAtIndex(0);
+  tabs::TabInterface* plan = NewTab();
+  tabs::TabInterface* child = OpenLinkFrom(plan);
+  tabs::TabInterface* trip = NewTab();
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(plan)}, u"Plan"));
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(trip)}, u"Trip"));
+  const std::string l = Id(loose).value();
+  const std::string p = Id(plan).value();
+  const std::string c = Id(child).value();
+  const std::string t = Id(trip).value();
+  Select(plan);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return Rows() == std::vector<std::string>{p, "  " + c, t, l}; }));
+
+  // A headless window doesn't press Option+Cmd with a bracket, as with the
+  // arrows, so the test asks which command each key runs, then runs it.
+  NSWindow* window =
+      browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+  const auto command = [&](ui::KeyboardCode key) {
+    return CommandForKeyEvent(cocoa_test_event_utils::SynthesizeKeyEvent(
+                                  window, /*keyDown=*/true, key, kOptionCmd))
+        .chrome_command;
+  };
+  EXPECT_EQ(command(ui::VKEY_OEM_4),
+            TabOrganizationController::kMoveToPreviousTask);
+  EXPECT_EQ(command(ui::VKEY_OEM_6),
+            TabOrganizationController::kMoveToNextTask);
+
+  // At the first task, Option+Cmd+[ has nowhere to go.
+  EXPECT_FALSE(controller()->CanExecute(
+      TabOrganizationController::kMoveToPreviousTask, {Id(plan)}));
+
+  // The branch lands at the top of the next task, then of the Scratchpad.
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kMoveToNextTask);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return plan->GetGroup() && plan->GetGroup() == trip->GetGroup();
+  }));
+  EXPECT_EQ(Rows(), (std::vector<std::string>{p, "  " + c, t, l}));
+  EXPECT_EQ(child->GetGroup(), trip->GetGroup());
+
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kMoveToNextTask);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return Rows() == std::vector<std::string>{t, p, "  " + c, l}; }));
+  ASSERT_TRUE(base::test::RunUntil([&] { return !plan->GetGroup(); }));
+  EXPECT_FALSE(child->GetGroup());
+  EXPECT_FALSE(controller()->CanExecute(
+      TabOrganizationController::kMoveToNextTask, {Id(plan)}));
+
+  // Back up, it lands at the bottom of the last task.
+  chrome::ExecuteCommand(browser(),
+                         TabOrganizationController::kMoveToPreviousTask);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return plan->GetGroup() && plan->GetGroup() == trip->GetGroup();
+  }));
+  EXPECT_EQ(Rows(), (std::vector<std::string>{t, p, "  " + c, l}));
+  EXPECT_EQ(tabs()->GetActiveTab(), plan);
 }
 
 IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,

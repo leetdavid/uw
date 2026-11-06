@@ -619,19 +619,22 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
             tasks);
 
   NewItemsMenu menu(browser());
-  ASSERT_EQ(menu.GetItemCount(), 7u);
+  ASSERT_EQ(menu.GetItemCount(), 8u);
   EXPECT_EQ(menu.GetCommandIdAt(0), IDC_NEW_TAB);
   EXPECT_EQ(menu.GetCommandIdAt(1), IDC_CREATE_NEW_TAB_GROUP);
-  EXPECT_EQ(menu.GetCommandIdAt(5), kSplitRight);
-  EXPECT_EQ(menu.GetCommandIdAt(6), kNewWorkspaceCommand);
+  EXPECT_EQ(menu.GetCommandIdAt(2), TabOrganizationController::kNewTask);
+  EXPECT_EQ(menu.GetCommandIdAt(6), kSplitRight);
+  EXPECT_EQ(menu.GetCommandIdAt(7), kNewWorkspaceCommand);
+  EXPECT_TRUE(menu.IsEnabledAt(2));
   ui::Accelerator key;
   ASSERT_TRUE(menu.GetAcceleratorForCommandId(IDC_CREATE_NEW_TAB_GROUP, &key));
-  // Windows has no agreed key for New task yet.
 #if BUILDFLAG(IS_MAC)
   EXPECT_EQ(key, ui::Accelerator(ui::VKEY_N,
                                  ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN));
+#else
+  EXPECT_EQ(key,
+            ui::Accelerator(ui::VKEY_N, ui::EF_ALT_DOWN | ui::EF_SHIFT_DOWN));
 #endif
-
 }
 
 // The Organize card says what organization is doing and offers the one step

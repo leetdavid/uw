@@ -66,7 +66,9 @@ class TabOrganizationController : public TabStripModelObserver,
     kToggleBranch,
     kNewChildTab,
     kKeepHere,
-    kLastCommand = kKeepHere,
+    kMoveToPreviousTask,
+    kMoveToNextTask,
+    kLastCommand = kMoveToNextTask,
   };
   static bool IsCommand(int command);
 
@@ -178,6 +180,9 @@ class TabOrganizationController : public TabStripModelObserver,
   bool MoveToScratchpad(const std::vector<PageId>& ids,
                         Origin origin = Origin::kUser,
                         const std::vector<PageId>& staying = {});
+  // Moves branches of one task to the top of the next task, or of the
+  // Scratchpad after the last task, or to the bottom of the previous task.
+  bool MoveToAdjacentTask(const std::vector<PageId>& ids, bool next);
   // Tidy's moves, in order, as one undoable organization action of uw's. A
   // new task starts the first time its name comes up, after every other
   // task, under that name as one uw gave.
@@ -422,6 +427,10 @@ class TabOrganizationController : public TabStripModelObserver,
 
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
+  // The task MoveToAdjacentTask would move `ids` to, empty for the
+  // Scratchpad, or none when they are in different tasks or at the end.
+  std::optional<std::string> AdjacentTask(const std::vector<PageId>& ids,
+                                          bool next) const;
   // Roots of `ids` with tabs under them.
   std::vector<PageId> Parents(const std::vector<PageId>& ids) const;
   // Closes the tabs of `ids` as Chromium's Close Tabs does.

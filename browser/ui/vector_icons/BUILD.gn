@@ -10,6 +10,7 @@ aggregate_vector_icons("uw_vector_icons") {
     "chat.icon",
     "chevrons_up_down.icon",
     "eye_filled.icon",
+    "folder_input.icon",
     "folder_plus.icon",
     "folders.icon",
     "inbox.icon",

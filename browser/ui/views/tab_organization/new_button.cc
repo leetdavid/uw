@@ -25,6 +25,7 @@
 #include "ui/views/view_class_properties.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_background.h"
@@ -61,6 +62,8 @@ NewItemsMenu::NewItemsMenu(BrowserWindowInterface* window)
     : ui::SimpleMenuModel(this), window_(window) {
   AddItemWithStringId(IDC_NEW_TAB, IDS_NEW_TAB);
   AddItemWithStringId(IDC_CREATE_NEW_TAB_GROUP, IDS_UW_NEW_TASK_MAC);
+  AddItemWithStringId(TabOrganizationController::kNewTask,
+                      IDS_UW_MOVE_TO_NEW_TASK_MAC);
   AddItemWithStringId(kNewChatCommand, IDS_UW_NEW_CHAT);
   AddItemWithStringId(kNewTerminalCommand, IDS_UW_NEW_TERMINAL);
   AddSeparator(ui::NORMAL_SEPARATOR);
@@ -71,6 +74,11 @@ NewItemsMenu::NewItemsMenu(BrowserWindowInterface* window)
 }
 
 NewItemsMenu::~NewItemsMenu() = default;
+
+bool NewItemsMenu::IsCommandIdEnabled(int command_id) const {
+  return !IsWindowCommand(command_id) ||
+         CanRunWindowCommand(window_, command_id);
+}
 
 void NewItemsMenu::ExecuteCommand(int command_id, int event_flags) {
   chrome::ExecuteCommand(window_, command_id);
