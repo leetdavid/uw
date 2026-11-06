@@ -22,6 +22,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
@@ -994,6 +995,209 @@ IN_PROC_BROWSER_TEST_F(WorkspaceSwipeBrowserTest,
 
   ExpectNoEdgeLeftOfTheCard(browser(), CaptureWindow(browser()));
   SaveWindowScreenshot(browser(), "swipe-edge-after-fade");
+}
+
+// Gets workspaces ready ahead, as uw does outside tests.
+class WorkspaceReadyBrowserTest : public WorkspaceSwipeBrowserTest {
+ protected:
+  void SetUp() override {
+    WorkspaceSwipe::GetReadyInTestsForTesting(true);
+    WorkspaceSwipeBrowserTest::SetUp();
+  }
+
+  void TearDown() override {
+    WorkspaceSwipeBrowserTest::TearDown();
+    WorkspaceSwipe::GetReadyInTestsForTesting(false);
+  }
+
+  // `window`'s partner for `workspace`, once it is open. Null until then.
+  static BrowserWindowInterface* PartnerOf(BrowserWindowInterface* window,
+                                           const std::string& workspace) {
+    for (WorkspaceWindow* partner : WorkspaceWindow::From(window)->Partners()) {
+      if (partner->workspace() == workspace) {
+        return partner->window();
+      }
+    }
+    return nullptr;
+  }
+
+  // Waits until `window`'s partner for `workspace` is ready behind it: its
+  // sidebar pictured, its page loaded, and the window behind again.
+  static BrowserWindowInterface* WaitForReady(BrowserWindowInterface* window,
+                                              const std::string& workspace) {
+    BrowserWindowInterface* ready = nullptr;
+    EXPECT_TRUE(base::test::RunUntil([&] {
+      ready = PartnerOf(window, workspace);
+      content::WebContents* page =
+          ready ? ready->GetTabStripModel()->GetActiveWebContents() : nullptr;
+      return page && !SwipeOf(ready)->picture().isNull() &&
+             !page->GetController().NeedsReload() && !page->IsLoading() &&
+             !ready->GetWindow()->IsVisible() && !page->IsBeingCaptured();
+    }));
+    return ready;
+  }
+
+  // Puts what Memory Saver leaves in place of `window`'s page: the page's
+  // history, unloaded.
+  static content::WebContents* Discard(BrowserWindowInterface* window) {
+    content::WebContents* unloaded = Unload(window);
+    unloaded->SetWasDiscarded(true);
+    return unloaded;
+  }
+};
+
+constexpr char kAside[] = "data:text/html,<title>Aside</title>Aside";
+constexpr char kArticle[] = "data:text/html,<title>Article</title>Article";
+
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       PRE_AfterARestartTheOtherWorkspaceIsReadyBeforeASwipe) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(content::NavigateToURL(
+      partner->GetTabStripModel()->GetActiveWebContents(), GURL(kAside)));
+  WorkspaceWindow::From(partner)->Switch(work_);
+  WaitForShown(partner, work_);
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+}
+
+// After a restart, the workspace behind loads its page and has its sidebar
+// pictured with no swipe, then goes behind again, unseen all along.
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       AfterARestartTheOtherWorkspaceIsReadyBeforeASwipe) {
+  BrowserWindowInterface* shown = nullptr;
+  BrowserWindowInterface* behind = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    shown = behind = nullptr;
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      (WorkspaceWindow::IsHidden(window) ? behind : shown) = window;
+    }
+    return shown && behind && shown->GetWindow()->IsVisible();
+  }));
+  const std::string reading = WorkspaceWindow::From(behind)->workspace();
+  EXPECT_EQ(WaitForReady(shown, reading), behind);
+  EXPECT_EQ(
+      behind->GetTabStripModel()->GetActiveWebContents()->GetLastCommittedURL(),
+      GURL(kAside));
+  EXPECT_TRUE(Seen(behind));
+  EXPECT_TRUE(Animates(shown));
+  EXPECT_EQ(ShownOf(shown), shown);
+
+  // The swipe starts with the picture already in.
+  MoveFingers(shown, -kShortSwipe);
+  WorkspaceSwipe* swipe = SwipeOf(shown);
+  EXPECT_EQ(swipe->target(), reading);
+  ASSERT_TRUE(base::test::RunUntil([&] { return swipe->shows_slide(); }));
+  SaveWindowScreenshot(shown->GetBrowserForMigrationOnly(),
+                       "swipe-ready-after-restart");
+  Lift(shown);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !swipe->sliding(); }));
+}
+
+// A window gets every other workspace ready, the one on another profile too,
+// so keys and clicks are instant as well as swipes.
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       EveryWorkspaceGetsReadyBehindTheWindow) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  const std::string home = AddWorkspace("Home", &MakeProfile());
+  BrowserWindowInterface* next = WaitForReady(browser(), reading);
+  BrowserWindowInterface* last = WaitForReady(browser(), home);
+  EXPECT_TRUE(WorkspaceWindow::IsHidden(next));
+  EXPECT_TRUE(WorkspaceWindow::IsHidden(last));
+  EXPECT_NE(last->GetProfile(), browser()->GetProfile());
+  EXPECT_EQ(ShownOf(browser()), browser());
+  EXPECT_EQ(WorkspaceWindow::From(browser())->Partners().size(), 2u);
+
+  // A key goes to the far workspace at once, with no window to open.
+  RunWindowCommand(browser(), kGoToWorkspace1 + 2);
+  EXPECT_EQ(WaitForShown(browser(), home), last);
+}
+
+// A window opened ahead for a workspace that has tabs adds no blank tab to
+// it: it shows the tab the workspace's last used window shows.
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       AWindowOpenedAheadAddsNoBlankTab) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* first = WaitForShown(browser(), reading);
+  ASSERT_TRUE(content::NavigateToURL(
+      first->GetTabStripModel()->GetActiveWebContents(), GURL(kArticle)));
+  ASSERT_EQ(first->GetTabStripModel()->count(), 1);
+  WorkspaceWindow::From(first)->Switch(work_);
+  WaitForShown(first, work_);
+
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::NewWindow(browser());
+  BrowserWindowInterface* opened = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
+      if (!std::ranges::contains(known, window) &&
+          !WorkspaceWindow::IsHidden(window)) {
+        opened = window;
+      }
+    }
+    return !!opened;
+  }));
+  ASSERT_EQ(WorkspaceWindow::From(opened)->workspace(), work_);
+  BrowserWindowInterface* second = WaitForReady(opened, reading);
+  ASSERT_NE(second, first);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return first->GetTabStripModel()->count() == 1 &&
+           second->GetTabStripModel()->count() == 1;
+  }));
+  EXPECT_EQ(second->GetTabStripModel()->GetActiveWebContents()->GetVisibleURL(),
+            GURL(kArticle));
+}
+
+// A sidebar that changes behind its window is pictured again once the
+// changes stop.
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       ASidebarThatChangesBehindIsPicturedAgain) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  BrowserWindowInterface* partner = WaitForReady(browser(), reading);
+  const gfx::ImageSkia before = SwipeOf(partner)->picture();
+
+  chrome::AddTabAt(partner->GetBrowserForMigrationOnly(), GURL("about:blank"),
+                   -1, false);
+  // Taller by the new tab.
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return SwipeOf(partner)->picture().height() > before.height() &&
+           !partner->GetWindow()->IsVisible();
+  }));
+  EXPECT_EQ(ShownOf(browser()), browser());
+}
+
+// A window whose page Memory Saver unloaded is left as it is, picture and
+// all, until a slide heads to it.
+IN_PROC_BROWSER_TEST_F(WorkspaceReadyBrowserTest,
+                       APageMemorySaverUnloadedIsLeftAlone) {
+  const std::string reading = AddWorkspace("Reading", browser()->GetProfile());
+  BrowserWindowInterface* partner = WaitForReady(browser(), reading);
+  const gfx::ImageSkia before = SwipeOf(partner)->picture();
+
+  content::WebContents* page = Discard(partner);
+  chrome::AddTabAt(partner->GetBrowserForMigrationOnly(), GURL("about:blank"),
+                   -1, false);
+  // Longer than a changed sidebar waits for its new picture.
+  base::RunLoop wait;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, wait.QuitClosure(), base::Seconds(2));
+  wait.Run();
+  EXPECT_TRUE(SwipeOf(partner)->picture().BackedBySameObjectAs(before));
+  EXPECT_EQ(partner->GetTabStripModel()->GetActiveWebContents(), page);
+  EXPECT_TRUE(page->GetController().NeedsReload());
+  EXPECT_FALSE(partner->GetWindow()->IsVisible());
+
+  MoveFingers(browser(), -kShortSwipe);
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !page->GetController().NeedsReload(); }));
+  Lift(browser());
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return !SwipeOf(browser())->sliding(); }));
 }
 
 }  // namespace

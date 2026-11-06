@@ -266,6 +266,13 @@ void TabOrganizationController::JoinWorkspace() {
   reveals_ = WorkspaceWindow::ObserveReveals(base::BindRepeating(
       &TabOrganizationController::OnRevealed, base::Unretained(this)));
   Apply();
+  // A window that joins hidden, as one opened ahead of a switch, adds no
+  // blank tab to a workspace that has tabs: it selects the tab the
+  // workspace's last used window shows, and its blank tab closes.
+  if (blank && WorkspaceWindow::IsHidden(window_) &&
+      shared_->tree().pages().size() > 1) {
+    SelectLastShownTab();
+  }
   if (blank && !WorkspaceWindow::IsHidden(window_)) {
     command_bar_requests_.Notify();
   }
@@ -301,6 +308,24 @@ void TabOrganizationController::JoinWorkspace() {
                        }
                      },
                      weak_factory_.GetWeakPtr()));
+}
+
+void TabOrganizationController::SelectLastShownTab() {
+  FillNow();
+  std::optional<PageId> shown;
+  GlobalBrowserCollection::GetInstance()->ForEach(
+      [&](BrowserWindowInterface* window) {
+        const TabOrganizationController* other = From(window);
+        if (window != window_ && other && other->joined_ &&
+            other->shared_ == shared_) {
+          shown = other->IdFor(other->tabs_->GetActiveTab());
+        }
+        return !shown;
+      },
+      BrowserCollection::Order::kActivation);
+  if (tabs::TabInterface* tab = shown ? TabFor(*shown) : nullptr) {
+    tabs_->ActivateTabAt(tabs_->GetIndexOfTab(tab));
+  }
 }
 
 bool TabOrganizationController::SavedGroupsLoaded() {

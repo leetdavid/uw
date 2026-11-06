@@ -6,11 +6,15 @@
 #include <cmath>
 #include <utility>
 
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "build/build_config.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/tabs/tab_change_type.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/custom_floating_corner.h"
@@ -25,6 +29,7 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -76,6 +81,23 @@ constexpr base::TimeDelta kFade = base::Milliseconds(150);
 constexpr base::TimeDelta kCoverWait = base::Seconds(1);
 // The other workspace's window opens once its profile loads.
 constexpr base::TimeDelta kGiveUp = base::Seconds(5);
+// Getting the other workspaces ready starts this long after the window shows.
+// It waits no longer than this for a page to draw or load, and gives a
+// workspace no longer than this in all.
+constexpr base::TimeDelta kReadyAfterShowing = base::Milliseconds(300);
+constexpr base::TimeDelta kReadyPageWait = base::Seconds(3);
+constexpr base::TimeDelta kReadyGiveUp = base::Seconds(8);
+// A sidebar that changed behind its partner is pictured again once its
+// changes stop for this long.
+constexpr base::TimeDelta kStaleAfter = base::Seconds(1);
+
+bool g_ready_in_tests = false;
+
+// Whether Memory Saver unloaded `page`, which then stays unloaded until a
+// slide or a switch heads to it.
+bool UnloadedByMemorySaver(content::WebContents* page) {
+  return page && page->WasDiscarded() && page->GetController().NeedsReload();
+}
 
 // Copies `layer` when it next draws, and gives `done` the part `area` covers,
 // in the layer's coordinates. Null when the copy fails.
@@ -215,6 +237,51 @@ class PageCover : public views::View {
 BEGIN_METADATA(PageCover)
 END_METADATA
 
+// Runs `done` once `page` has drawn or stopped loading, or with
+// `until_loaded` once it has stopped loading, and at the latest after
+// `wait`.
+class PageWait : public content::WebContentsObserver {
+ public:
+  PageWait(content::WebContents* page,
+           bool until_loaded,
+           base::TimeDelta wait,
+           base::OnceClosure done)
+      : content::WebContentsObserver(page),
+        until_loaded_(until_loaded),
+        done_(std::move(done)) {
+    timer_.Start(FROM_HERE, wait,
+                 base::BindOnce(&PageWait::Done, base::Unretained(this)));
+  }
+
+  // content::WebContentsObserver:
+  void DidFirstVisuallyNonEmptyPaint() override {
+    if (!until_loaded_) {
+      Done();
+    }
+  }
+  void DidStopLoading() override { Done(); }
+  void WebContentsDestroyed() override { Done(); }
+
+ private:
+  // `done` may let this go, so it runs later, unless this went first.
+  void Done() {
+    Observe(nullptr);
+    timer_.Stop();
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&PageWait::Run, weak_factory_.GetWeakPtr()));
+  }
+  void Run() {
+    if (done_) {
+      std::move(done_).Run();
+    }
+  }
+
+  const bool until_loaded_;
+  base::OnceClosure done_;
+  base::OneShotTimer timer_;
+  base::WeakPtrFactory<PageWait> weak_factory_{this};
+};
+
 DEFINE_USER_DATA(WorkspaceSwipe);
 
 WorkspaceSwipe::WorkspaceSwipe(BrowserWindowInterface* window,
@@ -231,6 +298,14 @@ WorkspaceSwipe::WorkspaceSwipe(BrowserWindowInterface* window,
     shown->SetSlide(base::BindRepeating(&WorkspaceSwipe::SlideTo,
                                         base::Unretained(this)));
   }
+  window_->GetTabStripModel()->AddObserver(this);
+  if (views::Widget* widget = browser_view_->GetWidget()) {
+    widget_observation_.Observe(widget);
+  }
+  workspaces_changed_ = WorkspaceList::Get().Observe(
+      base::BindRepeating(&WorkspaceSwipe::ScheduleReady,
+                          base::Unretained(this), kReadyAfterShowing));
+  ScheduleReady(kReadyAfterShowing);
 }
 
 WorkspaceSwipe::~WorkspaceSwipe() {
@@ -252,6 +327,11 @@ WorkspaceSwipe::~WorkspaceSwipe() {
 // static
 WorkspaceSwipe* WorkspaceSwipe::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;
+}
+
+// static
+void WorkspaceSwipe::GetReadyInTestsForTesting(bool ready) {
+  g_ready_in_tests = ready;
 }
 
 void WorkspaceSwipe::SlideTo(const std::string& id) {
@@ -333,6 +413,7 @@ void WorkspaceSwipe::FadeCover() {
 void WorkspaceSwipe::RetakePicture(base::OnceClosure taken) {
   views::View* strip = TabStrip();
   if (!strip || !strip->layer()) {
+    std::move(taken).Run();
     return;
   }
   // A window that has not shown since launch is laid out only now.
@@ -343,10 +424,10 @@ void WorkspaceSwipe::RetakePicture(base::OnceClosure taken) {
        base::BindOnce(
            [](base::WeakPtr<WorkspaceSwipe> self, base::OnceClosure taken,
               gfx::ImageSkia picture) {
-             if (!self || picture.isNull()) {
-               return;
+             if (self && !picture.isNull()) {
+               self->picture_ = std::move(picture);
+               self->stale_ = false;
              }
-             self->picture_ = std::move(picture);
              std::move(taken).Run();
            },
            weak_factory_.GetWeakPtr(), std::move(taken)));
@@ -455,12 +536,27 @@ void WorkspaceSwipe::DidStopLoading() {
   FadeCover();
 }
 
+void WorkspaceSwipe::OnViewBoundsChanged(views::View* view) {
+  // A new size makes the pictures of the windows behind this one old.
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+  if (view == region_.get() && shown && !shown->hidden() && !sliding()) {
+    resize_timer_.Start(
+        FROM_HERE, kStaleAfter,
+        base::BindOnce(&WorkspaceSwipe::OnResized, base::Unretained(this)));
+  }
+}
+
 void WorkspaceSwipe::OnViewHierarchyWillBeDeleted(views::View* view) {
   // The window's views are going, BrowserView's children before BrowserView
   // itself, so nothing here may touch any of them after.
   animation_.Stop();
   give_up_.Stop();
   cover_wait_.Stop();
+  StopReady();
+  stale_timer_.Stop();
+  resize_timer_.Stop();
+  workspaces_changed_ = {};
+  widget_observation_.Reset();
   Observe(nullptr);
   if (region_) {
     region_->RemovePreTargetHandler(this);
@@ -554,6 +650,7 @@ gfx::Rect WorkspaceSwipe::SlidingArea(const std::string& target) const {
 }
 
 void WorkspaceSwipe::Begin(bool with_picture) {
+  StopReady();
   phase_ = Phase::kTracking;
   ++slide_;
   target_.clear();
@@ -583,6 +680,7 @@ void WorkspaceSwipe::OnLeavingPicture(int slide, gfx::ImageSkia picture) {
   // Without a picture the real sidebar stays, and only the page fades.
   if (!leaving_.isNull()) {
     picture_ = leaving_;
+    stale_ = false;
     if (!slide_view_) {
       slide_view_ =
           region_->AddChildView(std::make_unique<SlideView>(browser_view_));
@@ -909,6 +1007,7 @@ void WorkspaceSwipe::Reset() {
   if (WorkspaceWindow* shown = WorkspaceWindow::From(window_)) {
     shown->Unprepare();
   }
+  ScheduleReady(kReadyAfterShowing);
 }
 
 void WorkspaceSwipe::RepaintTint() {
@@ -938,6 +1037,255 @@ void WorkspaceSwipe::RepaintTint() {
   };
   repaint_tint_views(browser_view_);
   repaint_tint_views(browser_view_->multi_contents_view());
+}
+
+void WorkspaceSwipe::OnWidgetVisibilityChanged(views::Widget* widget,
+                                               bool visible) {
+  if (visible) {
+    ScheduleReady(kReadyAfterShowing);
+  }
+}
+
+void WorkspaceSwipe::OnWidgetDestroying(views::Widget* widget) {
+  StopReady();
+  widget_observation_.Reset();
+}
+
+void WorkspaceSwipe::OnTabStripModelChanged(
+    TabStripModel* tab_strip_model,
+    const TabStripModelChange& change,
+    const TabStripSelectionChange& selection) {
+  OnSidebarChanged();
+}
+
+void WorkspaceSwipe::OnTabChangedAt(tabs::TabInterface* tab,
+                                    TabChangeType change_type) {
+  // A picture is taken once the page stops loading, so only what stays
+  // afterward counts.
+  if (change_type != TabChangeType::kLoadingOnly) {
+    OnSidebarChanged();
+  }
+}
+
+void WorkspaceSwipe::OnTabPinnedStateChanged(tabs::TabInterface* tab,
+                                             int index) {
+  OnSidebarChanged();
+}
+
+void WorkspaceSwipe::TabGroupedStateChanged(
+    TabStripModel* tab_strip_model,
+    std::optional<tab_groups::TabGroupId> old_group,
+    std::optional<tab_groups::TabGroupId> new_group,
+    tabs::TabInterface* tab,
+    int index) {
+  OnSidebarChanged();
+}
+
+void WorkspaceSwipe::OnTabGroupChanged(const TabGroupChange& change) {
+  OnSidebarChanged();
+}
+
+void WorkspaceSwipe::ScheduleReady(base::TimeDelta delay) {
+  tried_.clear();
+  ready_timer_.Start(
+      FROM_HERE, delay,
+      base::BindOnce(&WorkspaceSwipe::GetReady, base::Unretained(this)));
+}
+
+bool WorkspaceSwipe::CanGetReady() const {
+#if BUILDFLAG(IS_MAC)
+  if (!g_ready_in_tests &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch("test-type")) {
+    return false;
+  }
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+  return shown && !shown->hidden() && !shown->switching() && !sliding() &&
+         region_ && browser_view_ && window_->GetWindow()->IsVisible();
+#else
+  // Windows shows a window put under another on its taskbar, so workspaces
+  // get ready there once hidden windows do; see docs/plans/windows.md.
+  return false;
+#endif
+}
+
+void WorkspaceSwipe::GetReady() {
+  if (ready_wait_ || ready_give_up_.IsRunning() || !CanGetReady()) {
+    return;
+  }
+  // The page in front draws first.
+  content::WebContents* page = browser_view_->GetActiveWebContents();
+  if (page && page->IsLoading() &&
+      !page->CompletedFirstVisuallyNonEmptyPaint()) {
+    ready_wait_ =
+        std::make_unique<PageWait>(page, /*until_loaded=*/false, kReadyPageWait,
+                                   base::BindOnce(
+                                       [](base::WeakPtr<WorkspaceSwipe> self) {
+                                         if (self) {
+                                           self->ready_wait_.reset();
+                                           self->ReadyNext();
+                                         }
+                                       },
+                                       weak_factory_.GetWeakPtr()));
+    return;
+  }
+  ReadyNext();
+}
+
+void WorkspaceSwipe::ReadyNext() {
+  if (ready_wait_ || ready_give_up_.IsRunning() || !CanGetReady()) {
+    return;
+  }
+  const std::string id = NextToReady();
+  if (id.empty()) {
+    return;
+  }
+  tried_.insert(id);
+  const int step = ++ready_step_;
+  ready_give_up_.Start(FROM_HERE, kReadyGiveUp,
+                       base::BindOnce(&WorkspaceSwipe::EndReadyStep,
+                                      base::Unretained(this), step));
+  WorkspaceWindow::From(window_)->WithPartner(
+      id, base::BindOnce(&WorkspaceSwipe::OnReadyPartner,
+                         weak_factory_.GetWeakPtr(), step, id));
+}
+
+std::string WorkspaceSwipe::NextToReady() const {
+  const WorkspaceList& list = WorkspaceList::Get();
+  const int here = list.IndexOf(WorkspaceWindow::From(window_)->workspace());
+  const int count = static_cast<int>(list.workspaces().size());
+  for (int distance = 1; here >= 0 && distance < count; ++distance) {
+    for (int index : {here + distance, here - distance}) {
+      if (index < 0 || index >= count) {
+        continue;
+      }
+      const std::string& id = list.workspaces()[index].id;
+      if (tried_.contains(id)) {
+        continue;
+      }
+      WorkspaceWindow* partner = PartnerFor(id);
+      WorkspaceSwipe* other = partner ? From(partner->window()) : nullptr;
+      if (!partner || (other && other->NeedsReady())) {
+        return id;
+      }
+    }
+  }
+  return std::string();
+}
+
+void WorkspaceSwipe::OnReadyPartner(int step,
+                                    const std::string& id,
+                                    BrowserWindowInterface* window) {
+  if (step != ready_step_ || !ready_give_up_.IsRunning()) {
+    return;
+  }
+  // Going under this window shows its page, which then loads.
+  WorkspaceWindow* partner =
+      CanGetReady() && window != window_.get() &&
+              !UnloadedByMemorySaver(
+                  window->GetTabStripModel()->GetActiveWebContents())
+          ? WorkspaceWindow::From(window_)->Prepare(id)
+          : nullptr;
+  WorkspaceSwipe* other = partner ? From(partner->window()) : nullptr;
+  if (!other) {
+    EndReadyStep(step);
+    return;
+  }
+  // The picture waits for the page to load, so its tab shows how it ends up.
+  base::OnceClosure picture = base::BindOnce(&WorkspaceSwipe::TakeReadyPicture,
+                                             weak_factory_.GetWeakPtr(), step,
+                                             other->weak_factory_.GetWeakPtr());
+  content::WebContents* page =
+      partner->window()->GetTabStripModel()->GetActiveWebContents();
+  if (page && page->IsLoading()) {
+    ready_wait_ = std::make_unique<PageWait>(
+        page, /*until_loaded=*/true, kReadyPageWait, std::move(picture));
+    return;
+  }
+  std::move(picture).Run();
+}
+
+void WorkspaceSwipe::TakeReadyPicture(int step,
+                                      base::WeakPtr<WorkspaceSwipe> other) {
+  if (step != ready_step_ || !ready_give_up_.IsRunning()) {
+    return;
+  }
+  ready_wait_.reset();
+  if (!other) {
+    EndReadyStep(step);
+    return;
+  }
+  other->RetakePicture(base::BindOnce(&WorkspaceSwipe::EndReadyStep,
+                                      weak_factory_.GetWeakPtr(), step));
+}
+
+void WorkspaceSwipe::EndReadyStep(int step) {
+  if (step != ready_step_ || !ready_give_up_.IsRunning()) {
+    return;
+  }
+  ++ready_step_;
+  ready_give_up_.Stop();
+  ready_wait_.reset();
+  if (sliding()) {
+    return;
+  }
+  if (WorkspaceWindow* shown = WorkspaceWindow::From(window_)) {
+    shown->Unprepare();
+  }
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&WorkspaceSwipe::GetReady, weak_factory_.GetWeakPtr()));
+}
+
+void WorkspaceSwipe::StopReady() {
+  ++ready_step_;
+  ready_give_up_.Stop();
+  ready_timer_.Stop();
+  ready_wait_.reset();
+}
+
+bool WorkspaceSwipe::NeedsReady() const {
+  content::WebContents* page =
+      window_->GetTabStripModel()->GetActiveWebContents();
+  // Its picture stays as it was.
+  if (UnloadedByMemorySaver(page)) {
+    return false;
+  }
+  return picture_.isNull() || stale_ ||
+         (page && page->GetController().NeedsReload());
+}
+
+void WorkspaceSwipe::OnSidebarChanged() {
+  const WorkspaceWindow* self = WorkspaceWindow::From(window_);
+  if (self && self->hidden() && !picture_.isNull()) {
+    stale_timer_.Start(
+        FROM_HERE, kStaleAfter,
+        base::BindOnce(&WorkspaceSwipe::OnStale, base::Unretained(this)));
+  }
+}
+
+void WorkspaceSwipe::OnStale() {
+  stale_ = true;
+  const WorkspaceWindow* self = WorkspaceWindow::From(window_);
+  for (WorkspaceWindow* partner :
+       self ? self->Partners() : std::vector<WorkspaceWindow*>()) {
+    WorkspaceSwipe* shown =
+        partner->hidden() ? nullptr : From(partner->window());
+    if (shown) {
+      shown->ScheduleReady(base::TimeDelta());
+    }
+  }
+}
+
+void WorkspaceSwipe::OnResized() {
+  const WorkspaceWindow* self = WorkspaceWindow::From(window_);
+  for (WorkspaceWindow* partner :
+       self ? self->Partners() : std::vector<WorkspaceWindow*>()) {
+    if (WorkspaceSwipe* other = From(partner->window());
+        other && !other->picture_.isNull()) {
+      other->stale_ = true;
+    }
+  }
+  ScheduleReady(base::TimeDelta());
 }
 
 }  // namespace uw

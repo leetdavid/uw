@@ -43,7 +43,7 @@ Agreed on 2026-11-01. People download Windows uw from the website, and it update
 | 2. Runs on Windows | 5/10 | uw's install identity, icons, and strings. Windows' minimize, maximize, and close buttons, which uw's layout leaves out today, and no "Google API keys are missing" bar; both seen on the first run in the VM on 2026-11-01. Provider keys and sign-in tokens saved in files encrypted with DPAPI. Arc's Windows shortcuts and menu items. Crash reports to Sentry. The `uw` command over a named pipe, packaged as `uw.exe` and put on the user's `PATH` without an admin prompt (6/10). Done when the installer from stage 1 installs uw in the VM, and uw's browser tests pass there |
 | 3. Plays video | 3/10 | AAC and H.264 through Media Foundation, with a software decoder for H.264, and WebRTC's H.264. Done when the sites the Mac checks play in the VM, with the GPU on and off. AAC plays since 2026-11-06, Web Audio's included (T345, T346); H.264 without hardware decoding and calls are T347 and T348 |
 | 4. Ships | 5/10 | A Windows path in `pnpm run release`, the update fetcher and its signed feed, the Windows 10 check, the website's download button, Help that follows the reader's system, and the winget package, per [Distribution](#distribution). Done when a preview installs from the website, and updates itself to the next |
-| 5. Matches the Mac | 3/10 | The terminal through ConPTY, the mini player's dock-or-float choice, hidden workspace windows and the swipe, and Transparency through Mica |
+| 5. Matches the Mac | 3/10 | The terminal through ConPTY, the mini player's dock-or-float choice, hidden workspace windows, ready workspaces, and the swipe, and Transparency through Mica |
 
 ## Testing
 

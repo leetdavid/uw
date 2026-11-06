@@ -3,15 +3,21 @@
 #ifndef UW_BROWSER_UI_VIEWS_WORKSPACES_WORKSPACE_SWIPE_H_
 #define UW_BROWSER_UI_VIEWS_WORKSPACES_WORKSPACE_SWIPE_H_
 
+#include <memory>
+#include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_multi_source_observation.h"
+#include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "ui/base/unowned_user_data/scoped_unowned_user_data.h"
 #include "ui/events/event_constants.h"
@@ -22,6 +28,7 @@
 #include "ui/gfx/image/image_skia.h"
 #include "ui/views/view.h"
 #include "ui/views/view_observer.h"
+#include "ui/views/widget/widget_observer.h"
 
 class BrowserView;
 class BrowserWindowInterface;
@@ -34,6 +41,7 @@ class ScrollEvent;
 namespace uw {
 
 class PageCover;
+class PageWait;
 class SlideView;
 class WorkspaceWindow;
 
@@ -51,9 +59,18 @@ class WorkspaceWindow;
 // under this one as the slide heads to it, so it draws unseen. Until that
 // picture is in, the one from when the window last slid away stands in, or
 // only the other workspace's tint.
+//
+// Ahead of any slide, the window that shows gets every other workspace ready,
+// one at a time, nearest first, once its own page has drawn: its window opens
+// if it has none, goes in under this one, loads its page, has its sidebar
+// pictured, and goes behind again. A sidebar that changes behind is pictured
+// again a second after the changes stop. A window whose page Memory Saver
+// unloaded is left as it is.
 class WorkspaceSwipe : public ui::EventHandler,
                        public gfx::AnimationDelegate,
                        public views::ViewObserver,
+                       public views::WidgetObserver,
+                       public TabStripModelObserver,
                        public content::WebContentsObserver {
  public:
   DECLARE_USER_DATA(WorkspaceSwipe);
@@ -67,6 +84,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   ~WorkspaceSwipe() override;
 
   static WorkspaceSwipe* From(BrowserWindowInterface* window);
+  // Browser tests run without getting workspaces ready ahead, so no window
+  // opens or moves unasked. A test of it turns it on.
+  static void GetReadyInTestsForTesting(bool ready);
 
   // Slides to workspace `id` on its own, then switches. With Reduce Motion,
   // or while the sidebar is hidden, only the page fades.
@@ -75,8 +95,9 @@ class WorkspaceSwipe : public ui::EventHandler,
   // The tab strip as it was when this window last started to slide, or last
   // drew under the window that shows. Null until then.
   const gfx::ImageSkia& picture() const { return picture_; }
-  // Takes a new picture of the tab strip and runs `taken` once it is in. The
-  // window must be on screen, as under the window that shows.
+  // Takes a new picture of the tab strip and runs `taken` once it is in, or
+  // once taking it failed. The window must be on screen, as under the window
+  // that shows.
   void RetakePicture(base::OnceClosure taken);
 
   // Shows `page`, the page of the window this one takes over from, over this
@@ -103,7 +124,27 @@ class WorkspaceSwipe : public ui::EventHandler,
   void AnimationEnded(const gfx::Animation* animation) override;
 
   // views::ViewObserver:
+  void OnViewBoundsChanged(views::View* view) override;
   void OnViewHierarchyWillBeDeleted(views::View* view) override;
+
+  // views::WidgetObserver:
+  void OnWidgetVisibilityChanged(views::Widget* widget, bool visible) override;
+  void OnWidgetDestroying(views::Widget* widget) override;
+
+  // TabStripModelObserver:
+  void OnTabStripModelChanged(
+      TabStripModel* tab_strip_model,
+      const TabStripModelChange& change,
+      const TabStripSelectionChange& selection) override;
+  void OnTabChangedAt(tabs::TabInterface* tab,
+                      TabChangeType change_type) override;
+  void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
+  void TabGroupedStateChanged(TabStripModel* tab_strip_model,
+                              std::optional<tab_groups::TabGroupId> old_group,
+                              std::optional<tab_groups::TabGroupId> new_group,
+                              tabs::TabInterface* tab,
+                              int index) override;
+  void OnTabGroupChanged(const TabGroupChange& change) override;
 
   // content::WebContentsObserver:
   void DidFirstVisuallyNonEmptyPaint() override;
@@ -183,6 +224,36 @@ class WorkspaceSwipe : public ui::EventHandler,
   void Reset();
   void RepaintTint();
 
+  // Getting the other workspaces ready. Starts a round after `delay`.
+  void ScheduleReady(base::TimeDelta delay);
+  bool CanGetReady() const;
+  // Waits for this window's page to draw, then gets the other workspaces
+  // ready.
+  void GetReady();
+  // Gets the nearest workspace not ready yet ready, then the next.
+  void ReadyNext();
+  // The nearest workspace whose window is not open or not ready, and not
+  // tried yet in this round. Empty when there is none.
+  std::string NextToReady() const;
+  void OnReadyPartner(int step,
+                      const std::string& id,
+                      BrowserWindowInterface* window);
+  void TakeReadyPicture(int step, base::WeakPtr<WorkspaceSwipe> other);
+  // Sends the window just readied behind, and goes on to the next.
+  void EndReadyStep(int step);
+  // Stops getting ready, as when a slide starts.
+  void StopReady();
+  // Whether this window, behind its partner, still needs getting ready: its
+  // sidebar has no picture or an old one, or its page has not loaded, unless
+  // Memory Saver unloaded it.
+  bool NeedsReady() const;
+  // This window's sidebar changed while it is behind its partner.
+  void OnSidebarChanged();
+  // Marks the picture old and asks the window in front to take a new one.
+  void OnStale();
+  // Marks the pictures of this window's partners old, as after a resize.
+  void OnResized();
+
   const raw_ptr<BrowserWindowInterface> window_;
   // Null once their views go.
   raw_ptr<BrowserView> browser_view_;
@@ -227,6 +298,23 @@ class WorkspaceSwipe : public ui::EventHandler,
   // Gives up waiting for the other workspace's window, which opens once its
   // profile loads.
   base::OneShotTimer give_up_;
+
+  // Counts the steps of getting ready, so a late answer for an older one is
+  // left. A step runs while `ready_give_up_` does.
+  int ready_step_ = 0;
+  // The workspaces this round has tried, so one that cannot get ready is not
+  // tried again until something changes.
+  std::set<std::string> tried_;
+  base::OneShotTimer ready_timer_;
+  base::OneShotTimer ready_give_up_;
+  std::unique_ptr<PageWait> ready_wait_;
+  // Set once this window's sidebar changed after its picture was taken.
+  bool stale_ = false;
+  base::OneShotTimer stale_timer_;
+  base::OneShotTimer resize_timer_;
+  base::CallbackListSubscription workspaces_changed_;
+  base::ScopedObservation<views::Widget, views::WidgetObserver>
+      widget_observation_{this};
 
   raw_ptr<PageCover> cover_ = nullptr;
   int covers_ = 0;

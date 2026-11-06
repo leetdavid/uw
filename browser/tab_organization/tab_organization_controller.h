@@ -376,6 +376,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // Joins the tree of the window's workspace once the window has a tab, with
   // shared tabs on.
   void JoinWorkspace();
+  // Selects the tab that the most recently used other window on the
+  // workspace shows.
+  void SelectLastShownTab();
   // Whether Chromium's saved tab groups have loaded. Until then they miss
   // changes to tab groups, and at launch they put back their older copy of
   // each group, so a window joins its workspace only after.
