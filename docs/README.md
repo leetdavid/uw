@@ -81,6 +81,8 @@ Decisions marked agreed in [Product](product.md) are confirmed. The rest, and th
 - [Keyboard and mouse plan](plans/keyboard-and-mouse.md): menu bar entries and keys for every command, branch drags and collapse, mouse actions, and the sidebar as a keyboard tree.
 - [Split view plan](plans/split-view.md): any number of panes split right or down as in a terminal, rearranged by dragging, and whole splits pinned as one.
 - [ADR 0029: split views extend Chromium's split](adr/0029-split-views-extend-chromiums-split.md): why any number of panes is a patch to Chromium's two-tab split and not a pane layout of uw's own.
+- [Little window plan](plans/little-window.md): Option+Cmd+N, from any app, opens a small temporary window with the command bar, as Arc's Little Arc does, and Cmd+O moves its page to the Scratchpad.
+- [ADR 0033: a little window is a Chromium pop-up that looks like a regular window](adr/0033-a-little-window-is-a-chromium-pop-up-that-looks-like-a-regular-window.md): why a little window is not an ordinary window or a window of uw's own.
 - [Hidden sidebar plan](plans/hidden-sidebar.md): Cmd+S hides the sidebar, and it floats in over the page at the window's left edge, as in Arc.
 - [Mini player plan](plans/mini-player.md): picture-in-picture videos dock at the bottom of the sidebar, float while uw is in the background, and stack, as in Arc. Sites' small windows dock as live windows, and the sidebar shows playback controls.
 - [Sidebar menus plan](plans/sidebar-menus.md): the task menu and the Organize menu as uw cards, and naming a task on its row.

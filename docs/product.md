@@ -402,6 +402,10 @@ Agreed on 2026-10-24: a picture-in-picture video becomes a [mini player](CONTEXT
 
 Agreed on 2026-11-04: a [split view](CONTEXT.md#language) holds any number of tabs, split right with Cmd+D or down with Cmd+Shift+D as in a terminal, each [pane](CONTEXT.md#language) any kind of tab. Panes rearrange by dragging. A whole split can be pinned as one [pinned split view](CONTEXT.md#language). The [split view plan](plans/split-view.md) has the details. Splitting and maximizing a pane are built and in v0.1.7, not yet verified in daily use. Dragging panes and pinned split views are not built.
 
+### Little windows
+
+Agreed on 2026-11-07: Option+Cmd+N, from uw or any other app, opens a [little window](CONTEXT.md#language) for a quick look at a page, as Arc's Little Arc does. It opens with the command bar, has no sidebar, and is in no workspace. Cmd+O moves its page to the top of the Scratchpad. It closes on its own after a while and does not come back after a quit. The [little window plan](plans/little-window.md) has the details, and [ADR 0033](adr/0033-a-little-window-is-a-chromium-pop-up-that-looks-like-a-regular-window.md) the reasons. Not built.
+
 ## AI connections
 
 Agreed setup: when the user first enables an AI feature, ask them to choose a connection mode. Ordinary browsing works without AI setup.

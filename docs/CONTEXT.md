@@ -79,6 +79,10 @@ _Avoid_: Call window, live mini player, document PiP.
 Play, pause, and skip for a tab the user is not looking at that plays sound, shown at the bottom of the sidebar. A mini player or live window gets a row in every window but its home window, which shows it instead.
 _Avoid_: Media controls, now playing, audio bar.
 
+**Little window**:
+A small, temporary window for a quick look at one page, as Arc's Little Arc is. It has no sidebar and is in no workspace; moving its page into a workspace keeps it.
+_Avoid_: Mini window, quick window, Little uw, Little Arc, pop-up.
+
 **Pinned tab**:
 A persistent sidebar icon with a saved home URL. When open, it represents one continuing live page session shared by every window and workspace of its profile.
 
