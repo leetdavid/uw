@@ -1276,8 +1276,12 @@ bool TabOrganizationController::IsKept(const PageId& id) const {
 }
 
 bool TabOrganizationController::IsLeftAlone(const PageId& id) const {
-  const tabs::TabInterface* tab = TabFor(id);
-  return IsKept(id) || (tab && tab->IsSplit());
+  // With shared tabs, a split shows only in the window that made it.
+  return IsKept(id) ||
+         std::ranges::any_of(Windows(), [&id](BrowserWindowInterface* window) {
+           const tabs::TabInterface* tab = From(window)->TabFor(id);
+           return tab && tab->IsSplit();
+         });
 }
 
 bool TabOrganizationController::KeepsTabs(

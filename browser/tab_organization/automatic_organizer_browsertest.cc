@@ -2962,6 +2962,36 @@ IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
   EXPECT_EQ(other->DepthFor(TabIn(second, Id(link))), 1);
 }
 
+// A split shows only in the window that made it, and the organizer of
+// another window leaves its tabs alone too.
+IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
+                       ATabInASplitInTheOtherWindowStaysWhereItIs) {
+  const auto [ungrouped, task] = OneTask();
+  tabs::TabInterface* page = OpenLinkFrom(tabs()->GetTabAtIndex(0), "lisbon");
+  tabs::TabInterface* beside = OpenLinkFrom(page, "assistant");
+  ASSERT_EQ(beside->GetGroup(), task);
+  Browser* second = SecondWindow();
+  TabStripModel* other = second->tab_strip_model();
+  tabs::TabInterface* pane = TabIn(second, Id(beside));
+  other->SplitPane(other->GetIndexOfTab(TabIn(second, Id(page))),
+                   other->GetIndexOfTab(pane),
+                   split_tabs::SplitTabLayout::kSideBySide);
+  ASSERT_TRUE(pane->IsSplit());
+  EXPECT_TRUE(controller()->IsLeftAlone(Id(beside)));
+  TabOrganizationController::From(second)->BringLivePage(pane);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !TabOrganizationController::IsCopy(pane); }));
+
+  UseDecisionModel(ProviderFormat::kOpenAiDecisions);
+  Answer("/v1/decisions", DecisionsAnswer("none", 0.99));
+  Browse(pane, "weather");
+  Browse(ungrouped, "radar");
+  ASSERT_TRUE(SettleAfter(1));
+  EXPECT_EQ(Requests().size(), 1u);
+  EXPECT_EQ(beside->GetGroup(), task);
+  EXPECT_TRUE(pane->IsSplit());
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsOrganizerBrowserTest,
                        NameTaskFromTheOtherWindowNamesItEverywhere) {
   UseLanguageModel();
