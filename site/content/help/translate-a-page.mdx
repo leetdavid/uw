@@ -1,6 +1,6 @@
 ---
 title: Translate a page
-description: Translate a page on this device, so its text never leaves your Mac. Pick the engine once in Settings, then right-click a page.
+description: Translate a page on your Mac, with Google Cloud Translation, or with your AI provider. Pick the engine once in Settings, then right-click a page.
 ---
 
 uw translates pages with the engine you pick. Until you pick one, nothing translates, and uw never offers to translate by itself.
@@ -8,9 +8,19 @@ uw translates pages with the engine you pick. Until you pick one, nothing transl
 ## Pick *an engine*
 
 1. Right-click a page and choose **Set Up Translation…**, or open **Settings › Languages**.
-2. Under **Translate pages with**, pick **This device**.
+2. Under **Translate pages with**, pick an engine.
 
-**This device** translates on your Mac. The page's text isn't sent anywhere. It knows about 40 languages, from Arabic to Vietnamese, and translates between any two of them.
+| Engine | Where the page's text goes | Languages |
+| --- | --- | --- |
+| This device | Nowhere. It stays on your Mac. | About 40, from Arabic to Vietnamese |
+| Google Cloud Translation | To Google, with your own API key | Over 130 |
+| AI provider | To your [AI provider](./add-an-ai-provider.mdx) | Whatever your model knows |
+
+**This device** translates between any two of its languages.
+
+**Google Cloud Translation** needs a Google Cloud API key with the Cloud Translation API turned on. Paste it under **API key** and click **Save**. uw translates one word to check it, and if Google turns the key down, Google's reason shows under the field. The key is kept on this device and used by every profile. Google bills your Cloud account for what it translates.
+
+**AI provider** translates with a language model from a provider you added. Pick it under **Model**. The menu starts on the model that names your tasks.
 
 ## Translate *a page*
 
@@ -45,13 +55,19 @@ The first page in a language downloads that language to your Mac, about 80 MB. T
 
 To see the page as it was, click the translate icon and choose **Show original**.
 
+## Use *another engine once*
+
+Right-click the page and choose **Translate With**, then an engine. The page translates with it this one time, and the next page uses your engine again. Engines you haven't set up are grey, and **Set Up Translation…** at the bottom opens the settings.
+
 ## Translate *a language every time*
 
 Click the translate icon, then the bubble's ⋮ menu, and choose **Always translate Japanese**, or whichever language the page is in. Pages in that language then translate by themselves in normal windows. **Settings › Languages** lists these languages under **Automatically translate these languages**, and the languages uw never translates under **Never offer to translate these languages**.
 
 ## When this device *lacks a language*
 
-If the page is in a language this device doesn't know, the bubble says so, for example "This device can't translate Swahili". It offers **Set up another engine…**.
+If the page is in a language this device doesn't know, the bubble says so, for example "This device can't translate Swahili". With Google Cloud Translation or an AI provider set up, it offers to translate the page with it this one time. Otherwise it offers **Set up another engine…**.
+
+If Google or your provider turns a page down, the bubble says so, with their reason under the title.
 
 <Figure caption="The bubble on a Swahili page.">
   <Window height={200} cut>
@@ -77,4 +93,4 @@ If the page is in a language this device doesn't know, the bubble says so, for e
 
 ## Private *windows*
 
-Private windows translate with the same engine. Languages you always translate don't translate by themselves there.
+Private windows translate with the same engine, so Google Cloud Translation and your AI provider receive the text of pages you translate there too. Languages you always translate don't translate by themselves in private windows.

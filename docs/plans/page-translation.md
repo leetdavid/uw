@@ -1,6 +1,6 @@
 # Page translation
 
-Status: scope agreed on 2026-11-06 in a grilling session. T363 to T366 on the [board](roadmap.md#board) build it. The user approved all four, and the designs, in advance.
+Status: scope agreed on 2026-11-06 in a grilling session. T363 to T366 on the [board](roadmap.md#board) build it. The user approved all four, and the designs, in advance. The designs are the frame "Page translation: every state (T363)" on the Doop canvas's "Page translation" page. T363, T364, and T365 were built on 2026-11-07; see the board for what each has been checked against.
 
 Asked for on 2026-11-06: "i want the translate this page option back that is missing in chromium that is present in chrome."
 

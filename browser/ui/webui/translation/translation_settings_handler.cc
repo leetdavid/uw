@@ -285,9 +285,17 @@ void TranslationSettingsHandler::AnswerModels(size_t id) {
   if (request == models_requests_.end()) {
     return;
   }
-  const PrefService& prefs =
+  PrefService& prefs =
       *Profile::FromWebUI(web_ui())->GetOriginalProfile()->GetPrefs();
   std::optional<ModelChoice> picked = ReadTranslationModel(prefs);
+  // The menu starts on the model that names tasks. Saving it here gives it
+  // the lowest effort its listing names, as a pick in the menu would.
+  if (picked && prefs.GetDict(kTranslationModelPref).empty()) {
+    auto listed = listed_.find({picked->provider_id, picked->model});
+    if (listed != listed_.end()) {
+      SetTranslationModel(prefs, listed->second);
+    }
+  }
   base::DictValue answer;
   answer.Set("models", std::move(request->second->models));
   answer.Set("provider", picked ? picked->provider_id : std::string());

@@ -248,6 +248,10 @@ Then reload the page and right-click it again.
 
 Expected result: the translate icon shows at the end of the address, and no bubble pops up. `Translate to English` works, and `Translate With` lists This Device ticked, with Google Cloud and AI Provider grey. The first page in a language downloads it, about 80 MB, with progress in the bubble. The page's text turns English in place: links stay links and still work, and text the page adds later is translated too. Show original in the bubble puts the page back. Settings › Languages lists the downloaded language with its size, and its bin deletes it. A Swahili page shows `This device can't translate Swahili` in the bubble, with `Set up another engine…`.
 
+Then set `Translate pages with` to `Google Cloud Translation`, paste a Google Cloud API key that has the Cloud Translation API turned on, and click Save. Try a made-up key first.
+
+Expected result: the made-up key shows Google's reason under the field and isn't saved. The real one shows `A key is saved, and it works.`, and pages translate through Google, Swahili ones too. Set the engine to `AI provider` and pick a model from one of your providers: pages translate through it, more slowly. With one engine picked, `Translate With` › another engine translates the page with that one once, and the next page goes back to yours.
+
 ### Chats
 
 A chat asks before it changes anything on a site: a card in the chat names the step, such as `Click button "Place order"?`, with `Approve`, `Not this one`, `Stop the chat`, and a field to tell the agent what to do instead. uw asks on its own before a form's submit button, before pressing Enter in a form's field, and before typing a password or payment details, and the agent marks other changes. When Chromium's list marks a site as sensitive, the chat asks `Let the agent act on <site>?` before the agent uses it. Nothing on a page can answer for you. The agent works only while Safe Browsing is on.

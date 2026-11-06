@@ -34,6 +34,7 @@
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/model_test_server.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/translation/ai_translator.h"
@@ -342,6 +343,44 @@ IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,
     std::optional<ModelChoice> choice = ReadTranslationModel(prefs());
     return choice && choice->model == "other";
   }));
+}
+
+IN_PROC_BROWSER_TEST_F(TranslationEnginesBrowserTest,
+                       TheMenuStartsOnTheNamingModelAtItsLowestEffort) {
+  Provider provider = PresetProvider(ProviderPreset::kCustom);
+  provider.name = "Namer";
+  provider.address = embedded_test_server()->GetURL("/v1/ai").spec();
+  provider.format = ProviderFormat::kChatCompletions;
+  provider.id = AddProvider(prefs(), provider);
+  SetChoice(prefs(), ModelSlot::kLanguage, provider.id, "namer-model");
+  CatalogStore::SetSourceForTesting(
+      embedded_test_server()->GetURL("/v1/catalog.json"));
+  models_.Answer("/v1/ai/models", R"({"data": [{"id": "namer-model"}]})");
+  models_.Answer(
+      "/v1/catalog.json",
+      base::StrCat(
+          {R"({"namer": {"api": ")", provider.address,
+           R"(", "models": {"namer-model": {"reasoning_options":)"
+           R"( [{"type": "effort", "values": ["low", "high"]}]}}}})"}));
+  SetTranslationEngine(prefs(), TranslationEngine::kAi);
+  ASSERT_TRUE(ui_test_utils::NavigateToURL(
+      browser(), GURL("chrome://settings/languages")));
+  EXPECT_EQ("namer-model · Namer", Settings(R"(
+    (async () => {
+      const menu = await until('#uwModel');
+      await new Promise((resolve) => {
+        const check = () => menu.options.length ? resolve() :
+                                                  setTimeout(check, 20);
+        check();
+      });
+      return menu.options[menu.selectedIndex].textContent.trim();
+    })())"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !prefs().GetDict(kTranslationModelPref).empty(); }));
+  std::optional<ModelChoice> saved = ReadTranslationModel(prefs());
+  ASSERT_TRUE(saved);
+  EXPECT_EQ("namer-model", saved->model);
+  EXPECT_EQ("low", saved->effort);
 }
 
 }  // namespace
