@@ -371,6 +371,10 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T360 | Open Link in Little Window | todo | 8/10 | Builds on T358. Option+Cmd-click on a link, Ctrl+Alt-click on Windows, and the link menu's item, per [Opening one](little-window.md#opening-one). Done when check 6 passes. |
 | T361 | Links from other apps in little windows | todo | 7/10 | Builds on T358. A switch, off by default, per [Links from other apps](little-window.md#links-from-other-apps). Done when check 10 passes. |
 | T362 | Closing unused little windows | todo | 7/10 | Builds on T358. The setting, 6 hours by default, and the rules for sound and pages that ask, per [Closing](little-window.md#closing). Done when check 11 passes. |
+| T363 | Translate a page on this device | in progress | 5/10 | Chromium's translate menus, address-bar icon, and bubble back, run by Chromium's on-device engine, per the [plan](page-translation.md): the Engine setting in Settings › Languages › Translate, uw's page script and the route to the engine, downloading and removing languages, the bubble for a language the device lacks, "Translate with ›", and uw Helper (Translate) for signed Mac builds, per [ADR 0034](../adr/0034-the-on-device-translation-engine-runs-in-its-own-helper.md). Asked for and agreed on 2026-11-06; the user approved T363 to T366 and their designs in advance. Done when checks 1 to 8, 12, 13, and 14 pass on the Mac and check 6 in the Windows VM. |
+| T364 | Google Cloud Translation | todo | 7/10 | Builds on T363. The key field, Keychain, the check on save, and the engine, per the [plan](page-translation.md#settings). Done when check 10 passes. |
+| T365 | Translate with an AI provider | todo | 6/10 | Builds on T363. The Model menu and the engine, with long pages split into requests the model can take, per the [plan](page-translation.md#engines). Done when check 9 passes. |
+| T366 | Translate a selection | todo | 6/10 | Builds on T364 and T365. "Translate selection to English" with the picked engine and "Translate with ›", per the [plan](page-translation.md#ways-in). Done when check 11 passes. |
 
 ## 1. Choose the browser foundation
 
@@ -509,6 +513,12 @@ Agreed on 2026-11-07. Build the [little window plan](little-window.md) in its st
 
 Done when the plan's [acceptance checks](little-window.md#acceptance-checks) pass and a macOS release and a Windows test build with them are on GitHub.
 
+## Page translation
+
+Agreed on 2026-11-06. Build the [page translation plan](page-translation.md) in its ticket order: T363, translating on this device; T364, Google Cloud Translation; T365, an AI provider; T366, a selection.
+
+Done when the plan's [acceptance checks](page-translation.md#acceptance-checks) pass on the Mac and in the Windows VM.
+
 ## Implementability estimates
 
 10 means straightforward to build reliably; 1 means very difficult or uncertain. These are rough estimates, not progress scores. They assume a Chromium base and an initial macOS release, and include integration, accuracy, and ongoing maintenance. Revisit them as scope and technical choices become clearer.
@@ -533,6 +543,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [Mini player](mini-player.md) | 3/10 | Chromium lets the browser supply its own picture-in-picture window and hands it the video as a surface any view can show. uw moves one live video between sidebars and a floating window, keeps stills of paused ones, and adds 2× speed, which Chromium has no call for. Docking sites' own windows beside a video needs Chromium to keep two picture-in-picture windows and a site's page shown outside its own window, which T204 must prove first. |
 | [Split views](split-view.md) | 3/10 | Chromium's split view has the drop zones, mini toolbars, restore, and sidebar box, but holds exactly two tabs. uw patches it to hold any number in a layout tree, and each Chromium update can conflict. Pinned split views move several live pages and their layout between windows, where pins move one today. |
 | [Little windows](little-window.md) | 5/10 | Chromium has the pop-up window, a key listener that works in any app on the Mac and Windows, and moving a live page between windows. uw's page card, theme, and editable toolbar in a pop-up, the Space and full-screen behavior, and the Windows checks carry the risk. |
+| [Page translation](page-translation.md) | 6/10 | Chromium keeps Chrome's translate menus, bubble, and settings, and its on-device engine works in uw. uw writes the page script that swaps a page's text and puts it back, a helper for signed Mac builds, and three engines behind one route. |
 | [Pinned icons and home URLs](../product.md#pinned-tabs) | 8/10 | Shared saved entries and sidebar icons are bounded work. Cmd-W is a no-op; reset and explicit home-URL editing behavior are defined. |
 | [Pinned-tab Peek previews](../product.md#pinned-tabs) | 6/10 | Same-site navigation remains in the pin; off-site links open a temporary preview that can promote into Scratchpad. |
 | [Shared live pinned-page state](../product.md#pinned-tabs) | 4/10 | The live page transfers between windows and remains alive without a browser window. Every launch restores the last session; Chromium ownership and lifecycle need a trial. Up from 3/10 on 2026-10-21: Chromium already moves a live tab between two windows of one profile when a tab is dragged across. |

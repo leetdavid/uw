@@ -230,6 +230,10 @@ The language model a new chat starts on. Each chat can switch to another.
 How long a model may think before it answers, in the levels its provider offers for that model.
 _Avoid_: Reasoning level, thinking budget
 
+**Translation engine**:
+What translates a page: this device, Google Cloud Translation with the user's own key, or a language model. None until the user picks one.
+_Avoid_: Translator, translation provider, translation backend
+
 **Model catalog**:
 The public list at models.dev of what each provider's models can do: whether a model calls tools, and its effort levels. uw keeps a copy and refreshes it daily.
 
