@@ -32,6 +32,8 @@ source_set("problem_reports") {
     "problem_reporter.h",
     "problem_reports.cc",
     "problem_reports.h",
+    "webui_error_reports.cc",
+    "webui_error_reports.h",
   ]
   public_deps = [
     ":consent",
@@ -43,7 +45,9 @@ source_set("problem_reports") {
     "//base/version_info",
     "//chrome/browser:browser_public_dependencies",
     "//chrome/common:constants",
+    "//components/crash/content/browser/error_reporting",
     "//components/crash/core/app",
+    "//components/feedback/redaction_tool",
     "//content/public/browser",
     "//net",
     "//services/network/public/cpp",
@@ -59,15 +63,22 @@ source_set("problem_reports") {
 source_set("browser_tests") {
   testonly = true
   defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
-  sources = [ "problem_reports_browsertest.cc" ]
+  sources = [
+    "problem_reports_browsertest.cc",
+    "webui_error_reports_browsertest.cc",
+  ]
   deps = [
     ":problem_reports",
     "//base",
     "//base/test:test_support",
     "//chrome/browser",
     "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
     "//chrome/browser/ui",
     "//chrome/test:test_support",
+    "//components/crash/content/browser/error_reporting",
+    "//components/prefs",
+    "//components/webui/chrome_urls",
     "//content/public/browser",
     "//content/test:test_support",
     "//net:test_support",
