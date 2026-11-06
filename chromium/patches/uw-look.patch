@@ -832,7 +832,7 @@ index 982370f7cdb149a28adf1d5daaf2489741fb2618..317826b97ee52409dbf785a6afb3a2c8
    // The sync icon that is displayed in the tab group header of saved groups in
    // the tabstrip.
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index 75f02715c7af13fa992eb95586cfbd860286bef6..8828383ca623859a88911035ec780e59c704cbee 100644
+index 75f02715c7af13fa992eb95586cfbd860286bef6..b62a7ec6821a83beef781a6b1c976c6f2121f3a8 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -14,6 +14,7 @@
@@ -1152,7 +1152,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..8828383ca623859a88911035ec780e59
        views().vertical_tab_strip_top_corner->SetAlpha(frame_color.opacity);
        views().vertical_tab_strip_bottom_corner->SetAlpha(frame_color.opacity);
        vertical_tabs_background->SetCutoutFrom(tab_strip_cutout_views);
-@@ -1613,11 +1691,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1613,11 +1691,29 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      case TabStripType::kVertical: {
        // Curve trailing corner when it becomes the top trailing corner of the
        // browser.
@@ -1161,7 +1161,10 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..8828383ca623859a88911035ec780e59
 -          params.trailing_exclusion.IsEmpty()) {
 -        toolbar_corners[CornerOrientation::kTopTrailing] =
 -            toolbar_background->GetWindowCorner(/*upper=*/true);
-+      if (!is_fullscreen(layout_data_->window_state)) {
++      // uw: leaving full screen lays out once more while the toolbar is still
++      // in the full-screen overlay, which can't be measured from here.
++      if (!is_fullscreen(layout_data_->window_state) &&
++          views().browser_view->Contains(views().toolbar)) {
 +        // uw: over glass, the frame already draws the theme behind the corners.
 +        // A corner where the card meets the window's edge stays square.
 +        const auto corner =
@@ -1184,7 +1187,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..8828383ca623859a88911035ec780e59
        }
        break;
      }
-@@ -1635,7 +1728,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1635,7 +1731,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
    // Set up top container cutouts. These need to be updated whether or not glass
    // is active for the current window.
@@ -1193,7 +1196,7 @@ index 75f02715c7af13fa992eb95586cfbd860286bef6..8828383ca623859a88911035ec780e59
      if (!is_fullscreen(layout_data_->window_state)) {
        toolbar_background->SetCutoutFrom(top_container_cutout_views);
        // Cut the toolbar corners out of the top container itself.
-@@ -1690,7 +1783,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1690,7 +1786,7 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
  
      // Do the main area cutouts. These adjustments need to be made regardless of
      // whether the current window is in glass mode.
