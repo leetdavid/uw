@@ -13,7 +13,6 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/translate/translate_controller.h"
 #include "chrome/browser/ui/views/translate/partial_translate_bubble_view.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
@@ -189,7 +188,7 @@ IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
                        SetUpTranslationOpensTheLanguageSettings) {
   OpenSwahili();
   ui_test_utils::TabAddedWaiter added(browser());
-  ExecuteTranslateMenuCommand(contents(), kSetUpTranslation, u"");
+  PageMenu()->ExecuteCommand(kSetUpTranslation, 0);
   added.Wait();
   EXPECT_EQ(GURL("chrome://settings/languages"), contents()->GetVisibleURL());
 }
@@ -234,8 +233,8 @@ IN_PROC_BROWSER_TEST_F(TranslationUiBrowserTest,
                        TheSelectionBubbleNamesALanguageThisDeviceLacks) {
   UseEngine(TranslationEngine::kDevice);
   OpenSwahili();
-  TranslateController::From(browser())->StartPartialTranslate(
-      "sw", "en", u"Habari za asubuhi");
+  PageMenu(u"Habari za asubuhi")
+      ->ExecuteCommand(kTranslateSelectionWithDevice, 0);
   PartialTranslateBubbleView* bubble = nullptr;
   ASSERT_TRUE(base::test::RunUntil([&] {
     bubble =

@@ -118,7 +118,6 @@ source_set("ui_browser_tests") {
     "//chrome/browser/renderer_context_menu:test_support",
     "//chrome/browser/translate",
     "//chrome/browser/ui",
-    "//chrome/browser/ui/translate",
     "//chrome/browser/ui/views/translate",
     "//chrome/test:test_support",
     "//components/translate/core/browser",
