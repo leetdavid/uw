@@ -1,0 +1,687 @@
+diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
+index e802cb451a2f54b874bfe49def1923164553f72b..4ddd7e40b86c2d28b9b0540216f7cb124734721e 100644
+--- a/chrome/browser/prefs/BUILD.gn
++++ b/chrome/browser/prefs/BUILD.gn
+@@ -210,6 +210,7 @@ source_set("impl") {
+     "//uw/browser/pins:prefs",
+     "//uw/browser/shortcuts:prefs",
+     "//uw/browser/tab_organization:ai_connection",
++    "//uw/browser/translation:prefs",
+     "//uw/browser/ui/look:prefs",
+     "//uw/browser/ui/views/mini_player:prefs",
+     "//uw/browser/workspaces:prefs",
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+index c339010bb3465bfb79b756c4af25b5eef22d5ce1..2f075ae072165ad6516754e19549bb660493e58b 100644
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -564,6 +564,7 @@
+ #include "uw/browser/pins/pin_prefs.h"
+ #include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/ai_connection.h"
++#include "uw/browser/translation/translation_prefs.h"
+ #include "uw/browser/ui/look/page_space_prefs.h"
+ #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
+ #include "uw/browser/workspaces/workspace_prefs.h"
+@@ -1792,6 +1793,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+   registry->RegisterIntegerPref(prefs::kContextualTasksNextPanelOpenCount, 0);
+   uw::RegisterAiConnectionProfilePrefs(registry);
+   uw::RegisterPinProfilePrefs(registry);
++  uw::RegisterTranslationProfilePrefs(registry);
+   registry->RegisterBooleanPref(prefs::kCtrlTabMru, false);
+   cross_device::RegisterProfilePrefs(registry);
+   enterprise::RegisterIdentifiersProfilePrefs(registry);
+diff --git a/chrome/browser/translate/BUILD.gn b/chrome/browser/translate/BUILD.gn
+index 1e4b7db012ae68b710069944cbf457517724d943..c7251c649365e6e7b41f8c969ec9c15a114a4034 100644
+--- a/chrome/browser/translate/BUILD.gn
++++ b/chrome/browser/translate/BUILD.gn
+@@ -64,6 +64,7 @@ source_set("impl") {
+     "//third_party/metrics_proto",
+     "//ui/base",
+     "//url",
++    "//uw/browser/translation",
+   ]
+ 
+   if (is_android) {
+diff --git a/chrome/browser/translate/chrome_translate_client.cc b/chrome/browser/translate/chrome_translate_client.cc
+index 8b9ffa540f8846be276e253b6384316d45fe860a..6f26742849b2242f0db70e81ed4aa78db8967b0f 100644
+--- a/chrome/browser/translate/chrome_translate_client.cc
++++ b/chrome/browser/translate/chrome_translate_client.cc
+@@ -55,6 +55,8 @@
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/metrics_proto/translate_event.pb.h"
+ #include "url/gurl.h"
++#include "uw/browser/translation/page_translator.h"
++#include "uw/browser/translation/translation_engine.h"
+ 
+ #if BUILDFLAG(IS_ANDROID)
+ #include "chrome/browser/android/android_theme_resources.h"
+@@ -122,6 +124,7 @@ bool IsAutomaticTranslationType(translate::TranslationType type) {
+ ChromeTranslateClient::ChromeTranslateClient(content::WebContents* web_contents)
+     : content::WebContentsObserver(web_contents),
+       content::WebContentsUserData<ChromeTranslateClient>(*web_contents),
++      page_translator_(std::make_unique<uw::PageTranslator>(*web_contents)),
+       translate_driver_(new translate::ContentTranslateDriver(
+           *web_contents,
+           UrlLanguageHistogramFactory::GetForBrowserContext(
+@@ -140,11 +143,13 @@ ChromeTranslateClient::ChromeTranslateClient(content::WebContents* web_contents)
+               ->GetPrimaryModel())) {
+   translate_driver_->AddLanguageDetectionObserver(this);
+   translate_driver_->set_translate_manager(translate_manager_.get());
++  translate_driver_->set_text_translator(page_translator_.get());
+ }
+ 
+ ChromeTranslateClient::~ChromeTranslateClient() {
+   translate_driver_->RemoveLanguageDetectionObserver(this);
+   translate_driver_->set_translate_manager(nullptr);
++  translate_driver_->set_text_translator(nullptr);
+ }
+ 
+ const translate::LanguageState& ChromeTranslateClient::GetLanguageState() {
+@@ -332,6 +337,11 @@ bool ChromeTranslateClient::IsTranslatableURL(const GURL& url) {
+   return TranslateService::IsTranslatableURL(url);
+ }
+ 
++bool ChromeTranslateClient::HasTranslationEngine() {
++  return uw::GetTranslationEngine(*GetPrefs()) !=
++         uw::TranslationEngine::kNone;
++}
++
+ void ChromeTranslateClient::UndoTranslate() {
+   std::string source_language = GetLanguageState().source_language();
+   std::string target_language = GetLanguageState().current_language();
+diff --git a/chrome/browser/translate/chrome_translate_client.h b/chrome/browser/translate/chrome_translate_client.h
+index 278e13ba52d005c91d7f9a53193f00f3a287d90a..87e87d4277bb82e6c2c848037aaeb3cff9a5e134 100644
+--- a/chrome/browser/translate/chrome_translate_client.h
++++ b/chrome/browser/translate/chrome_translate_client.h
+@@ -32,6 +32,10 @@ class WebContents;
+ 
+ class PrefService;
+ 
++namespace uw {
++class PageTranslator;
++}
++
+ namespace language {
+ class AcceptLanguagesService;
+ }
+@@ -101,6 +105,9 @@ class ChromeTranslateClient
+   // Gets the associated TranslateManager.
+   translate::TranslateManager* GetTranslateManager();
+ 
++  // uw: translates the page's text with the profile's translation engine.
++  uw::PageTranslator* page_translator() { return page_translator_.get(); }
++
+   // TranslateClient implementation.
+   translate::TranslateDriver* GetTranslateDriver() override;
+   PrefService* GetPrefs() override;
+@@ -120,6 +127,7 @@ class ChromeTranslateClient
+                        translate::TranslateErrors error_type,
+                        bool triggered_from_menu) override;
+   bool IsTranslatableURL(const GURL& url) override;
++  bool HasTranslationEngine() override;
+ 
+   // Performs a one-time undo of the translation and shows the translation
+   // bubble.
+@@ -153,6 +161,7 @@ class ChromeTranslateClient
+                                        bool is_user_gesture);
+ #endif
+ 
++  std::unique_ptr<uw::PageTranslator> page_translator_;
+   std::unique_ptr<translate::ContentTranslateDriver> translate_driver_;
+   std::unique_ptr<language_detection::ContentLanguageDetectionDriver>
+       language_detection_driver_;
+diff --git a/chrome/browser/translate/translate_service.cc b/chrome/browser/translate/translate_service.cc
+index f1706d05c89ad874b582ad5e4fea86d4377656a1..24b67c362d3e62c60dc099e02a8813da308f30bc 100644
+--- a/chrome/browser/translate/translate_service.cc
++++ b/chrome/browser/translate/translate_service.cc
+@@ -111,8 +111,9 @@ void TranslateService::OnResourceRequestsAllowed() {
+     NOTREACHED();
+   }
+ 
+-  language_list->SetResourceRequestsAllowed(
+-      resource_request_allowed_notifier_.ResourceRequestsAllowed());
++  // uw: the list of languages Google translates is never fetched; the built-in
++  // list stands.
++  language_list->SetResourceRequestsAllowed(false);
+ }
+ 
+ // static
+diff --git a/chrome/renderer/chrome_render_frame_observer_browsertest.cc b/chrome/renderer/chrome_render_frame_observer_browsertest.cc
+index 63c45105132b72d77a85177fa9a125bc307ceca7..acb7f0083e0a79dafac722fd8b3437d591f62105 100644
+--- a/chrome/renderer/chrome_render_frame_observer_browsertest.cc
++++ b/chrome/renderer/chrome_render_frame_observer_browsertest.cc
+@@ -67,6 +67,13 @@ class FakeContentTranslateDriver
+     page_level_translation_criteria_met_ = page_level_translation_criteria_met;
+   }
+ 
++  void TranslateSegments(const std::vector<std::string>& segments,
++                         const std::string& source_lang,
++                         const std::string& target_lang,
++                         TranslateSegmentsCallback callback) override {
++    std::move(callback).Run(std::nullopt, 1);
++  }
++
+   int register_page_count_ = 0;
+   bool page_level_translation_criteria_met_ = false;
+ 
+diff --git a/chrome/renderer/translate/translate_agent_browsertest.cc b/chrome/renderer/translate/translate_agent_browsertest.cc
+index e689496966a29daab315d6182419d3580311ff21..88f51fdb98b144b066e66c61dddf01b8ed813b75 100644
+--- a/chrome/renderer/translate/translate_agent_browsertest.cc
++++ b/chrome/renderer/translate/translate_agent_browsertest.cc
+@@ -70,6 +70,13 @@ class FakeContentTranslateDriver
+     page_level_translation_criteria_met_ = page_level_translation_criteria_met;
+   }
+ 
++  void TranslateSegments(const std::vector<std::string>& segments,
++                         const std::string& source_lang,
++                         const std::string& target_lang,
++                         TranslateSegmentsCallback callback) override {
++    std::move(callback).Run(std::nullopt, 1);
++  }
++
+   void ResetNewPageValues() {
+     called_new_page_ = false;
+     details_ = std::nullopt;
+diff --git a/components/resources/translate_resources.grdp b/components/resources/translate_resources.grdp
+index 5226e140218da29593df319ebcfc340a996992c9..d39ae1098b06fc467672b0e6a2bd7f58325885e8 100644
+--- a/components/resources/translate_resources.grdp
++++ b/components/resources/translate_resources.grdp
+@@ -1,4 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <grit-part>
+   <include name="IDR_TRANSLATE_JS" file="../translate/core/browser/resources/translate.js" type="BINDATA" />
++  <include name="IDR_UW_TRANSLATE_JS" file="../../uw/browser/translation/uw_translate.js" type="BINDATA" />
+ </grit-part>
+diff --git a/components/translate/content/browser/content_translate_driver.cc b/components/translate/content/browser/content_translate_driver.cc
+index 92b5655fbdcab064dd6c09ed6817c37ae4546cfc..832fc7db0991ff3d52559a65bc81f70c915c692a 100644
+--- a/components/translate/content/browser/content_translate_driver.cc
++++ b/components/translate/content/browser/content_translate_driver.cc
+@@ -25,6 +25,7 @@
+ #include "components/google/core/common/google_util.h"
+ #include "components/language/core/browser/url_language_histogram.h"
+ #include "components/translate/content/browser/content_record_page_language.h"
++#include "components/translate/core/browser/language_state.h"
+ #include "components/translate/core/browser/translate_download_manager.h"
+ #include "components/translate/core/browser/translate_manager.h"
+ #include "components/translate/core/browser/translate_metrics_logger.h"
+@@ -184,6 +185,9 @@ void ContentTranslateDriver::TranslatePage(int page_seq_no,
+     return;
+   }
+ 
++  if (text_translator_) {
++    text_translator_->OnTranslationStarted();
++  }
+   agent->TranslateFrame(
+       std::string(translate_script), std::string(source_lang),
+       std::string(target_lang),
+@@ -372,6 +376,22 @@ void ContentTranslateDriver::AddReceiver(
+   receivers_.Add(this, std::move(receiver));
+ }
+ 
++void ContentTranslateDriver::TranslateSegments(
++    const std::vector<std::string>& segments,
++    const std::string& source_lang,
++    const std::string& target_lang,
++    TranslateSegmentsCallback callback) {
++  LanguageState* state =
++      translate_manager_ ? translate_manager_->GetLanguageState() : nullptr;
++  if (!text_translator_ || !state ||
++      !(state->translation_pending() || state->IsPageTranslated())) {
++    std::move(callback).Run(std::nullopt, 1);
++    return;
++  }
++  text_translator_->TranslateSegments(segments, source_lang, target_lang,
++                                      std::move(callback));
++}
++
+ void ContentTranslateDriver::RegisterPage(
+     mojo::PendingRemote<translate::mojom::TranslateAgent> translate_agent,
+     const translate::LanguageDetectionDetails& details,
+diff --git a/components/translate/content/browser/content_translate_driver.h b/components/translate/content/browser/content_translate_driver.h
+index c2f8aeff61f37d4a0d665ee047c6106af779186b..c9e720b3dfeb448d71291cae7e51c56a0354afb4 100644
+--- a/components/translate/content/browser/content_translate_driver.h
++++ b/components/translate/content/browser/content_translate_driver.h
+@@ -8,6 +8,7 @@
+ #include <map>
+ #include <string>
+ #include <string_view>
++#include <vector>
+ 
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
+@@ -57,6 +58,23 @@ class ContentTranslateDriver : public TranslateDriver,
+                                   translate::TranslateErrors error_type) {}
+   };
+ 
++  // uw: translates the page's text for uw's translate script, which stands in
++  // for Google's Translate Element.
++  class TextTranslator {
++   public:
++    using TranslateSegmentsCallback =
++        mojom::ContentTranslateDriver::TranslateSegmentsCallback;
++
++    virtual ~TextTranslator() = default;
++
++    // Called as a translation of the page starts.
++    virtual void OnTranslationStarted() = 0;
++    virtual void TranslateSegments(std::vector<std::string> segments,
++                                   const std::string& source_lang,
++                                   const std::string& target_lang,
++                                   TranslateSegmentsCallback callback) = 0;
++  };
++
+   ContentTranslateDriver(
+       content::WebContents& web_contents,
+       language::UrlLanguageHistogram* url_language_histogram);
+@@ -82,6 +100,10 @@ class ContentTranslateDriver : public TranslateDriver,
+ 
+   TranslateManager* translate_manager() { return translate_manager_; }
+ 
++  void set_text_translator(TextTranslator* text_translator) {
++    text_translator_ = text_translator;
++  }
++
+   static ContentTranslateDriver* FromWebContents(
+       content::WebContents* web_contents);
+ 
+@@ -124,6 +146,10 @@ class ContentTranslateDriver : public TranslateDriver,
+       mojo::PendingRemote<translate::mojom::TranslateAgent> translate_agent,
+       const translate::LanguageDetectionDetails& details,
+       bool page_level_translation_criteria_met) override;
++  void TranslateSegments(const std::vector<std::string>& segments,
++                         const std::string& source_lang,
++                         const std::string& target_lang,
++                         TranslateSegmentsCallback callback) override;
+ 
+  private:
+ 
+@@ -142,6 +168,7 @@ class ContentTranslateDriver : public TranslateDriver,
+   mojom::TranslateAgent* GetTranslateAgent(int page_seq_no);
+ 
+   raw_ptr<TranslateManager> translate_manager_ = nullptr;
++  raw_ptr<TextTranslator> text_translator_ = nullptr;
+ 
+   base::ObserverList<TranslationObserver, true> translation_observers_;
+ 
+diff --git a/components/translate/content/common/translate.mojom b/components/translate/content/common/translate.mojom
+index 472870508bb28930a50bde98d822f8bdd5dfa0e8..30589ff3a9564f84f478bf46846437f1302419ad 100644
+--- a/components/translate/content/common/translate.mojom
++++ b/components/translate/content/common/translate.mojom
+@@ -122,4 +122,11 @@ interface ContentTranslateDriver {
+   RegisterPage(pending_remote<TranslateAgent> translate_agent,
+                LanguageDetectionDetails details,
+                bool translation_critiera_met);
++
++  // uw: translates a batch of the page's text segments for uw's translate
++  // script with the profile's translation engine. `error` is 0, 2 when the
++  // engine does not know a language, or 1 for any other failure.
++  TranslateSegments(array<string> segments, string source_lang,
++                    string target_lang)
++      => (array<string>? translations, int32 error);
+ };
+diff --git a/components/translate/content/renderer/translate_agent.cc b/components/translate/content/renderer/translate_agent.cc
+index 3c16c19ac226f448653f70eb93e8801c2a3f30ab..6b6816211eb80776e5b826b2c1b8d411f356b500 100644
+--- a/components/translate/content/renderer/translate_agent.cc
++++ b/components/translate/content/renderer/translate_agent.cc
+@@ -12,8 +12,10 @@
+ #include "base/check_op.h"
+ #include "base/command_line.h"
+ #include "base/compiler_specific.h"
++#include "base/containers/span.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
++#include "base/json/json_writer.h"
+ #include "base/json/string_escape.h"
+ #include "base/location.h"
+ #include "base/metrics/histogram_functions.h"
+@@ -21,6 +23,7 @@
+ #include "base/metrics/histogram_macros_local.h"
+ #include "base/no_destructor.h"
+ #include "base/notreached.h"
++#include "base/strings/string_number_conversions.h"
+ #include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/single_thread_task_runner.h"
+@@ -686,6 +689,7 @@ void TranslateAgent::TranslatePageImpl(int count) {
+   if (!weak_this) {
+     return;
+   }
++  RequestNextSegments();
+   // Check the status of the translation.
+   translate_task_runner_->PostDelayedTask(
+       FROM_HERE,
+@@ -694,6 +698,72 @@ void TranslateAgent::TranslatePageImpl(int count) {
+       AdjustDelay(kTranslateStatusCheckDelayMs));
+ }
+ 
++void TranslateAgent::RequestNextSegments() {
++  WebLocalFrame* main_frame = render_frame()->GetWebFrame();
++  if (!main_frame) {
++    return;
++  }
++  WebScriptSource source(WebString::FromAscii("uwTranslate.next()"));
++  main_frame->RequestExecuteScript(
++      world_id_, base::span_from_ref(source),
++      blink::mojom::UserActivationOption::kDoNotActivate,
++      blink::mojom::EvaluationTiming::kAsynchronous,
++      blink::mojom::LoadEventBlockingOption::kDoNotBlock,
++      base::BindOnce(&TranslateAgent::OnSegments,
++                     weak_method_factory_.GetWeakPtr()),
++      blink::BackForwardCacheAware::kAllow,
++      blink::mojom::WantResultOption::kWantResult,
++      blink::mojom::PromiseResultOption::kAwait,
++      /*is_injected_extension_script=*/false);
++}
++
++void TranslateAgent::OnSegments(std::optional<base::Value> batch,
++                                base::TimeTicks start_time) {
++  if (!batch || !batch->is_dict()) {
++    return;
++  }
++  const base::DictValue& dict = batch->GetDict();
++  std::optional<int> id = dict.FindInt("id");
++  const base::ListValue* texts = dict.FindList("texts");
++  const std::string* source = dict.FindString("source");
++  const std::string* target = dict.FindString("target");
++  if (!id || !texts || !source || !target) {
++    return;
++  }
++  std::vector<std::string> segments;
++  for (const base::Value& text : *texts) {
++    segments.push_back(text.is_string() ? text.GetString() : std::string());
++  }
++  GetTranslateHandler()->TranslateSegments(
++      std::move(segments), *source, *target,
++      base::BindOnce(&TranslateAgent::OnSegmentsTranslated,
++                     weak_method_factory_.GetWeakPtr(), *id));
++  RequestNextSegments();
++}
++
++void TranslateAgent::OnSegmentsTranslated(
++    int batch_id,
++    const std::optional<std::vector<std::string>>& translations,
++    int32_t error) {
++  WebLocalFrame* main_frame = render_frame()->GetWebFrame();
++  if (!main_frame) {
++    return;
++  }
++  std::string json = "null";
++  if (translations) {
++    base::ListValue list;
++    for (const std::string& translation : *translations) {
++      list.Append(translation);
++    }
++    base::JSONWriter::Write(list, &json);
++  }
++  std::string script = "uwTranslate.deliver(" + base::NumberToString(batch_id) +
++                       "," + json + "," + base::NumberToString(error) + ")";
++  main_frame->ExecuteScriptInIsolatedWorld(
++      world_id_, WebScriptSource(WebString::FromUtf8(script)),
++      blink::BackForwardCacheAware::kAllow);
++}
++
+ void TranslateAgent::NotifyBrowserTranslationFailed(TranslateErrors error) {
+   DCHECK(translate_callback_pending_);
+   // Notify the browser there was an error.
+diff --git a/components/translate/content/renderer/translate_agent.h b/components/translate/content/renderer/translate_agent.h
+index a666c16306459a83ff6ef6c89f81552b8a0707d0..043c1277076ae6e57a1acbc40036cd318cc6241c 100644
+--- a/components/translate/content/renderer/translate_agent.h
++++ b/components/translate/content/renderer/translate_agent.h
+@@ -8,12 +8,14 @@
+ #include <memory>
+ #include <optional>
+ #include <string>
++#include <vector>
+ 
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/ref_counted_memory.h"
+ #include "base/memory/weak_ptr.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/time/time.h"
++#include "base/values.h"
+ #include "components/language_detection/content/renderer/language_detection_agent.h"
+ #include "components/translate/content/common/translate.mojom.h"
+ #include "components/translate/core/common/translate_errors.h"
+@@ -169,6 +171,16 @@ class TranslateAgent : public content::RenderFrameObserver,
+   // limit the number of retries.
+   void TranslatePageImpl(int count);
+ 
++  // uw: asks uw's translate script for the next batch of the page's text,
++  // has the browser translate it, and hands the result back, until the
++  // script answers null.
++  void RequestNextSegments();
++  void OnSegments(std::optional<base::Value> batch, base::TimeTicks start_time);
++  void OnSegmentsTranslated(
++      int batch_id,
++      const std::optional<std::vector<std::string>>& translations,
++      int32_t error);
++
+   // Sends a message to the browser to notify it that the translation failed
+   // with |error|.
+   void NotifyBrowserTranslationFailed(TranslateErrors error);
+diff --git a/components/translate/core/browser/translate_client.h b/components/translate/core/browser/translate_client.h
+index 35a4031598e9621551e01469245c6fa9be8cf322..d99d57c60a45a86b8a5ec8b27002e3fa38f93ab6 100644
+--- a/components/translate/core/browser/translate_client.h
++++ b/components/translate/core/browser/translate_client.h
+@@ -70,6 +70,10 @@ class TranslateClient {
+ 
+   // Returns true if the URL can be translated.
+   virtual bool IsTranslatableURL(const GURL& url) = 0;
++
++  // uw: whether the profile has a translation engine. Without one, the page
++  // offers no translation and the menus show it greyed out.
++  virtual bool HasTranslationEngine();
+ };
+ 
+ }  // namespace translate
+diff --git a/components/translate/core/browser/translate_manager.cc b/components/translate/core/browser/translate_manager.cc
+index 13837394602d39266a03c53faf387895d4a1df45..2244e07595b694fc5860fb1de81d819481736467 100644
+--- a/components/translate/core/browser/translate_manager.cc
++++ b/components/translate/core/browser/translate_manager.cc
+@@ -50,7 +50,6 @@
+ #include "components/translate/core/common/translate_switches.h"
+ #include "components/translate/core/common/translate_util.h"
+ #include "components/variations/variations_associated_data.h"
+-#include "google_apis/google_api_keys.h"
+ #include "net/base/mime_util.h"
+ #include "net/base/network_change_notifier.h"
+ #include "net/base/url_util.h"
+@@ -198,17 +197,6 @@ bool TranslateManager::CanManuallyTranslate(bool menu_logging) {
+     can_translate = false;
+   }
+ 
+-  if (!ignore_missing_key_for_testing_ &&
+-      !::google_apis::HasAPIKeyConfigured()) {
+-    if (!menu_logging) {
+-      return false;
+-    }
+-    TranslateBrowserMetrics::ReportMenuTranslationUnavailableReason(
+-        TranslateBrowserMetrics::MenuTranslationUnavailableReason::
+-            kApiKeysMissing);
+-    can_translate = false;
+-  }
+-
+   // not supported MIME type pages currently cannot be translated.
+   // See bug: 217945, 1208340.
+   if (!IsMimeTypeSupported(translate_driver_->GetContentsMimeType())) {
+@@ -741,9 +729,7 @@ void TranslateManager::SetIgnoreMissingKeyForTesting(bool ignore) {
+ // static
+ bool TranslateManager::IsAvailable(const TranslatePrefs* prefs) {
+   // These conditions mirror the conditions in InitiateTranslation.
+-  return (ignore_missing_key_for_testing_ ||
+-          ::google_apis::HasAPIKeyConfigured()) &&
+-         prefs->IsOfferTranslateEnabled();
++  return prefs->IsOfferTranslateEnabled();
+ }
+ 
+ void TranslateManager::InitTranslateEvent(std::string_view src_lang,
+@@ -915,11 +901,8 @@ void TranslateManager::FilterIsTranslatePossible(
+         TriggerDecision::kDisabledOffline);
+   }
+ 
+-  if (!ignore_missing_key_for_testing_ &&
+-      !::google_apis::HasAPIKeyConfigured()) {
+-    // Without an API key, translate won't work, so don't offer to translate in
+-    // the first place. Leave kOfferTranslateEnabled on, though, because that
+-    // settings syncs and we don't want to turn off translate everywhere else.
++  if (!translate_client_->HasTranslationEngine()) {
++    // uw: without a translation engine, nothing can translate.
+     decision->PreventAllTriggering();
+     GetActiveTranslateMetricsLogger()->LogTriggerDecision(
+         TriggerDecision::kDisabledMissingAPIKey);
+@@ -1166,74 +1149,9 @@ bool TranslateManager::MaterializeDecision(
+     return true;
+   }
+ 
+-  if (decision.can_auto_href_translate()) {
+-    TranslatePage(decision.href_translate_source,
+-                  decision.href_translate_target, false,
+-                  TranslationType::kAutomaticTranslationByHref);
+-    GetActiveTranslateMetricsLogger()->LogTriggerDecision(
+-        TriggerDecision::kAutomaticTranslationByHref);
+-    return true;
+-  }
+-
+-  if (decision.can_auto_translate_for_predefined_language()) {
+-    TranslatePage(decision.predefined_translate_source,
+-                  decision.predefined_translate_target, false,
+-                  TranslationType::kAutomaticTranslationToPredefinedTarget);
+-    GetActiveTranslateMetricsLogger()->LogTriggerDecision(
+-        TriggerDecision::kAutomaticTranslationToPredefinedTarget);
+-    return true;
+-  }
+-
+-  // Auto-translate didn't happen, so check if the UI should be shown. It must
+-  // not be suppressed by preference, system state, or the Ranker.
+-
+-  // Will be true if we've decided to show the infobar/bubble UI to the user.
+-  bool did_show_ui = false;
+-
+-  // Check whether the target language is predefined. If it is predefined
+-  // trigger Translate UI even if it would not otherwise be triggered
+-  // or would be triggered with another language.
+-  if (decision.can_show_predefined_language_translate_ui()) {
+-    did_show_ui = translate_client_->ShowTranslateUI(
+-        translate::TRANSLATE_STEP_BEFORE_TRANSLATE,
+-        std::string(page_language_code), decision.predefined_translate_target,
+-        TranslateErrors::NONE, false);
+-  }
+-
+-  if (!did_show_ui && decision.ShouldShowUI()) {
+-    // If the source language matches the UI language, it means the translation
+-    // prompt is being forced by an experiment. Report this so the count of how
+-    // often it happens can be tracked to suppress the experiment as necessary.
+-    if (page_language_code ==
+-        TranslateDownloadManager::GetLanguageCode(
+-            TranslateDownloadManager::GetInstance()->application_locale())) {
+-      translate_prefs->ReportForceTriggerOnEnglishPages();
+-    }
+-
+-    // Prompts the user if they want the page translated.
+-    did_show_ui = translate_client_->ShowTranslateUI(
+-        translate::TRANSLATE_STEP_BEFORE_TRANSLATE,
+-        std::string(page_language_code), std::string(target_lang),
+-        TranslateErrors::NONE, false);
+-  }
+-
+-  // Auto-translate didn't happen, and the UI wasn't shown so consider the
+-  // hrefTranslate attribute if it was present on the originating link.
+-  if (!did_show_ui && decision.can_show_href_translate_ui()) {
+-    did_show_ui = translate_client_->ShowTranslateUI(
+-        translate::TRANSLATE_STEP_BEFORE_TRANSLATE,
+-        decision.href_translate_source, decision.href_translate_target,
+-        TranslateErrors::NONE, false);
+-    GetActiveTranslateMetricsLogger()->LogTriggerDecision(
+-        TriggerDecision::kShowUIFromHref);
+-  }
+-
+-  if (did_show_ui) {
+-    GetActiveTranslateMetricsLogger()->LogTriggerDecision(
+-        TriggerDecision::kShowUI);
+-  }
+-
+-  return did_show_ui;
++  // uw never offers to translate by itself, and translates by itself only the
++  // languages the user asked it to and pages reached from a translated page.
++  return false;
+ }
+ 
+ void TranslateManager::RecordDecisionMetrics(
+@@ -1319,4 +1237,8 @@ void TranslateManager::RegisterTranslateMetricsLogger(
+   active_translate_metrics_logger_ = translate_metrics_logger;
+ }
+ 
++bool TranslateClient::HasTranslationEngine() {
++  return false;
++}
++
+ }  // namespace translate
+diff --git a/components/translate/core/browser/translate_ranker_impl.cc b/components/translate/core/browser/translate_ranker_impl.cc
+index 379099eda553440646e2e630535ff78af5c49c77..9f31dc0eed3c0550e34a1230708bf75b0b1a3200 100644
+--- a/components/translate/core/browser/translate_ranker_impl.cc
++++ b/components/translate/core/browser/translate_ranker_impl.cc
+@@ -93,8 +93,10 @@ const char kDefaultTranslateRankerModelURL[] =
+     "translate/2017/03/translate_ranker_model_20170329.pb.bin";
+ #endif
+ 
+-BASE_FEATURE(kTranslateRankerQuery, base::FEATURE_ENABLED_BY_DEFAULT);
+-BASE_FEATURE(kTranslateRankerEnforcement, base::FEATURE_ENABLED_BY_DEFAULT);
++// uw: off, so the ranker's model is never downloaded. uw never offers to
++// translate by itself, so it has nothing to rank.
++BASE_FEATURE(kTranslateRankerQuery, base::FEATURE_DISABLED_BY_DEFAULT);
++BASE_FEATURE(kTranslateRankerEnforcement, base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ TranslateRankerFeatures::TranslateRankerFeatures() = default;
+ 
+diff --git a/components/translate/core/browser/translate_script.cc b/components/translate/core/browser/translate_script.cc
+index db76c7938f708a8e3817e4bc1a51d16bc8f32cda..af34c91332713e7e58c128ddd55c0a69fb07126b 100644
+--- a/components/translate/core/browser/translate_script.cc
++++ b/components/translate/core/browser/translate_script.cc
+@@ -93,43 +93,10 @@ void TranslateScript::Request(RequestCallback callback,
+   DCHECK(data_.empty()) << "Do not fetch the script if it is already fetched";
+   callback_list_.AddUnsafe(std::move(callback));
+ 
+-  if (fetcher_) {
+-    // If there is already a request in progress, do nothing. |callback| will be
+-    // run on completion.
+-    return;
+-  }
+-
+-  GURL translate_script_url = GetTranslateScriptURL();
+-
+-  if (base::FeatureList::IsEnabled(kTranslateElementRegionalization)) {
+-    DataRegion data_region = GetDataRegionFromPref(prefs);
+-
+-    fetched_data_region_ = data_region;
+-
+-    switch (data_region) {
+-      case DataRegion::kUnitedStates:
+-        translate_script_url =
+-            net::AppendQueryParameter(translate_script_url, "region", "us");
+-        break;
+-      case DataRegion::kEurope:
+-        translate_script_url =
+-            net::AppendQueryParameter(translate_script_url, "region", "eu");
+-        break;
+-      case DataRegion::kNoPreference:
+-        // Do nothing, no region parameter needed.
+-        break;
+-    }
+-  }
+-
+-  net::HttpRequestHeaders headers;
+-  headers.SetHeader(TranslateScript::kRequestHeaderName,
+-                    TranslateScript::kRequestHeaderValue);
+-  fetcher_ = std::make_unique<TranslateURLFetcherImpl>(headers);
+-
+-  fetcher_->Request(translate_script_url,
+-                    base::BindOnce(&TranslateScript::OnScriptFetchComplete,
+-                                   base::Unretained(this)),
+-                    is_incognito);
++  // uw: the page script is uw's own, built in, and asks Google for nothing.
++  OnScriptFetchComplete(
++      true, ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
++                IDR_UW_TRANSLATE_JS));
+ }
+ 
+ // static

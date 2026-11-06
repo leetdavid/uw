@@ -5,6 +5,7 @@ group("browser_tests") {
     "codecs:browser_tests",
     "pins:browser_tests",
     "privacy:browser_tests",
+    "translation:browser_tests",
     "problem_reports:browser_tests",
     "tab_organization:browser_tests",
     "ui:browser_tests",
