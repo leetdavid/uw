@@ -155,6 +155,16 @@ Select a tab in the second window that the first one shows. Expected result: the
 
 Close one of the windows: no tab closes. Close the last one, then press Cmd+N or click uw in the Dock: every tab is back, and a page playing sound or a terminal running a program kept running. Quit and launch again: each window comes back with its selected tab, and no tab is doubled. Drag a tab onto the desktop and back: the window it opened closes, and the tab is where it was. Launch with `--disable-features=UwSharedTabs` to give each window its own tabs again.
 
+### Split view
+
+On a web page, press Cmd+D and pick a page in the command bar. Then press Cmd+Shift+D.
+
+Expected result: Cmd+D splits the page left and right, and the new pane on the right opens the command bar. Cmd+Shift+D splits the right pane top and bottom, and the left pane keeps its size. The pane you're in is outlined, and the others show a tag with their site. The sidebar shows the split as one box with a row per pane, left to right and then top to bottom, and Ctrl+Tab goes through the panes in that order before leaving the split. Drag the gap between two panes to resize them. Cmd+D in a terminal tab opens a new terminal in the same folder. A pane that would be under 200 pixels wide or tall does not split.
+
+Press Shift+Cmd+Return. Expected result: the pane fills the page area and the others hide. A video playing in a hidden pane moves to the mini player. Press the keys again, or Ctrl+Tab to another pane, and the panes come back.
+
+Press Cmd+W: that pane closes, and the panes beside it take its space. Right-click a tab in the split and choose `Close`: the whole split closes, and Shift+Cmd+T brings it back with its panes, their sizes, and the pane you were in. Quit and launch again: the split is still there. While a tab is in a split, the organizer neither asks about it nor moves it.
+
 ### Themes
 
 Open the theme picker from View → Theme…, from `Theme…` in the menu of empty space in the sidebar, or from the `Theme` row at `uw://settings/uwOrganization`.
@@ -272,6 +282,7 @@ A local build is uw dev. Install its command from uw dev's settings and run it a
 - Shared pinned-page sessions, saved home URLs, and Peek previews.
 - The Chats section in the sidebar, scheduled chats, and prompt-built site customizations.
 - A warning before a terminal that is running a command closes, and terminals that come back in their folder after a restart.
+- Dragging panes, pinned split views, and a split that shows in every window on its workspace.
 - Verified extension compatibility or daily-use stability.
 
 ## Report a problem
