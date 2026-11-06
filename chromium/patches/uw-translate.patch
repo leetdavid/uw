@@ -1,3 +1,219 @@
+diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
+index 68c3d83e553b053168dd5d3b9f56f53a2894d744..162fac264fb08449faf54166ed006165d02fe3d8 100644
+--- a/chrome/BUILD.gn
++++ b/chrome/BUILD.gn
+@@ -912,10 +912,20 @@ if (is_win) {
+     " (Aperitif Alerts)",
+   ]
+ 
++  # uw: runs the on-device translation service. The release signs it with the
++  # entitlement to load Google's TranslateKit; see
++  # //uw/browser/translation/helper-translate-entitlements.plist.
++  translate_helper_params = [
++    "translate",
++    ".translate",
++    " (Translate)",
++  ]
++
+   # Merge all helper apps needed by //content and //chrome.
+   chrome_mac_helpers = content_mac_helpers + content_mac_aperitif_helpers + [
+                          alert_helper_params,
+                          aperitif_alert_helper_params,
++                         translate_helper_params,
+                        ]
+ 
+   # Create all helper apps required by //content.
+@@ -965,6 +975,11 @@ if (is_win) {
+     }
+   }
+ 
++  chrome_helper_app("chrome_helper_app_${translate_helper_params[0]}") {
++    helper_name_suffix = translate_helper_params[2]
++    helper_bundle_id_suffix = translate_helper_params[1]
++  }
++
+   chrome_helper_app("chrome_helper_app_${alert_helper_params[0]}") {
+     helper_name_suffix = alert_helper_params[2]
+     helper_bundle_id_suffix = alert_helper_params[1]
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index 47206ed5ed68b38b984f5df2ac869c3bf4a140fd..7bdec42014c237f0e0e41daa3fb1a46a880ddd44 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -503,6 +503,45 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_DELETE_PROFILE_TOO" desc="Button that deletes a workspace and its profile, with the profile's sign-ins, history, and pins.">Delete Profile Too</message>
+       <message name="IDS_UW_KEEP_PROFILE" desc="Default button that deletes a profile's last workspace and keeps the profile.">Keep Profile</message>
+       <message name="IDS_UW_MOVE_TO_WORKSPACE" desc="In Title Case: Item in a tab's menu that opens a list of workspaces to move the tab to.">Move to Workspace</message>
++      <if expr="is_macosx">
++        <message name="IDS_UW_TRANSLATE_SET_UP" desc="In Title Case: Item in a page's right-click menu and the app menu that opens the translation settings, where the user picks what translates pages.">Set Up Translation…</message>
++      </if>
++      <if expr="not is_macosx">
++        <message name="IDS_UW_TRANSLATE_SET_UP" desc="Item in a page's right-click menu and the app menu that opens the translation settings, where the user picks what translates pages.">Set up translation…</message>
++      </if>
++      <if expr="is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH" desc="In Title Case: Item in a page's right-click menu that opens a list of translation engines, to translate the page with one of them this one time.">Translate With</message>
++      </if>
++      <if expr="not is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH" desc="Item in a page's right-click menu that opens a list of translation engines, to translate the page with one of them this one time.">Translate with</message>
++      </if>
++      <if expr="is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_DEVICE" desc="In Title Case: Item under Translate With that translates the page on this computer, with no text sent anywhere.">This Device</message>
++      </if>
++      <if expr="not is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_DEVICE" desc="Item under Translate With that translates the page on this computer, with no text sent anywhere.">This device</message>
++      </if>
++      <if expr="is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_GOOGLE_CLOUD" desc="In Title Case: Item under Translate With that translates the page with Google Cloud Translation, using the user's own key. Google Cloud is a product name.">Google Cloud</message>
++      </if>
++      <if expr="not is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_GOOGLE_CLOUD" desc="Item under Translate With that translates the page with Google Cloud Translation, using the user's own key. Google Cloud is a product name.">Google Cloud</message>
++      </if>
++      <if expr="is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_AI" desc="In Title Case: Item under Translate With that translates the page with a language model from the user's AI provider.">AI Provider</message>
++      </if>
++      <if expr="not is_macosx">
++        <message name="IDS_UW_TRANSLATE_WITH_AI" desc="Item under Translate With that translates the page with a language model from the user's AI provider.">AI provider</message>
++      </if>
++      <message name="IDS_UW_TRANSLATION_ENGINE_DEVICE" desc="Name of the translation engine that runs on this computer, at the start of a sentence in the translate bubble.">This device</message>
++      <message name="IDS_UW_TRANSLATION_ENGINE_GOOGLE_CLOUD" desc="Name of the translation engine that uses Google Cloud Translation, at the start of a sentence in the translate bubble. Google Cloud is a product name.">Google Cloud</message>
++      <message name="IDS_UW_TRANSLATION_ENGINE_AI" desc="Name of the translation engine that uses the user's AI provider, at the start of a sentence in the translate bubble.">AI provider</message>
++      <message name="IDS_UW_TRANSLATE_DOWNLOADING" desc="Line in the translate bubble while this computer downloads what it needs to translate a language, with the percentage done.">Downloading <ph name="LANGUAGE">$1<ex>Japanese</ex></ph> to this device… <ph name="PERCENT">$2<ex>45</ex></ph>%</message>
++      <message name="IDS_UW_TRANSLATE_ENGINE_LACKS_LANGUAGE" desc="Title of the translate bubble when the translation engine does not know the page's language."><ph name="ENGINE">$1<ex>This device</ex></ph> can't translate <ph name="LANGUAGE">$2<ex>Swahili</ex></ph></message>
++      <message name="IDS_UW_TRANSLATE_ENGINE_UNKNOWN_LANGUAGE" desc="Title of the translate bubble when the translation engine cannot tell the page's language."><ph name="ENGINE">$1<ex>This device</ex></ph> can't tell what language this page is in</message>
++      <message name="IDS_UW_TRANSLATE_ENGINE_FAILED" desc="Title of the translate bubble when the translation engine or its service failed."><ph name="ENGINE">$1<ex>This device</ex></ph> couldn't translate this page</message>
++      <message name="IDS_UW_TRANSLATE_WITH_ENGINE" desc="Button in the translate bubble that translates the page with another engine this one time.">Translate with <ph name="ENGINE">$1<ex>Google Cloud</ex></ph></message>
++      <message name="IDS_UW_TRANSLATE_SET_UP_ANOTHER" desc="Button in the translate bubble that opens the translation settings to set up another translation engine.">Set up another engine…</message>
+       <message name="IDS_UW_REOPENS_IN_ANOTHER_PROFILE" desc="Heading over the workspaces of other profiles in the Move to Workspace list. Their tab reopens there from its address.">Reopens in another profile</message>
+       <!-- Access Code Cast specific strings -->
+       <part file="access_code_cast_strings.grdp" />
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+index 7a17f664a8235e221f367ce14573ee871e9f8ce5..ef8a9c84459c8588b769a1ff3b12cdbbe42cf74b 100644
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -1215,6 +1215,72 @@
+       <message name="IDS_SETTINGS_LANGUAGES_OFFER_TO_ENABLE_TRANSLATE_SUBLABEL_WITH_PDF" desc="The sublabel of the check-box that enables the prompt to translate a page or PDF.">
+   When on, Google Translate will offer to translate sites and PDFs into your preferred language. It can also automatically translate sites.
+ </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_ENGINE" desc="Label of the menu in the translation settings that picks what translates pages: none, this device, Google Cloud Translation, or an AI provider.">
++        Translate pages with
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_ENGINE_NONE" desc="Choice in the translation engine menu: nothing translates pages.">
++        Nothing
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_ENGINE_DEVICE" desc="Choice in the translation engine menu: pages are translated on this computer.">
++        This device
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_ENGINE_GOOGLE_CLOUD" desc="Choice in the translation engine menu: pages are translated by Google Cloud Translation with the user's own key. Google Cloud Translation is a product name.">
++        Google Cloud Translation
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_ENGINE_AI" desc="Choice in the translation engine menu: pages are translated by a language model from the user's AI provider.">
++        AI provider
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_NONE_NOTE" desc="Note under the translation engine menu while no engine is picked.">
++        Pick one to translate pages. uw never offers to translate by itself.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_DEVICE_NOTE" desc="Note under the translation engine menu while this device translates pages.">
++        Pages are translated on this device. Their text isn't sent anywhere.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_CLOUD_NOTE" desc="Note under the translation engine menu while Google Cloud Translation translates pages.">
++        The text of each page you translate goes to Google, from private windows too.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_AI_NOTE" desc="Note under the translation engine menu while an AI provider translates pages.">
++        The text of each page you translate goes to your AI provider, from private windows too.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_DOWNLOADED" desc="Heading of the list of languages this computer has downloaded for translating pages.">
++        Downloaded languages
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_NO_DOWNLOADS" desc="Shown in place of the downloaded languages while there are none.">
++        None yet. A language downloads the first time a page needs it.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_REMOVE_LANGUAGE" desc="Text read by screen readers for the button that deletes a downloaded translation language.">
++        Remove <ph name="LANGUAGE">$1<ex>Japanese</ex></ph>
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_TARGET_UNSUPPORTED" desc="Note when this computer cannot translate into the language pages are translated into.">
++        This device can't translate into <ph name="LANGUAGE">$1<ex>Catalan</ex></ph>.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY" desc="Label of the field for the user's Google Cloud API key.">
++        API key
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_HINT" desc="Hint under the Google Cloud API key field.">
++        A Google Cloud API key with the Cloud Translation API turned on. It's kept on this device and used by every profile.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_SAVE" desc="Button that checks and saves the Google Cloud API key.">
++        Save
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_CHECKING" desc="Shown while the Google Cloud API key is checked by translating one word.">
++        Checking the key…
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_SAVED" desc="Shown once a Google Cloud API key is saved and works.">
++        A key is saved, and it works.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_GOOGLE_KEY_REMOVE" desc="Button that deletes the saved Google Cloud API key.">
++        Remove key
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_MODEL" desc="Label of the menu that picks the language model that translates pages.">
++        Model
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_NO_MODELS" desc="Shown in place of the model menu when no AI provider is saved.">
++        Add a provider on the AI providers page first.
++      </message>
++      <message name="IDS_UW_SETTINGS_TRANSLATION_OPEN_PROVIDERS" desc="Button that opens uw's AI providers page.">
++        AI providers
++      </message>
+       <message name="IDS_SETTINGS_LANGUAGES_TRANSLATE_TARGET" desc="The label under a language's name in a list of enabled languages indicating that pages will be translated to this language.">
+         This language is used when translating pages
+       </message>
+diff --git a/chrome/browser/child_process_host_flags.h b/chrome/browser/child_process_host_flags.h
+index 4893825b11968004a3e0df24896a43651c7e4c20..780b08c1533ea4817c2f584ce94cb6aafed9e545 100644
+--- a/chrome/browser/child_process_host_flags.h
++++ b/chrome/browser/child_process_host_flags.h
+@@ -16,6 +16,11 @@ enum class ChildProcessHostFlags {
+   // alerts instead of banners which are shown by the main app.
+   kChildProcessHelperAlerts =
+       content::ChildProcessHost::CHILD_EMBEDDER_FIRST + 1,
++  // uw: runs the on-device translation service, the one helper allowed to load
++  // a library another team signed: Google's TranslateKit. See uw's ADR 0034
++  // and kTranslateHelperFlags in service_launcher.cc.
++  kChildProcessHelperTranslate =
++      content::ChildProcessHost::CHILD_EMBEDDER_FIRST + 2,
+ #endif  // BUILDFLAG(IS_MAC)
+ };
+ 
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index 09b450d58aa84054c428be019c8671f10fd889ab..24755b7037ac046eaa4aebb231b84fdcb8891b5d 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -8780,6 +8780,10 @@ std::string ChromeContentBrowserClient::GetChildProcessSuffix(int child_flags) {
+     }
+     return chrome::kMacHelperSuffixAlerts;
+   }
++  if (child_flags ==
++      std::to_underlying(ChildProcessHostFlags::kChildProcessHelperTranslate)) {
++    return " (Translate)";
++  }
+   NOTREACHED() << "Unsupported child process flags!";
+ }
+ #endif  // BUILDFLAG(IS_MAC)
+diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+index 93efa759d535182ba84a7b5cd0563ab2de56303a..8764f79a059e531791097de0759f06d95cacf303 100644
+--- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
++++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
+@@ -82,6 +82,7 @@
+ #include "extensions/browser/extension_system.h"
+ #include "extensions/browser/management_policy.h"
+ #include "extensions/common/extension.h"
++#include "uw/browser/translation/translation_prefs.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/constants/ash_login_pref_names.h"
+@@ -522,6 +523,8 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
+       settings_api::PrefType::kString;
+   (*s_allowlist)[translate::prefs::kPrefAlwaysTranslateList] =
+       settings_api::PrefType::kList;
++  (*s_allowlist)[uw::kTranslationEnginePref] =
++      settings_api::PrefType::kString;
+ #if BUILDFLAG(IS_CHROMEOS)
+   (*s_allowlist)[ash::prefs::kLanguageImeMenuActivated] =
+       settings_api::PrefType::kBoolean;
 diff --git a/chrome/browser/prefs/BUILD.gn b/chrome/browser/prefs/BUILD.gn
 index e802cb451a2f54b874bfe49def1923164553f72b..4ddd7e40b86c2d28b9b0540216f7cb124734721e 100644
 --- a/chrome/browser/prefs/BUILD.gn
@@ -30,6 +246,347 @@ index c339010bb3465bfb79b756c4af25b5eef22d5ce1..2f075ae072165ad6516754e19549bb66
    registry->RegisterBooleanPref(prefs::kCtrlTabMru, false);
    cross_device::RegisterProfilePrefs(registry);
    enterprise::RegisterIdentifiersProfilePrefs(registry);
+diff --git a/chrome/browser/renderer_context_menu/BUILD.gn b/chrome/browser/renderer_context_menu/BUILD.gn
+index db3ab9dae742191cb8138c5fb8d6f432a2199dbc..77b79d60f010af278a074376f40137cec319b5b1 100644
+--- a/chrome/browser/renderer_context_menu/BUILD.gn
++++ b/chrome/browser/renderer_context_menu/BUILD.gn
+@@ -146,6 +146,7 @@ source_set("impl") {
+       "//chrome/browser/spellchecker",
+       "//chrome/browser/sync",
+       "//chrome/browser/translate",
++      "//uw/browser/translation:menu",
+       "//chrome/browser/ui",
+       "//chrome/browser/ui:chrome_pages",
+       "//chrome/browser/ui:confirm_bubble",
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..c016eae65baf5d532c967c722dbc5a3d62d981b8 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -284,6 +284,7 @@
+ #include "ui/gfx/vector_icon_types.h"
+ #include "ui/strings/grit/ui_strings.h"
+ #include "url/origin.h"
++#include "uw/browser/translation/translate_menu.h"
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX) || \
+     BUILDFLAG(IS_CHROMEOS)
+@@ -2593,6 +2594,9 @@ void RenderViewContextMenu::AppendPageItems() {
+     // Translate to language
+     if (CanTranslate(/*menu_logging=*/true)) {
+       AppendTranslateItem();
++      uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
++                                uw_translate_with_submenu_,
++                                /*with_submenu=*/true);
+     }
+ 
+     menu_model_.AddSeparator(ui::NORMAL_SEPARATOR);
+@@ -2677,6 +2681,9 @@ void RenderViewContextMenu::AppendPageItems() {
+ 
+   if (CanTranslate(/*menu_logging=*/true)) {
+     AppendTranslateItem();
++    uw::AddTranslateMenuItems(embedder_web_contents_, menu_model_, this,
++                              uw_translate_with_submenu_,
++                              /*with_submenu=*/true);
+   }
+ }
+ 
+@@ -3313,6 +3320,9 @@ void RenderViewContextMenu::AppendLiveCaptionItem() {
+ // Menu delegate functions -----------------------------------------------------
+ 
+ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
++  if (uw::IsTranslateMenuCommand(id)) {
++    return uw::IsTranslateMenuCommandEnabled(embedder_web_contents_, id);
++  }
+ #if BUILDFLAG(IS_CHROMEOS)
+   // Disable context menu in locked fullscreen mode to prevent users from
+   // exiting this mode (the menu is not really disabled as the user can still
+@@ -3429,7 +3439,8 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
+       return IsDevCommandEnabled(id);
+ 
+     case IDC_CONTENT_CONTEXT_TRANSLATE:
+-      return navigation_allowed && IsTranslateEnabled();
++      return navigation_allowed && IsTranslateEnabled() &&
++             uw::HasTranslationEngine(embedder_web_contents_);
+ 
+     case IDC_CONTENT_CONTEXT_PARTIAL_TRANSLATE:
+       return navigation_allowed;
+@@ -3657,6 +3668,10 @@ bool RenderViewContextMenu::IsCommandIdChecked(int id) const {
+     return true;
+   }
+ 
++  if (uw::IsTranslateMenuCommand(id)) {
++    return uw::IsTranslateMenuCommandChecked(embedder_web_contents_, id);
++  }
++
+   // See if the video is set to looping.
+   if (id == IDC_CONTENT_CONTEXT_LOOP) {
+     return (params_.media_flags & ContextMenuData::kMediaLoop) != 0;
+@@ -3742,6 +3757,11 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+   }
+   command_executed_ = true;
+ 
++  if (uw::IsTranslateMenuCommand(id)) {
++    uw::ExecuteTranslateMenuCommand(embedder_web_contents_, id);
++    return;
++  }
++
+   // Process extension menu items.
+   if (ContextMenuMatcher::IsExtensionsCustomCommandId(id)) {
+     RenderFrameHost* render_frame_host = GetRenderFrameHost();
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.h b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+index 0daa02b83276fa571777ffe54ae9432961718fe3..aba0b22e616da5a3bad563ae525a3dc4a0328294 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.h
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.h
+@@ -614,6 +614,7 @@ class RenderViewContextMenu
+   const bool is_paste_and_match_style_enabled_;
+ 
+   std::unique_ptr<ui::SimpleMenuModel> send_tab_to_self_submenu_;
++  std::unique_ptr<ui::SimpleMenuModel> uw_translate_with_submenu_;
+   std::unique_ptr<send_tab_to_self::SendTabToSelfContextMenuDelegate>
+       send_tab_to_self_submenu_delegate_;
+ 
+diff --git a/chrome/browser/resources/settings/languages_page/translate_page.html b/chrome/browser/resources/settings/languages_page/translate_page.html
+index ab5a8c76727a2baf300d2b605255b138ad441c0a..935cae66ec6fcc4d0a95e54375a8434180260b39 100644
+--- a/chrome/browser/resources/settings/languages_page/translate_page.html
++++ b/chrome/browser/resources/settings/languages_page/translate_page.html
+@@ -1,12 +1,61 @@
+ <style include="cr-shared-style settings-shared md-select"></style>
+ <settings-section page-title="$i18n{translatePageTitle}">
+-<settings-toggle-button id="offerTranslateOtherLanguages"
+-    pref-key="translate.enabled"
+-    label="$i18n{offerToEnableTranslate}"
+-    sub-label="$i18n{offerToEnableTranslateSublabel}"
+-    on-settings-boolean-control-change="onTranslateToggleChange_">
+-</settings-toggle-button>
+-<cr-collapse opened="[[translateEnabledPref_.value]]">
++<div class="cr-row first">
++  <div class="flex cr-padded-text">
++    <div id="uwEngineLabel" aria-hidden="true">
++      $i18n{uwTranslationEngine}
++    </div>
++    <div id="uwEngineNote" class="secondary">
++      [[uwEngineNote_(uwEnginePref_.value)]]
++    </div>
++  </div>
++  <select id="uwEngine" class="md-select" aria-labelledby="uwEngineLabel"
++      aria-describedby="uwEngineNote" on-change="onUwEngineChange_">
++    <option value="" selected="[[uwIsEngine_(uwEnginePref_.value, '')]]">
++      $i18n{uwTranslationEngineNone}
++    </option>
++    <option value="device"
++        selected="[[uwIsEngine_(uwEnginePref_.value, 'device')]]">
++      $i18n{uwTranslationEngineDevice}
++    </option>
++    <option value="google_cloud" disabled="[[!uwGoogleCloudBuilt_]]"
++        selected="[[uwIsEngine_(uwEnginePref_.value, 'google_cloud')]]">
++      $i18n{uwTranslationEngineGoogleCloud}
++    </option>
++    <option value="ai" disabled="[[!uwAiBuilt_]]"
++        selected="[[uwIsEngine_(uwEnginePref_.value, 'ai')]]">
++      $i18n{uwTranslationEngineAi}
++    </option>
++  </select>
++</div>
++<template is="dom-if" if="[[uwIsEngine_(uwEnginePref_.value, 'device')]]">
++  <div id="uwTargetUnsupported" class="cr-row continuation secondary"
++      hidden$="[[uwTargetSupported_]]">
++    [[i18n('uwTranslationTargetUnsupported', uwTargetName_)]]
++  </div>
++  <div class="cr-row continuation">
++    <h2 class="flex">$i18n{uwTranslationDownloaded}</h2>
++  </div>
++  <div class="list-frame">
++    <div id="uwDownloadedList" class="vertical-list" role="list">
++      <template is="dom-repeat" items="[[uwDownloaded_]]">
++        <div class="list-item" role="listitem">
++          <div class="start cr-padded-text">[[item.name]]</div>
++          <div class="cr-padded-text secondary">[[item.size]]</div>
++          <cr-icon-button class="icon-delete-gray"
++              aria-label="[[i18n('uwTranslationRemoveLanguage', item.name)]]"
++              on-click="onUwRemoveLanguageClick_" title="$i18n{delete}">
++          </cr-icon-button>
++        </div>
++      </template>
++    </div>
++    <div id="uwNoDownloads" class="list-item" role="listitem"
++        hidden$="[[hasSome_(uwDownloaded_)]]">
++      $i18n{uwTranslationNoDownloads}
++    </div>
++  </div>
++</template>
++<cr-collapse opened="[[uwHasEngine_(uwEnginePref_.value)]]">
+   <div class="cr-row continuation">
+     <div id="targetLanguageLabel" class="flex cr-padded-text"
+         aria-hidden="true">
+diff --git a/chrome/browser/resources/settings/languages_page/translate_page.ts b/chrome/browser/resources/settings/languages_page/translate_page.ts
+index 24974cc365283802db88e4eb6fd0314b4865b1f4..f063346173d1c7154f920c55d7a71f982655fd19 100644
+--- a/chrome/browser/resources/settings/languages_page/translate_page.ts
++++ b/chrome/browser/resources/settings/languages_page/translate_page.ts
+@@ -15,19 +15,21 @@ import 'chrome://resources/cr_elements/cr_shared_style.css.js';
+ import 'chrome://resources/cr_elements/md_select.css.js';
+ import './add_languages_dialog.js';
+ import './languages.js';
+-import '../controls/settings_toggle_button.js';
+ import '../icons.html.js';
+ import '../settings_page/settings_section.js';
+ import '../settings_shared.css.js';
+ 
++import {PrefService} from '/shared/settings/prefs2/pref_service.js';
+ import {PrefServiceObserverMixin} from '/shared/settings/prefs2/pref_service_observer_mixin.js';
+ import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
+ import {assert} from 'chrome://resources/js/assert.js';
++import type {WebUiListener} from 'chrome://resources/js/cr.js';
++import {addWebUiListener, removeWebUiListener, sendWithPromise} from 'chrome://resources/js/cr.js';
+ import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
+ import type {DomRepeatEvent} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+ import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
+ 
+-import type {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
++import {loadTimeData} from '../i18n_setup.js';
+ 
+ import {getLanguageHelperInstance} from './languages.js';
+ import type {LanguageSettingsMetricsProxy} from './languages_settings_metrics_proxy.js';
+@@ -36,6 +38,19 @@ import type {LanguageHelper, LanguagesModel} from './languages_types.js';
+ import {convertLanguageCodeForChrome, getFullName, isTranslateBaseLanguage} from './languages_util.js';
+ import {getTemplate} from './translate_page.html.js';
+ 
++// uw: a language this device has downloaded for translating pages.
++interface UwTranslationLanguage {
++  code: string;
++  name: string;
++  size: string;
++}
++
++interface UwTranslationLanguages {
++  languages: UwTranslationLanguage[];
++  targetSupported: boolean;
++  targetName: string;
++}
++
+ const SettingsTranslatePageElementBase =
+     PrefServiceObserverMixin(I18nMixin(PolymerElement));
+ 
+@@ -60,14 +75,31 @@ export class SettingsTranslatePageElement extends
+       showAddAlwaysTranslateDialog_: Boolean,
+       showAddNeverTranslateDialog_: Boolean,
+       addLanguagesDialogLanguages_: Array,
+-      translateEnabledPref_: Object,
++      uwEnginePref_: Object,
++      uwDownloaded_: Array,
++      uwTargetSupported_: Boolean,
++      uwTargetName_: String,
++      uwGoogleCloudBuilt_: Boolean,
++      uwAiBuilt_: Boolean,
+     };
+   }
+ 
++  static get observers() {
++    return [
++      'uwRefreshLanguages_(uwEnginePref_.value, languages.translateTarget)',
++    ];
++  }
++
+   declare languages?: LanguagesModel;
+-  declare protected translateEnabledPref_:
+-      chrome.settingsPrivate.PrefObject<boolean>|undefined;
+   declare private showAddAlwaysTranslateDialog_: boolean;
++  declare protected uwEnginePref_:
++      chrome.settingsPrivate.PrefObject<string>|undefined;
++  declare protected uwDownloaded_: UwTranslationLanguage[];
++  declare protected uwTargetSupported_: boolean;
++  declare protected uwTargetName_: string;
++  declare protected uwGoogleCloudBuilt_: boolean;
++  declare protected uwAiBuilt_: boolean;
++  private uwLanguagesListener_: WebUiListener|null = null;
+   declare private showAddNeverTranslateDialog_: boolean;
+   declare private addLanguagesDialogLanguages_:
+       chrome.languageSettingsPrivate.Language[]|null;
+@@ -79,10 +111,70 @@ export class SettingsTranslatePageElement extends
+     super.connectedCallback();
+ 
+     this.mirrorPrefs({
+-      'translate.enabled': 'translateEnabledPref_',
++      'uw.translation.engine': 'uwEnginePref_',
+     });
+ 
+     this.languageHelper_ = getLanguageHelperInstance();
++    this.uwDownloaded_ = [];
++    this.uwTargetSupported_ = true;
++    this.uwTargetName_ = '';
++    this.uwGoogleCloudBuilt_ =
++        loadTimeData.getBoolean('uwTranslationGoogleCloudBuilt');
++    this.uwAiBuilt_ = loadTimeData.getBoolean('uwTranslationAiBuilt');
++    this.uwLanguagesListener_ = addWebUiListener(
++        'uw-translation-languages-changed', () => this.uwRefreshLanguages_());
++  }
++
++  override disconnectedCallback() {
++    super.disconnectedCallback();
++    if (this.uwLanguagesListener_) {
++      removeWebUiListener(this.uwLanguagesListener_);
++      this.uwLanguagesListener_ = null;
++    }
++  }
++
++  protected uwIsEngine_(value: string|undefined, engine: string): boolean {
++    return (value || '') === engine;
++  }
++
++  protected uwHasEngine_(value: string|undefined): boolean {
++    return !!value;
++  }
++
++  protected uwEngineNote_(value: string|undefined): string {
++    switch (value || '') {
++      case 'device':
++        return this.i18n('uwTranslationDeviceNote');
++      case 'google_cloud':
++        return this.i18n('uwTranslationGoogleCloudNote');
++      case 'ai':
++        return this.i18n('uwTranslationAiNote');
++      default:
++        return this.i18n('uwTranslationNoneNote');
++    }
++  }
++
++  protected onUwEngineChange_(event: Event) {
++    PrefService.getInstance().setPrefValue<string>(
++        'uw.translation.engine', (event.target as HTMLSelectElement).value);
++  }
++
++  protected onUwRemoveLanguageClick_(
++      event: DomRepeatEvent<UwTranslationLanguage>) {
++    chrome.send('uwRemoveTranslationLanguage', [event.model.item.code]);
++  }
++
++  private uwRefreshLanguages_() {
++    if (!this.uwIsEngine_(this.uwEnginePref_?.value, 'device')) {
++      return;
++    }
++    sendWithPromise<UwTranslationLanguages>(
++        'uwGetTranslationLanguages', this.languages?.translateTarget || '')
++        .then(result => {
++          this.uwDownloaded_ = result.languages;
++          this.uwTargetSupported_ = result.targetSupported;
++          this.uwTargetName_ = result.targetName;
++        });
+   }
+ 
+   private onTargetLanguageChange_() {
+@@ -217,13 +309,6 @@ export class SettingsTranslatePageElement extends
+         LanguageSettingsActionType.REMOVE_FROM_NEVER_TRANSLATE);
+   }
+ 
+-  private onTranslateToggleChange_(e: Event) {
+-    this.languageSettingsMetricsProxy_.recordSettingsMetric(
+-        (e.target as SettingsToggleButtonElement).checked ?
+-            LanguageSettingsActionType.ENABLE_TRANSLATE_GLOBALLY :
+-            LanguageSettingsActionType.DISABLE_TRANSLATE_GLOBALLY);
+-  }
+-
+   /**
+    * @return Whether the list has any items.
+    */
 diff --git a/chrome/browser/translate/BUILD.gn b/chrome/browser/translate/BUILD.gn
 index 1e4b7db012ae68b710069944cbf457517724d943..c7251c649365e6e7b41f8c969ec9c15a114a4034 100644
 --- a/chrome/browser/translate/BUILD.gn
@@ -146,6 +703,387 @@ index f1706d05c89ad874b582ad5e4fea86d4377656a1..24b67c362d3e62c60dc099e02a8813da
  }
  
  // static
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index c51887a0f14841f0d5560c1a1631214aadd184a4..022c901e41a797310b690fed9ef89082c2e7b104 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -1333,6 +1333,7 @@ static_library("ui") {
+     # Non-android deps for "ui" target.
+     deps += [
+       "//uw/browser/tab_organization",
++      "//uw/browser/translation:menu",
+       "//uw/browser/ui/webui/uw_chat",
+       "//uw/browser/ui/webui/uw_organization:mojo_bindings",
+       "//uw/browser/ui/webui/uw_shortcuts:mojo_bindings",
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index b7bd5b8d91e5814c3914835782fe94e0f8a39b42..1720e7c37e3d1129d756d43a89b335e736b1efbf 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -148,6 +148,7 @@
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/agent/chat_tab.h"
+ #include "uw/browser/terminal/terminal_tab.h"
++#include "uw/browser/translation/translate_menu.h"
+ #include "uw/browser/ui/views/command_bar/command_bar.h"
+ #include "uw/browser/ui/views/tab_organization/window_commands.h"
+ #include "uw/browser/ui/views/workspaces/workspace_switcher.h"
+@@ -2263,7 +2264,8 @@ void BrowserCommandController::UpdateCommandsForTabState() {
+       ChromeTranslateClient::FromWebContents(current_web_contents);
+   const bool can_translate =
+       chrome_translate_client &&
+-      chrome_translate_client->GetTranslateManager()->CanManuallyTranslate();
++      chrome_translate_client->GetTranslateManager()->CanManuallyTranslate() &&
++      uw::HasTranslationEngine(current_web_contents);
+   UpdateCommandAndActionEnabled(IDC_SHOW_TRANSLATE, kActionShowTranslate,
+                                 can_translate);
+ 
+diff --git a/chrome/browser/ui/toolbar/app_menu_model.cc b/chrome/browser/ui/toolbar/app_menu_model.cc
+index 14765d4d1540b399794897f761326d665c230500..024b2e99840e1929619cf8f62abf140cf194ed05 100644
+--- a/chrome/browser/ui/toolbar/app_menu_model.cc
++++ b/chrome/browser/ui/toolbar/app_menu_model.cc
+@@ -167,6 +167,7 @@
+ #include "ui/gfx/paint_vector_icon.h"
+ #include "ui/gfx/text_elider.h"
+ #include "ui/menus/simple_menu_model.h"
++#include "uw/browser/translation/translate_menu.h"
+ 
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING) || BUILDFLAG(IS_CHROMEOS)
+ #include "base/feature_list.h"
+@@ -1362,6 +1363,12 @@ void AppMenuModel::ExecuteCommand(int command_id, int event_flags) {
+     return;
+   }
+ 
++  if (uw::IsTranslateMenuCommand(command_id)) {
++    uw::ExecuteTranslateMenuCommand(
++        browser_->tab_strip_model()->GetActiveWebContents(), command_id);
++    return;
++  }
++
+   if (command_id == IDC_VIEW_PASSWORDS) {
+     browser()->GetProfile()->GetPrefs()->SetBoolean(
+         password_manager::prefs::kPasswordsPrefWithNewLabelUsed, true);
+@@ -2110,6 +2117,10 @@ bool AppMenuModel::IsCommandIdEnabled(int command_id) const {
+     return true;
+   }
+ 
++  if (uw::IsTranslateMenuCommand(command_id)) {
++    return true;
++  }
++
+   switch (command_id) {
+     case IDC_NEW_INCOGNITO_WINDOW:
+       return IncognitoModePrefs::IsIncognitoAllowed(browser_->GetProfile());
+@@ -2354,6 +2365,9 @@ void AppMenuModel::Build() {
+ 
+   AddItemWithStringIdAndVectorIcon(this, IDC_SHOW_TRANSLATE, IDS_SHOW_TRANSLATE,
+                                    vector_icons::kGTranslateIcon);
++  std::unique_ptr<ui::SimpleMenuModel> no_submenu;
++  uw::AddTranslateMenuItems(browser_->tab_strip_model()->GetActiveWebContents(),
++                            *this, this, no_submenu, /*with_submenu=*/false);
+ 
+   CreateFindAndEditSubMenu();
+ 
+diff --git a/chrome/browser/ui/views/translate/BUILD.gn b/chrome/browser/ui/views/translate/BUILD.gn
+index 03364f38b69d463c1c0357e8b2f2e83dc85c5664..5a3fc921d3537956ec8ae067462f7a46a259df1e 100644
+--- a/chrome/browser/ui/views/translate/BUILD.gn
++++ b/chrome/browser/ui/views/translate/BUILD.gn
+@@ -35,6 +35,7 @@ source_set("translate") {
+     "//ui/base/unowned_user_data",
+     "//ui/menus",
+     "//ui/views",
++    "//uw/browser/translation",
+   ]
+ }
+ 
+@@ -73,6 +74,7 @@ source_set("impl") {
+     "//components/vector_icons",
+     "//services/network/public/cpp",
+     "//ui/strings:ui_strings",
++    "//uw/browser/ui/views/translation",
+   ]
+   public_deps = [ "//chrome/browser:browser_public_dependencies" ]
+ }
+diff --git a/chrome/browser/ui/views/translate/translate_bubble_view.cc b/chrome/browser/ui/views/translate/translate_bubble_view.cc
+index 7c12096ea734f9ddf3127b052159e88d29d7113e..1bc330d5108e95a33a5bd2ba03ff4f4c04a7e0ff 100644
+--- a/chrome/browser/ui/views/translate/translate_bubble_view.cc
++++ b/chrome/browser/ui/views/translate/translate_bubble_view.cc
+@@ -17,6 +17,7 @@
+ #include "base/memory/singleton.h"
+ #include "base/metrics/field_trial_params.h"
+ #include "base/strings/utf_string_conversions.h"
++#include "base/task/sequenced_task_runner.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
+@@ -84,6 +85,7 @@
+ #include "ui/views/style/platform_style.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
++#include "uw/browser/ui/views/translation/translation_bubble.h"
+ 
+ namespace {
+ 
+@@ -155,6 +157,9 @@ TranslateBubbleView::TranslateBubbleView(
+   if (web_contents) {  // web_contents can be null in unit_tests.
+     mouse_handler_ =
+         std::make_unique<WebContentMouseHandler>(this, web_contents);
++    if (auto* translator = uw::PageTranslator::FromWebContents(web_contents)) {
++      uw_observation_.Observe(translator);
++    }
+   }
+   SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
+   SetFootnoteView(CreateWordmarkView());
+@@ -166,6 +171,10 @@ TranslateBubbleView::~TranslateBubbleView() {
+   // the child view is destructed. For example, `source_language_combobox_` has
+   // a pointer to `model_`. Before destroying the models, removing the child
+   // views is needed.
++  uw_download_label_ = nullptr;
++  uw_error_title_ = nullptr;
++  uw_error_message_ = nullptr;
++  uw_error_buttons_ = nullptr;
+   translate_view_ = nullptr;
+   error_view_ = nullptr;
+   advanced_view_source_ = nullptr;
+@@ -244,6 +253,7 @@ void TranslateBubbleView::Init() {
+   if (GetViewState() == TranslateBubbleModel::VIEW_STATE_ERROR) {
+     model_->ShowError(error_type_);
+   }
++  UpdateUwParts();
+ }
+ 
+ views::View* TranslateBubbleView::GetInitiallyFocusedView() {
+@@ -738,6 +748,13 @@ std::unique_ptr<views::View> TranslateBubbleView::CreateView() {
+                                             gfx::Insets::VH(2, 0));
+   }
+ 
++  auto download_label = std::make_unique<views::Label>(
++      std::u16string(), views::style::CONTEXT_LABEL,
++      views::style::STYLE_SECONDARY);
++  download_label->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
++  download_label->SetVisible(false);
++  uw_download_label_ = view->AddChildView(std::move(download_label));
++
+   return view;
+ }
+ 
+@@ -790,10 +807,18 @@ std::unique_ptr<views::View> TranslateBubbleView::CreateViewErrorNoTitle(
+                                views::MinimumFlexSizeRule::kScaleToZero,
+                                views::MaximumFlexSizeRule::kUnbounded));
+ 
+-  title_row->AddChildView(std::move(error_message_label));
++  uw_error_title_ = title_row->AddChildView(std::move(error_message_label));
+   title_row->AddChildView(CreateCloseButton());
+   view->AddChildView(std::move(title_row));
+ 
++  auto uw_message = std::make_unique<views::Label>(
++      std::u16string(), views::style::CONTEXT_LABEL,
++      views::style::STYLE_SECONDARY);
++  uw_message->SetMultiLine(true);
++  uw_message->SetHorizontalAlignment(gfx::HorizontalAlignment::ALIGN_LEFT);
++  uw_message->SetVisible(false);
++  uw_error_message_ = view->AddChildView(std::move(uw_message));
++
+   // Button row.
+   auto button_row = std::make_unique<views::BoxLayoutView>();
+   button_row->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
+@@ -805,6 +830,10 @@ std::unique_ptr<views::View> TranslateBubbleView::CreateViewErrorNoTitle(
+           base::Unretained(model_.get())),
+       l10n_util::GetStringUTF16(IDS_TRANSLATE_BUBBLE_TRY_AGAIN));
+   try_again_button->SetID(BUTTON_ID_TRY_AGAIN);
++  auto uw_buttons = std::make_unique<views::BoxLayoutView>();
++  uw_buttons->SetBetweenChildSpacing(
++      provider->GetDistanceMetric(views::DISTANCE_RELATED_BUTTON_HORIZONTAL));
++  uw_error_buttons_ = button_row->AddChildView(std::move(uw_buttons));
+   button_row->AddChildView(std::move(try_again_button));
+   button_row->AddChildView(std::move(advanced_button));
+   view->AddChildView(std::move(button_row));
+@@ -1212,6 +1241,42 @@ void TranslateBubbleView::SwitchToErrorView(
+   SwitchView(TranslateBubbleModel::VIEW_STATE_ERROR);
+   error_type_ = error_type;
+   model_->ShowError(error_type);
++  UpdateUwParts();
++}
++
++void TranslateBubbleView::OnPageTranslatorChanged() {
++  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&TranslateBubbleView::UpdateUwParts,
++                                uw_weak_factory_.GetWeakPtr()));
++}
++
++void TranslateBubbleView::OnPageTranslatorDestroyed() {
++  uw_observation_.Reset();
++}
++
++void TranslateBubbleView::UpdateUwParts() {
++  if (uw_download_label_) {
++    const std::u16string download = uw::TranslationDownloadText(web_contents());
++    uw_download_label_->SetText(download);
++    uw_download_label_->SetVisible(!download.empty());
++  }
++  if (uw_error_title_) {
++    const std::u16string title = uw::TranslationProblemTitle(web_contents());
++    uw_error_title_->SetText(
++        title.empty() ? l10n_util::GetStringUTF16(
++                            IDS_TRANSLATE_BUBBLE_COULD_NOT_TRANSLATE_TITLE)
++                      : title);
++    const std::u16string message =
++        uw::TranslationProblemMessage(web_contents());
++    uw_error_message_->SetText(message);
++    uw_error_message_->SetVisible(!message.empty());
++    uw_error_buttons_->RemoveAllChildViews();
++    uw::AddOtherEngineButtons(
++        web_contents(), uw_error_buttons_,
++        base::BindRepeating(&TranslateBubbleView::CloseBubble,
++                            uw_weak_factory_.GetWeakPtr()));
++  }
++  SizeToContents();
+ }
+ 
+ void TranslateBubbleView::UpdateAdvancedView() {
+diff --git a/chrome/browser/ui/views/translate/translate_bubble_view.h b/chrome/browser/ui/views/translate/translate_bubble_view.h
+index 5e693d588a43efcceb118d9c9910e6595f4ebea5..f79d9085daf7e7a7686d120c8cccc6455850240e 100644
+--- a/chrome/browser/ui/views/translate/translate_bubble_view.h
++++ b/chrome/browser/ui/views/translate/translate_bubble_view.h
+@@ -11,6 +11,8 @@
+ #include "base/functional/callback_forward.h"
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/memory/weak_ptr.h"
++#include "base/scoped_observation.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "chrome/browser/translate/chrome_translate_client.h"
+ #include "chrome/browser/ui/translate/source_language_combobox_model.h"
+@@ -31,6 +33,7 @@
+ #include "ui/views/controls/tabbed_pane/tabbed_pane.h"
+ #include "ui/views/controls/tabbed_pane/tabbed_pane_listener.h"
+ #include "ui/views/window/frame_view.h"
++#include "uw/browser/translation/page_translator.h"
+ 
+ class Browser;
+ 
+@@ -50,7 +53,8 @@ class TranslateLanguageSearchView;
+ 
+ class TranslateBubbleView : public LocationBarBubbleDelegateView,
+                             public ui::SimpleMenuModel::Delegate,
+-                            public views::TabbedPaneListener {
++                            public views::TabbedPaneListener,
++                            public uw::PageTranslator::Observer {
+   METADATA_HEADER(TranslateBubbleView, LocationBarBubbleDelegateView)
+ 
+  public:
+@@ -261,6 +265,14 @@ class TranslateBubbleView : public LocationBarBubbleDelegateView,
+   // Switches to the error view.
+   void SwitchToErrorView(translate::TranslateErrors error_type);
+ 
++  // uw::PageTranslator::Observer:
++  void OnPageTranslatorChanged() override;
++  void OnPageTranslatorDestroyed() override;
++
++  // uw: shows this device's download under the tabs, and the engine's
++  // problem and the other engines in the error view.
++  void UpdateUwParts();
++
+   // Updates the advanced view.
+   void UpdateAdvancedView();
+ 
+@@ -290,6 +302,12 @@ class TranslateBubbleView : public LocationBarBubbleDelegateView,
+   // Helper method to announce the passed-in text to the screenreader.
+   void AnnounceTextToScreenReader(const std::u16string& announcement_text);
+ 
++  raw_ptr<views::Label> uw_download_label_ = nullptr;
++  raw_ptr<views::Label> uw_error_title_ = nullptr;
++  raw_ptr<views::Label> uw_error_message_ = nullptr;
++  raw_ptr<views::View> uw_error_buttons_ = nullptr;
++  base::ScopedObservation<uw::PageTranslator, uw::PageTranslator::Observer>
++      uw_observation_{this};
+   raw_ptr<views::View> translate_view_ = nullptr;
+   raw_ptr<views::View> error_view_ = nullptr;
+   raw_ptr<views::View> advanced_view_source_ = nullptr;
+@@ -330,6 +348,7 @@ class TranslateBubbleView : public LocationBarBubbleDelegateView,
+   std::unique_ptr<WebContentMouseHandler> mouse_handler_;
+ 
+   base::OnceClosure on_closing_;
++  base::WeakPtrFactory<TranslateBubbleView> uw_weak_factory_{this};
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TRANSLATE_TRANSLATE_BUBBLE_VIEW_H_
+diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
+index 1fc5f9f42a1c7877fd3e4908b5f3eb3c19b06316..676ea15210e3fe6b5e2c50ef25999a0a8987722e 100644
+--- a/chrome/browser/ui/webui/settings/BUILD.gn
++++ b/chrome/browser/ui/webui/settings/BUILD.gn
+@@ -124,6 +124,7 @@ source_set("settings") {
+ 
+   if (!is_chromeos) {
+     public_deps += [
++      "//uw/browser/ui/webui/translation",
+       "//uw/browser/ui/webui/uw_organization:uw_organization_handler",
+       "//uw/browser/ui/webui/uw_shortcuts",
+     ]
+diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+index 621d814ef80f6a6401859691a25d0f5188c16122..5462889ca0e58000479729dc283681a0303c1db8 100644
+--- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
++++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
+@@ -1485,7 +1485,8 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
+        IDS_SETTINGS_LANGUAGES_REMOVE_AUTOMATIC_ARIA_LABEL},
+       {"removeNeverLanguageAriaLabel",
+        IDS_SETTINGS_LANGUAGES_REMOVE_NEVER_ARIA_LABEL},
+-      {"translatePageTitle", IDS_SETTINGS_TRANSLATE_PAGE_TITLE},
++      // uw: the section is the translation engine's, not Google Translate's.
++      {"translatePageTitle", IDS_TRANSLATE_BUBBLE_ACCEPT},
+       {"targetLanguageLabel", IDS_SETTINGS_TARGET_TRANSLATE_LABEL},
+       {"automaticallyTranslateLanguages",
+        IDS_SETTINGS_LANGUAGES_AUTOMATIC_TRANSLATE},
+@@ -1539,6 +1540,30 @@ void AddLanguagesStrings(content::WebUIDataSource* html_source,
+   };
+   html_source->AddLocalizedStrings(kLocalizedStrings);
+ #if !BUILDFLAG(IS_CHROMEOS)
++  // uw: the translation engine and this device's languages. See
++  // docs/plans/page-translation.md.
++  static constexpr webui::LocalizedString kUwTranslationStrings[] = {
++      {"uwTranslationEngine", IDS_UW_SETTINGS_TRANSLATION_ENGINE},
++      {"uwTranslationEngineNone", IDS_UW_SETTINGS_TRANSLATION_ENGINE_NONE},
++      {"uwTranslationEngineDevice", IDS_UW_SETTINGS_TRANSLATION_ENGINE_DEVICE},
++      {"uwTranslationEngineGoogleCloud",
++       IDS_UW_SETTINGS_TRANSLATION_ENGINE_GOOGLE_CLOUD},
++      {"uwTranslationEngineAi", IDS_UW_SETTINGS_TRANSLATION_ENGINE_AI},
++      {"uwTranslationNoneNote", IDS_UW_SETTINGS_TRANSLATION_NONE_NOTE},
++      {"uwTranslationDeviceNote", IDS_UW_SETTINGS_TRANSLATION_DEVICE_NOTE},
++      {"uwTranslationGoogleCloudNote",
++       IDS_UW_SETTINGS_TRANSLATION_GOOGLE_CLOUD_NOTE},
++      {"uwTranslationAiNote", IDS_UW_SETTINGS_TRANSLATION_AI_NOTE},
++      {"uwTranslationDownloaded", IDS_UW_SETTINGS_TRANSLATION_DOWNLOADED},
++      {"uwTranslationNoDownloads", IDS_UW_SETTINGS_TRANSLATION_NO_DOWNLOADS},
++      {"uwTranslationRemoveLanguage",
++       IDS_UW_SETTINGS_TRANSLATION_REMOVE_LANGUAGE},
++      {"uwTranslationTargetUnsupported",
++       IDS_UW_SETTINGS_TRANSLATION_TARGET_UNSUPPORTED},
++  };
++  html_source->AddLocalizedStrings(kUwTranslationStrings);
++  html_source->AddBoolean("uwTranslationGoogleCloudBuilt", false);
++  html_source->AddBoolean("uwTranslationAiBuilt", false);
+   html_source->AddLocalizedString(
+       "offerToEnableTranslateSublabel",
+       base::FeatureList::IsEnabled(translate::kEnableTranslatePdf)
+diff --git a/chrome/browser/ui/webui/settings/settings_ui.cc b/chrome/browser/ui/webui/settings/settings_ui.cc
+index 9e5b60f205c8bdc49c44ab3dc65b26d7ac3f6ec4..b9e6125623de14caf32541a85e0e7c9c514cadb1 100644
+--- a/chrome/browser/ui/webui/settings/settings_ui.cc
++++ b/chrome/browser/ui/webui/settings/settings_ui.cc
+@@ -227,6 +227,7 @@
+ #if !BUILDFLAG(IS_CHROMEOS)
+ #include "uw/browser/ui/webui/uw_organization/uw_organization_handler.h"
+ #include "uw/browser/ui/webui/uw_shortcuts/uw_shortcuts_handler.h"
++#include "uw/browser/ui/webui/translation/translation_settings_handler.h"
+ #endif
+ 
+ namespace settings {
+@@ -314,6 +315,7 @@ SettingsUI::SettingsUI(content::WebUI* web_ui)
+   AddSettingsPageUIHandler(std::make_unique<DefaultBrowserHandler>());
+   AddSettingsPageUIHandler(std::make_unique<ManageProfileHandler>(profile));
+   AddSettingsPageUIHandler(std::make_unique<SystemHandler>());
++  web_ui->AddMessageHandler(std::make_unique<uw::TranslationSettingsHandler>());
+ 
+ #endif
+ 
 diff --git a/chrome/renderer/chrome_render_frame_observer_browsertest.cc b/chrome/renderer/chrome_render_frame_observer_browsertest.cc
 index 63c45105132b72d77a85177fa9a125bc307ceca7..acb7f0083e0a79dafac722fd8b3437d591f62105 100644
 --- a/chrome/renderer/chrome_render_frame_observer_browsertest.cc
@@ -182,6 +1120,42 @@ index e689496966a29daab315d6182419d3580311ff21..88f51fdb98b144b066e66c61dddf01b8
    void ResetNewPageValues() {
      called_new_page_ = false;
      details_ = std::nullopt;
+diff --git a/components/on_device_translation/service/service_launcher.cc b/components/on_device_translation/service/service_launcher.cc
+index 22eb3f03a007a320a91ab303ec2e5f21f22e04dd..3ad7326780605312526b9156d716877736c7f47d 100644
+--- a/components/on_device_translation/service/service_launcher.cc
++++ b/components/on_device_translation/service/service_launcher.cc
+@@ -13,6 +13,7 @@
+ #include "components/on_device_translation/public/language_pack.h"
+ #include "components/on_device_translation/public/mojom/on_device_translation_service.mojom.h"
+ #include "components/on_device_translation/service/file_operation_proxy_impl.h"
++#include "content/public/browser/child_process_host.h"
+ #include "content/public/browser/service_process_host.h"
+ #include "content/public/browser/service_process_host_passkeys.h"
+ #include "mojo/public/cpp/bindings/remote.h"
+@@ -33,6 +34,13 @@ using mojom::OnDeviceTranslationServiceConfig;
+ constexpr std::string_view kOnDeviceTranslationServiceDisplayNamePrefix =
+     "On-device Translation Service: ";
+ 
++#if BUILDFLAG(IS_MAC)
++// uw: ChildProcessHostFlags::kChildProcessHelperTranslate, the helper allowed
++// to load Google's library in a signed uw.
++constexpr int kTranslateHelperFlags =
++    content::ChildProcessHost::CHILD_EMBEDDER_FIRST + 2;
++#endif
++
+ std::string ToString(const base::FilePath& path) {
+ #if BUILDFLAG(IS_WIN)
+   // TODO(crbug.com/362123222): Get rid of conditional decoding.
+@@ -102,6 +110,9 @@ class OnDeviceTranslationServiceLauncherImpl
+             .WithPreloadedLibraries(
+                 {binary_path},
+                 content::ServiceProcessHostPreloadLibraries::GetPassKey())
++#endif
++#if BUILDFLAG(IS_MAC)
++            .WithChildFlags(kTranslateHelperFlags)
+ #endif
+             .Pass());
+ 
 diff --git a/components/resources/translate_resources.grdp b/components/resources/translate_resources.grdp
 index 5226e140218da29593df319ebcfc340a996992c9..d39ae1098b06fc467672b0e6a2bd7f58325885e8 100644
 --- a/components/resources/translate_resources.grdp

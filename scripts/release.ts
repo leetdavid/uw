@@ -226,6 +226,14 @@ export class Release {
       "--identifier", "com.uwbrowser.uw.command", "--entitlements", join(worktree, "command/entitlements.plist"),
       join(app, "Contents/Helpers/uw"),
     ], directory);
+    // Only this helper may load another team's library: Google's TranslateKit,
+    // for translating on the device. See
+    // docs/adr/0034-the-on-device-translation-engine-runs-in-its-own-helper.md.
+    this.step([
+      "codesign", "--force", "--sign", identity, "--options", "restrict,kill,runtime", "--timestamp",
+      "--entitlements", join(worktree, "browser/translation/helper-translate-entitlements.plist"),
+      join(app, "Contents/Frameworks/uw Framework.framework/Helpers/uw Helper (Translate).app"),
+    ], directory);
     this.step([
       "python3", join(input, "uw Packaging/sign_chrome.py"), "--input", input, "--output", join(directory, "signed"),
       "--identity", identity, "--notarize", "staple", "--notary-arg=--keychain-profile", `--notary-arg=${NOTARY_PROFILE}`,

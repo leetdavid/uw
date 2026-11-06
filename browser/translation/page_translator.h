@@ -32,6 +32,8 @@ class PageTranslator
    public:
     // The engine, the problem, or a download changed.
     virtual void OnPageTranslatorChanged() = 0;
+    // The tab is going, and the translator with it.
+    virtual void OnPageTranslatorDestroyed() = 0;
   };
 
   explicit PageTranslator(content::WebContents& web_contents);

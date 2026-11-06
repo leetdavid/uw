@@ -24,7 +24,11 @@ constexpr int32_t kUnsupportedLanguage = 2;
 PageTranslator::PageTranslator(content::WebContents& web_contents)
     : web_contents_(web_contents) {}
 
-PageTranslator::~PageTranslator() = default;
+PageTranslator::~PageTranslator() {
+  for (Observer& observer : observers_) {
+    observer.OnPageTranslatorDestroyed();
+  }
+}
 
 // static
 PageTranslator* PageTranslator::FromWebContents(

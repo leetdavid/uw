@@ -119,6 +119,11 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
   assert.equal(helper[helper.indexOf("--sign") + 1], HASH);
   assert.equal(helper[helper.indexOf("--entitlements") + 1], join(worktree, "command/entitlements.plist"));
   assert.ok(helper.at(-1)!.endsWith("uw.app/Contents/Helpers/uw"));
+  const translate = signing.find((command) => command.at(-1)!.endsWith("uw Helper (Translate).app"));
+  assert.ok(translate);
+  assert.equal(translate[translate.indexOf("--entitlements") + 1],
+    join(worktree, "browser/translation/helper-translate-entitlements.plist"));
+  assert.equal(translate[translate.indexOf("--options") + 1], "restrict,kill,runtime");
   const [sign] = find("python3");
   assert.ok(sign);
   assert.deepEqual(sign.slice(sign.indexOf("--identity")), [

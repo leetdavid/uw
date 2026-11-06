@@ -1,0 +1,18 @@
+# What uw adds to Chromium's translate bubble. See
+# docs/plans/page-translation.md.
+source_set("translation") {
+  sources = [
+    "translation_bubble.cc",
+    "translation_bubble.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/views",
+    "//uw/browser/translation",
+    "//uw/browser/translation:menu",
+  ]
+}

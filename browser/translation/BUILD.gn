@@ -60,3 +60,49 @@ source_set("browser_tests") {
     "//testing/gtest",
   ]
 }
+
+# The translation items of a page's right-click menu and the app menu.
+source_set("menu") {
+  sources = [
+    "translate_menu.cc",
+    "translate_menu.h",
+  ]
+  public_deps = [ "//ui/menus" ]
+  deps = [
+    ":translation",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/translate",
+    "//components/translate/core/browser",
+    "//content/public/browser",
+  ]
+}
+
+source_set("ui_browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "translation_ui_browsertest.cc" ]
+  deps = [
+    ":menu",
+    ":translation",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/app:command_ids",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/renderer_context_menu:test_support",
+    "//chrome/browser/translate",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/views/translate",
+    "//chrome/test:test_support",
+    "//components/translate/core/browser",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//third_party/blink/public/common",
+    "//ui/base",
+    "//ui/views",
+  ]
+}

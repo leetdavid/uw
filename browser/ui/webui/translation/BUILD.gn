@@ -1,0 +1,19 @@
+# Settings › Languages › Translate: this device's downloaded languages. See
+# docs/plans/page-translation.md.
+source_set("translation") {
+  sources = [
+    "translation_settings_handler.cc",
+    "translation_settings_handler.h",
+  ]
+  public_deps = [
+    "//base",
+    "//components/on_device_translation",
+    "//content/public/browser",
+  ]
+  deps = [
+    "//chrome/browser:browser_public_dependencies",
+    "//components/on_device_translation:public",
+    "//ui/base",
+    "//uw/browser/translation",
+  ]
+}
