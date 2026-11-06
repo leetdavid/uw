@@ -233,14 +233,20 @@ IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, WebCodecsDecodesAac) {
   )"));
 }
 
+// HE-AAC decodes at its fuller layer's rate, and v2's mono core to stereo, so
+// each file lasts its two seconds.
 IN_PROC_BROWSER_TEST_F(CodecsBrowserTest, WebAudioDecodesAac) {
-  EXPECT_EQ("44100 2 true", Run(R"(
-    const bytes = await (await fetch('lc.m4a')).arrayBuffer();
-    const context = new OfflineAudioContext(2, 44100, 44100);
-    const audio = await context.decodeAudioData(bytes);
-    return `${audio.sampleRate} ${audio.numberOfChannels} ` +
-           `${audio.duration > 1.9}`;
-  )"));
+  for (const char* file : {"lc.m4a", "he.m4a", "he_v2.m4a"}) {
+    SCOPED_TRACE(file);
+    EXPECT_EQ("44100 2 true",
+              Run(base::StrCat(
+                  {"const bytes = await (await fetch('", file,
+                   "')).arrayBuffer();"
+                   "const context = new OfflineAudioContext(2, 44100, 44100);"
+                   "const audio = await context.decodeAudioData(bytes);"
+                   "return `${audio.sampleRate} ${audio.numberOfChannels} ` +"
+                   "    `${audio.duration > 1.9 && audio.duration < 2.2}`;"})));
+  }
 }
 
 // FFmpeg in uw has no AAC demuxer, so raw ADTS plays on uw's ADTS engine.

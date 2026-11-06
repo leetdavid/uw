@@ -1,3 +1,84 @@
+diff --git a/content/renderer/BUILD.gn b/content/renderer/BUILD.gn
+index 5a4051158ce35d281eeaff71f3505321925b73ac..e879868844a144d4d3c2df0ffb39b3d8edebe926 100644
+--- a/content/renderer/BUILD.gn
++++ b/content/renderer/BUILD.gn
+@@ -393,6 +393,11 @@ target(link_target_type, "renderer") {
+       "media/win/dcomp_texture_host.h",
+       "media/win/dcomp_texture_wrapper_impl.cc",
+       "media/win/dcomp_texture_wrapper_impl.h",
++
++      # uw: Web Audio's AAC through Media Foundation in the GPU process. See
++      # uw's docs/plans/distribution.md, "Codecs".
++      "//uw/components/media/gpu_audio_decoder.cc",
++      "//uw/components/media/gpu_audio_decoder.h",
+     ]
+   }
+ 
+diff --git a/content/renderer/media/audio_decoder.cc b/content/renderer/media/audio_decoder.cc
+index bf0c1c3895434e9f78817ed62d36a7b5b650de8e..ae2cbc476891793d501ceee66a52024e772a2762 100644
+--- a/content/renderer/media/audio_decoder.cc
++++ b/content/renderer/media/audio_decoder.cc
+@@ -24,6 +24,14 @@
+ #include "media/media_buildflags.h"
+ #include "third_party/blink/public/platform/web_audio_bus.h"
+ 
++#if BUILDFLAG(IS_WIN) && BUILDFLAG(USE_PROPRIETARY_CODECS)
++#include "media/mojo/mojom/interface_factory.mojom.h"
++#include "mojo/public/cpp/bindings/pending_remote.h"
++#include "third_party/blink/public/common/thread_safe_browser_interface_broker_proxy.h"
++#include "third_party/blink/public/platform/platform.h"
++#include "uw/components/media/gpu_audio_decoder.h"
++#endif
++
+ using media::AudioBus;
+ using media::AudioFileReader;
+ using media::InMemoryUrlProtocol;
+@@ -40,6 +48,17 @@ std::unique_ptr<blink::WebAudioBus> DecodeAudioFileData(
+ 
+   InMemoryUrlProtocol url_protocol(base::as_byte_span(data), false);
+   auto reader = std::make_unique<AudioFileReader>(&url_protocol);
++#if BUILDFLAG(IS_WIN) && BUILDFLAG(USE_PROPRIETARY_CODECS)
++  // uw: the page's sandbox keeps Media Foundation out of this process, so AAC
++  // decodes in the GPU process. See uw's docs/plans/distribution.md, "Codecs".
++  reader->SetAacDecoderFactory(
++      base::BindOnce([]() -> std::unique_ptr<media::AudioDecoder> {
++        mojo::PendingRemote<media::mojom::InterfaceFactory> factory;
++        blink::Platform::Current()->GetBrowserInterfaceBroker()->GetInterface(
++            factory.InitWithNewPipeAndPassReceiver());
++        return std::make_unique<uw::GpuAudioDecoder>(std::move(factory));
++      }));
++#endif
+   bool open_success = reader->Open();
+   base::UmaHistogramBoolean("Media.ContentAudioDecoder.CreateReaderSuccess",
+                             open_success);
+@@ -47,6 +66,14 @@ std::unique_ptr<blink::WebAudioBus> DecodeAudioFileData(
+     return nullptr;
+   }
+ 
++  std::vector<std::unique_ptr<AudioBus>> decoded_audio_packets;
++  const size_t number_of_frames = reader->Read(&decoded_audio_packets);
++  if (number_of_frames == 0) {
++    return nullptr;
++  }
++
++  // uw: read once decoded, since a decoder in another process gives its rate
++  // and channels with its first buffer.
+   const size_t number_of_channels = reader->channels();
+   const double sample_rate = reader->sample_rate();
+ 
+@@ -59,12 +86,6 @@ std::unique_ptr<blink::WebAudioBus> DecodeAudioFileData(
+     return nullptr;
+   }
+ 
+-  std::vector<std::unique_ptr<AudioBus>> decoded_audio_packets;
+-  const size_t number_of_frames = reader->Read(&decoded_audio_packets);
+-  if (number_of_frames == 0) {
+-    return nullptr;
+-  }
+-
+   // Allocate and configure the output audio channel data and then
+   // copy the decoded data to the destination.
+   auto out = std::make_unique<WebAudioBus>();
 diff --git a/media/BUILD.gn b/media/BUILD.gn
 index a9ef4aa60e3c44e90d7cf0b04eaf5f3632547e17..342fa711d30c3edc5f216e938f92dbdc164dd731 100644
 --- a/media/BUILD.gn
@@ -92,7 +173,7 @@ index 4a53e96173ce5dc48f81b63f1c29aebd7b73dbf1..3e3a4b928764fd6231ae777b02d7add5
    }
  }
 diff --git a/media/filters/audio_file_reader.cc b/media/filters/audio_file_reader.cc
-index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df3987eb6c 100644
+index 4b88853014508815d5f6873fae54060580fb3cba..4217464c14a5e26e9314f4dde9d98f3715cbf762 100644
 --- a/media/filters/audio_file_reader.cc
 +++ b/media/filters/audio_file_reader.cc
 @@ -35,6 +35,10 @@
@@ -106,7 +187,7 @@ index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df
  namespace media {
  
  namespace {
-@@ -90,6 +94,19 @@ bool AudioFileReader::OpenDecoder() {
+@@ -90,6 +94,26 @@ bool AudioFileReader::OpenDecoder() {
          nullptr, OpusAudioDecoder::ExecutionMode::kSynchronous);
    }
  
@@ -123,10 +204,17 @@ index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df
 +  }
 +#endif
 +
++  // uw: AAC from another process, such as Windows' Media Foundation in the
++  // GPU process. See uw's docs/plans/distribution.md, "Codecs".
++  if (!decoder_ && config.codec() == AudioCodec::kAAC && aac_decoder_factory_) {
++    decoder_ = std::move(aac_decoder_factory_).Run();
++    take_output_format_ = true;
++  }
++
    // By default, use the FFmpegAudioDecoder.
    if (!decoder_) {
      decoder_ = std::make_unique<FFmpegAudioDecoder>(
-@@ -115,6 +132,18 @@ bool AudioFileReader::OpenDecoder() {
+@@ -115,6 +139,18 @@ bool AudioFileReader::OpenDecoder() {
                       &initialize_status),
        base::BindRepeating(&AudioFileReader::OnOutput, base::Unretained(this)),
        base::DoNothing());
@@ -145,6 +233,64 @@ index 4b88853014508815d5f6873fae54060580fb3cba..165ceabeeb697f4b39dfd1b77e5894df
    config_ = std::move(config);
    return initialize_status.value();
  }
+@@ -318,6 +354,18 @@ void AudioFileReader::OnOutput(scoped_refptr<AudioBuffer> buffer) {
+     return;
+   }
+ 
++  // uw: Media Foundation decodes HE-AAC at its fuller layer's rate and
++  // channels, which the file may not name, and Web Audio sizes its buffer by
++  // them.
++  if (take_output_format_) {
++    take_output_format_ = false;
++    config_->Initialize(config_->codec(), config_->sample_format(),
++                        ChannelLayoutConfig::Guess(buffer->channel_count()),
++                        buffer->sample_rate(), config_->extra_data(),
++                        config_->encryption_scheme(), config_->seek_preroll(),
++                        config_->codec_delay());
++  }
++
+   // Ensure that there are no unsupported midstream configuration changes.
+   // We allow channel layout changes as long as the channel count remains the
+   // same, to handle cases where FFmpeg refines the layout during decoding.
+diff --git a/media/filters/audio_file_reader.h b/media/filters/audio_file_reader.h
+index 99e6f506cfbb5a9c1f5d2342513aa7dc784f7399..efbf04bfccb61595b401bb1f75f66fab294eab56 100644
+--- a/media/filters/audio_file_reader.h
++++ b/media/filters/audio_file_reader.h
+@@ -9,6 +9,7 @@
+ #include <memory>
+ #include <vector>
+ 
++#include "base/functional/callback.h"
+ #include "base/memory/raw_ptr.h"
+ #include "media/base/media_export.h"
+ #include "media/base/media_util.h"
+@@ -60,6 +61,15 @@ class MEDIA_EXPORT AudioFileReader {
+   size_t Read(std::vector<std::unique_ptr<AudioBus>>* decoded_audio_packets,
+               int packets_to_read = std::numeric_limits<int>::max());
+ 
++  // uw: makes the AAC decoder, before Open(), where AAC can't be decoded in
++  // this process. Its first buffer's rate and channels become the reader's.
++  // See uw's docs/plans/distribution.md, "Codecs".
++  using AacDecoderFactory =
++      base::OnceCallback<std::unique_ptr<AudioDecoder>()>;
++  void SetAacDecoderFactory(AacDecoderFactory factory) {
++    aac_decoder_factory_ = std::move(factory);
++  }
++
+   // These methods can be called once Open() has been called and `config_` has
+   // been populated.
+   int channels() const { return config_->channels(); }
+@@ -133,6 +143,10 @@ class MEDIA_EXPORT AudioFileReader {
+   // as AAC tail trimming, are only applied after decode output is complete.
+   scoped_refptr<AudioBuffer> pending_output_buffer_;
+ 
++  // uw: see SetAacDecoderFactory(). True until its decoder's first buffer.
++  AacDecoderFactory aac_decoder_factory_;
++  bool take_output_format_ = false;
++
+   // Tracks the total number of frames emitted so far in the current Read()
+   // session.
+   int num_frames_emitted_ = 0;
 diff --git a/media/filters/demuxer_manager.cc b/media/filters/demuxer_manager.cc
 index 7401dbf9e4898109b750a97051bd9947f50a3835..c76f79ae343797adbe9ca518688fdb76f3caa409 100644
 --- a/media/filters/demuxer_manager.cc
@@ -1129,6 +1275,23 @@ index 687bca71bdff74c14ed837907f8d44922ebce5ea..25530007058c2376adf5d39530c6dd17
  (if (param-true? enable-distributed-notifications)
    (allow mach-lookup
      (global-name "com.apple.distributed_notifications@Uv3")
+diff --git a/third_party/blink/renderer/modules/webaudio/base_audio_context.cc b/third_party/blink/renderer/modules/webaudio/base_audio_context.cc
+index 107783a84f1281b7af7cd1e5e3360ee50326034c..a3929e425f9edd65e1ded9e7f34e845dd83febe3 100644
+--- a/third_party/blink/renderer/modules/webaudio/base_audio_context.cc
++++ b/third_party/blink/renderer/modules/webaudio/base_audio_context.cc
+@@ -415,6 +415,12 @@ ScriptPromise<AudioBuffer> BaseAudioContext::decodeAudioData(
+     // with the caller to process the decoding appropriately when finished.
+     worker_pool::PostTask(
+         FROM_HERE,
++#if BUILDFLAG(IS_WIN)
++        // uw: AAC decodes in the GPU process, which this task waits for. See
++        // uw's docs/plans/distribution.md, "Codecs".
++        {base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN, base::MayBlock(),
++         base::WithBaseSyncPrimitives()},
++#endif
+         CrossThreadBindOnce(
+             &DecodeOnBackgroundThread, std::move(audio_data_contents),
+             sampleRate(), MakeCrossThreadHandle(success_callback),
 diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.cc b/third_party/blink/renderer/platform/media/web_media_player_impl.cc
 index 839bcbcfe76c3cb39df329cf73e6bc458b4033dc..9b96997c127e8b26dbcd61fc764f9a0ca118b417 100644
 --- a/third_party/blink/renderer/platform/media/web_media_player_impl.cc
