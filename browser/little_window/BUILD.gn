@@ -1,0 +1,109 @@
+# Little windows: Arc's Little Arc in uw. See docs/plans/little-window.md and
+# ADR 0033.
+source_set("little_window") {
+  sources = [
+    "little_window.cc",
+    "little_window.h",
+    "little_window_key.cc",
+    "little_window_key.h",
+    "little_window_toolbar.cc",
+    "little_window_toolbar.h",
+  ]
+  if (is_mac) {
+    sources += [ "little_window_key_mac.mm" ]
+    frameworks = [ "AppKit.framework" ]
+  } else if (is_win) {
+    sources += [ "little_window_key_win.cc" ]
+  } else {
+    sources += [ "little_window_key_stub.cc" ]
+  }
+  public_deps = [
+    ":mark",
+    ":prefs",
+    "//components/prefs",
+    "//ui/base/accelerators/global_accelerator_listener",
+    "//base",
+    "//ui/base/unowned_user_data",
+    "//ui/menus",
+    "//ui/views",
+    "//url",
+  ]
+  deps = [
+    "//chrome/app:command_ids",
+    "//chrome:strings",
+    "//chrome/browser:browser_public_dependencies",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/color:color_headers",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/tabs:public",
+    "//components/vector_icons",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/display",
+    "//ui/events",
+    "//ui/gfx",
+    "//uw/browser/agent:run_window_mark",
+    "//uw/browser/tab_organization",
+    "//uw/browser/ui/glass",
+    "//uw/browser/shortcuts",
+    "//uw/browser/ui/views/command_bar",
+    "//uw/browser/workspaces",
+  ]
+}
+
+# The Little windows settings, in local state.
+source_set("prefs") {
+  sources = [
+    "little_window_prefs.cc",
+    "little_window_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+# Whether a browser window is a little window, and the numbers of its
+# commands. Chromium's own files ask, so this depends on nothing but //base.
+source_set("mark") {
+  sources = [
+    "little_window_commands.h",
+    "little_window_mark.cc",
+    "little_window_mark.h",
+  ]
+  deps = [ "//base" ]
+}
+
+source_set("browser_tests") {
+  testonly = true
+  defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+  sources = [ "little_window_browsertest.cc" ]
+  deps = [
+    ":little_window",
+    ":prefs",
+    "//base",
+    "//base/test:test_support",
+    "//chrome/app:command_ids",
+    "//chrome:strings",
+    "//chrome/browser",
+    "//chrome/browser/headless:browser_tests",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/test:test_support",
+    "//components/prefs",
+    "//components/sessions",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//content/test:test_support",
+    "//net:test_support",
+    "//testing/gtest",
+    "//ui/base",
+    "//ui/views",
+    "//url",
+    "//uw/browser/tab_organization",
+    "//uw/browser/tab_organization:test_support",
+    "//uw/browser/ui/views/command_bar",
+    "//uw/browser/workspaces",
+  ]
+}

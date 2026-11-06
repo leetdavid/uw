@@ -134,6 +134,10 @@ class WorkspaceWindow : public views::WidgetObserver,
   static void Delete(std::string_view id, bool with_profile);
   // The tabs, besides pins, that deleting workspace `id` closes.
   static int CountTabs(std::string_view id);
+  // Opens a window that shows workspace `id`, with no tab yet, once its
+  // profile has loaded, and gives it to `opened`. A little window's page
+  // goes there when no window shows its workspace.
+  static void OpenWindow(std::string_view id, WindowCallback opened);
   // Moves `tab` to the window for workspace `id` in its window's group.
   // Within a profile the page moves with its state. Across profiles its address
   // opens there and the tab closes here.

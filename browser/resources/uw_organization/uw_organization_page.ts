@@ -23,7 +23,7 @@ import {getCss as getMdSelectCss} from 'chrome://resources/cr_elements/md_select
 import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
 import {CrLitElement} from 'chrome://resources/lit/v3_0/lit.rollup.js';
 
-import {MiniPlayerMode, MiniPlayerSwitch, MouseAction, Waiting} from './uw_organization.mojom-webui.js';
+import {LittleWindowSwitch, MiniPlayerMode, MiniPlayerSwitch, MouseAction, Waiting} from './uw_organization.mojom-webui.js';
 import type {State, Thresholds} from './uw_organization.mojom-webui.js';
 import {UwOrganizationBrowserProxyImpl} from './uw_organization_browser_proxy.js';
 import {getHtml} from './uw_organization_page.html.js';
@@ -35,6 +35,15 @@ const MAX_THRESHOLD = 0.95;
 const THRESHOLD_STEP = 0.05;
 
 // The choices of Picture in picture, by the radio button's name.
+// How long an unused little window stays open, in minutes. Zero keeps it.
+const LITTLE_WINDOW_CLOSE_AFTER = [
+  {minutes: 60, label: 'uwLittleWindowsClose1Hour'},
+  {minutes: 6 * 60, label: 'uwLittleWindowsClose6Hours'},
+  {minutes: 12 * 60, label: 'uwLittleWindowsClose12Hours'},
+  {minutes: 24 * 60, label: 'uwLittleWindowsClose1Day'},
+  {minutes: 0, label: 'uwLittleWindowsCloseNever'},
+];
+
 const MINI_PLAYER_MODES = [
   {
     mode: MiniPlayerMode.kDock,
@@ -354,6 +363,57 @@ export class SettingsUwOrganizationPageElement extends CrLitElement {
       return;
     }
     await this.browserProxy_.setMiniPlayerMode(choice.mode);
+    this.refresh_();
+  }
+
+  // A switch's label, which names the little window's key.
+  protected littleWindowKeyText_(id: string): string {
+    return loadTimeData.getStringF(id, this.state_?.littleWindowKey ?? '');
+  }
+
+  protected littleWindowAltGrText_(): string {
+    const state = this.state_;
+    if (!state?.littleWindowAltgrCharacter) {
+      return '';
+    }
+    return loadTimeData.getStringF(
+        'uwLittleWindowsAltGr', state.littleWindowAltgrCharacter,
+        state.littleWindowAltgrLetter, state.littleWindowKey);
+  }
+
+  // Off while the keyboard types a letter with the key, whatever the switch.
+  protected littleWindowKeyFromApps_(): boolean {
+    return !!this.state_?.littleWindowKeyFromApps &&
+        !this.state_?.littleWindowAltgrCharacter;
+  }
+
+  protected littleWindowCloseOptions_() {
+    const closeAfter = this.state_?.littleWindowCloseAfter;
+    return LITTLE_WINDOW_CLOSE_AFTER.map(
+        item => ({...item, selected: item.minutes === closeAfter}));
+  }
+
+  protected async onLittleWindowKeyInUwChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setLittleWindow(
+        LittleWindowSwitch.kKeyInUw, e.detail);
+    this.refresh_();
+  }
+
+  protected async onLittleWindowKeyFromAppsChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setLittleWindow(
+        LittleWindowSwitch.kKeyFromApps, e.detail);
+    this.refresh_();
+  }
+
+  protected async onLittleWindowLinksChange_(e: CustomEvent<boolean>) {
+    await this.browserProxy_.setLittleWindow(
+        LittleWindowSwitch.kLinks, e.detail);
+    this.refresh_();
+  }
+
+  protected async onLittleWindowCloseChange_(e: Event) {
+    const select = e.currentTarget as HTMLSelectElement;
+    await this.browserProxy_.setLittleWindowCloseAfter(Number(select.value));
     this.refresh_();
   }
 

@@ -27,14 +27,17 @@
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tabs/public/split_tab_data.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/focused_node_details.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
+#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
+#include "ui/base/base_window.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size_conversions.h"
@@ -44,6 +47,7 @@
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/little_window/little_window_mark.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -54,11 +58,28 @@ namespace uw {
 namespace {
 
 constexpr int kTopInset = 96;
+// In a little window, which is small, it sits closer under the toolbar.
+constexpr int kLittleWindowTopInset = 48;
 // A key the browser refused is tried again after about one frame.
 constexpr base::TimeDelta kRetry = base::Milliseconds(16);
 // The browser stops holding keys after this, even if the page never reported
 // focus or kept refusing them.
 constexpr base::TimeDelta kLongestHold = base::Seconds(1);
+
+// Closes little window `window` when it never showed a page, as Esc in its
+// command bar does before anything is picked.
+void CloseLittleWindowIfBlank(BrowserWindowInterface* window) {
+  tabs::TabInterface* tab = window->GetTabStripModel()->GetActiveTab();
+  if (!IsLittleWindow(window) || !tab) {
+    return;
+  }
+  const GURL shown = tab->GetContents()->GetLastCommittedURL();
+  if (tab->GetContents()->GetController().GetPendingEntry() ||
+      !(shown.is_empty() || shown.IsAboutBlank())) {
+    return;
+  }
+  window->GetWindow()->Close();
+}
 
 }  // namespace
 
@@ -314,7 +335,10 @@ void CommandBar::Show() {
       area = panes[index] + page_area->GetBoundsInScreen().OffsetFromOrigin();
     }
   }
-  const gfx::Rect anchor(area.CenterPoint().x(), area.y() + kTopInset, 0, 0);
+  const gfx::Rect anchor(
+      area.CenterPoint().x(),
+      area.y() + (IsLittleWindow(window_) ? kLittleWindowTopInset : kTopInset),
+      0, 0);
   // The page's last size is in pixels at the scale it was laid out at.
   content::RenderWidgetHostView* page_view = page()->GetRenderWidgetHostView();
   const float scale = page_view ? page_view->GetDeviceScaleFactor() : 0;
@@ -345,6 +369,10 @@ void CommandBar::OnWidgetClosing(views::Widget* widget) {
   panel_.Reset();
   if (widget->closed_reason() != views::Widget::ClosedReason::kLostFocus) {
     ResetCommandBar(page(), /*shell=*/false);
+    // Esc before anything was picked closes an empty little window.
+    if (!opening_) {
+      CloseLittleWindowIfBlank(window_);
+    }
   }
 }
 
@@ -354,6 +382,7 @@ void CommandBar::OnWidgetDestroying(views::Widget* widget) {
 
 void CommandBar::OpenPicked(const content::OpenURLParams& params) {
   if (bubble_) {
+    base::AutoReset<bool> opening(&opening_, true);
     bubble_->CloseUI();
   }
   NavigateParams navigate(window_, params.url, params.transition);
@@ -362,6 +391,9 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
   navigate.tabstrip_index = -1;
   if (params.disposition == WindowOpenDisposition::SWITCH_TO_TAB) {
     navigate.disposition = WindowOpenDisposition::SWITCH_TO_TAB;
+  } else if (IsLittleWindow(window_)) {
+    // A little window shows what was picked in itself.
+    navigate.disposition = WindowOpenDisposition::CURRENT_TAB;
   } else {
     // As chrome::NewTab does, so the page lands where Cmd+T's blank tab
     // would have.
@@ -391,6 +423,8 @@ void CommandBar::OpenPicked(const content::OpenURLParams& params) {
     PlaceInTask();
   }
   PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
+  // An open tab picked in an empty little window takes its place.
+  CloseLittleWindowIfBlank(window_);
 }
 
 tabs::TabInterface* CommandBar::SelectedPage() {
@@ -402,15 +436,18 @@ tabs::TabInterface* CommandBar::SelectedPage() {
 
 void CommandBar::Ask(const std::string& text, tabs::TabInterface* page) {
   if (bubble_) {
+    base::AutoReset<bool> opening(&opening_, true);
     bubble_->CloseUI();
   }
   AskInNewChat(window_, page, text);
   PlaceInTask();
   PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
+  CloseLittleWindowIfBlank(window_);
 }
 
 void CommandBar::RunInTerminal(const std::string& text) {
   if (bubble_) {
+    base::AutoReset<bool> opening(&opening_, true);
     bubble_->CloseUI();
   }
   OpenTerminalTabRunning(window_, text);

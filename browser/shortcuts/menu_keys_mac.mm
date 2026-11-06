@@ -27,6 +27,7 @@
 #include "ui/base/accelerators/platform_accelerator_cocoa.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/little_window/little_window_commands.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -46,6 +47,7 @@ constexpr struct {
     {kNewTerminalCommand, "new_terminal"},
     {kNewChatCommand, "new_chat"},
     {kNewWorkspaceCommand, "new_workspace"},
+    {kNewLittleWindowCommand, "new_little_window"},
     {kShowThemePicker, "theme"},
     {Controller::kNewChildTab, "new_child_tab"},
     {Controller::kNest, "nest_under_previous_tab"},

@@ -703,6 +703,7 @@ const TEST_SUITES = {
     "CommandSettingsTest.*", "CommandMessagesTest.*", "SplitLayoutTest.*",
   ],
   browser_tests: [
+    "LittleWindowBrowserTest.*",
     "TabOrganizationControllerBrowserTest.*", "AutomaticOrganizerBrowserTest.*", "OrganizerLogBrowserTest.*",
     "UwOrganizationPageBrowserTest.*", "MenuKeysBrowserTest.*", "ReleaseVersionBrowserTest.*", "UpdateBrowserTest.*", "AboutUpdatesBrowserTest.*", "ProblemReportsBrowserTest.*", "GoogleRequestsBrowserTest.*", "CodecsBrowserTest.*", "UwShortcutsPageBrowserTest.*",
     "WindowScreenshotBrowserTest.*", "TintBrowserTest.*", "WindowButtonsBrowserTest.*", "UwSchemeBrowserTest.*", "PageClipboardBrowserTest.*", "UwTerminalBrowserTest.*",

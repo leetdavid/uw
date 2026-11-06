@@ -165,6 +165,16 @@ Press Shift+Cmd+Return. Expected result: the pane fills the page area and the ot
 
 Press Cmd+W: that pane closes, and the panes beside it take its space. Right-click a tab in the split and choose `Close`: the whole split closes, and Shift+Cmd+T brings it back with its panes, their sizes, and the pane you were in. Quit and launch again: the split is still there. While a tab is in a split, the organizer neither asks about it nor moves it.
 
+### Little windows
+
+Switch to another app, such as Finder, and press Option+Cmd+N. Type an address and press Return.
+
+Expected result: a small uw window with no sidebar opens on the desktop you're looking at, over the other app, with the command bar. The page loads in it. Its toolbar has the window buttons at the left, the address, and `Move to` with your workspace's name at the right. Press Option+Cmd+N again with nothing typed and press Esc: that window closes.
+
+Press Cmd+O in a little window with a page. Expected result: the little window closes, and the same page, scrolled where it was, sits selected at the top of the Scratchpad in your workspace's window. Open another little window, Cmd-click a link in it: the link opens at the top of the Scratchpad and the little window stays in front. Close a little window with Cmd+W and press Shift+Cmd+T: it comes back as a little window. Quit and launch again: no little window comes back.
+
+Option+Cmd-click a link, or right-click it and choose `Open Link in Little Window`: it opens in a little window. Under Little windows on uw's settings page, turn off `from other apps`: Option+Cmd+N in Finder does nothing, and still works in uw.
+
 ### Themes
 
 Open the theme picker from View → Theme…, from `Theme…` in the menu of empty space in the sidebar, or from the `Theme` row at `uw://settings/uwOrganization`.

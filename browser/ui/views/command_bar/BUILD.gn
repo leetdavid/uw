@@ -15,6 +15,7 @@ source_set("command_bar") {
   deps = [
     "//chrome:strings",
     "//chrome/browser:browser_public_dependencies",
+    "//uw/browser/little_window:mark",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",

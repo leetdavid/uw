@@ -27,6 +27,7 @@ source_set("workspaces") {
   ]
   deps = [
     ":prefs",
+    "//uw/browser/little_window:mark",
     "//chrome/browser/themes",
     "//ui/base/mojom",
     "//ui/color",

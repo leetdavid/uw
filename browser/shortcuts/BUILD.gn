@@ -24,6 +24,7 @@ source_set("shortcuts") {
     "//components/prefs",
     "//ui/base",
     "//uw/browser/agent:chat_tab",
+    "//uw/browser/little_window:mark",
     "//uw/browser/tab_organization",
     "//uw/browser/terminal",
     "//uw/browser/workspaces",

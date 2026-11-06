@@ -97,6 +97,23 @@ Drawn on 2026-11-07 as T357, on the "Little windows" page of the Doop canvas nam
 - "Little window: Move to Workspace": a page in a little window, with the workspace menu open.
 - "Little windows: every state": the menus that open one, a link's menu, light, dark, and behind another window, the command bar before typing, a Cmd-click, the page after Move to Workspace, over a full-screen app, the settings, Keyboard shortcuts, and Windows with the AltGr note.
 
+## How it is built
+
+- `uw/browser/little_window` holds the feature. `little_window_mark` says which windows are little windows, and their workspace, with nothing but `//base`, so Chromium's own files can ask. Chromium makes some parts of a window, such as its `WindowFeatureController`, before uw marks it, so those ask `IsMakingLittleWindow()` and mark themselves.
+- `OpenLittleWindow()` makes a `TYPE_POPUP` window inside `ScopedMakingLittleWindow`, with `omit_from_session_restore`, so a quit drops it. `EmbedderBrowserWindowFeatures` gives it a `LittleWindow`, a command bar, and page colors, and none of a regular window's features. It also gives it the eye's page action, since a page moved to a regular window brings its window's actions along.
+- Chromium's files change in `uw-little-window.patch`, last in the series:
+  - `WindowFeatureController` gives a little window the toolbar and location bar, and no title bar. The toolbar takes its normal mode, so the address can change.
+  - On the Mac, the window takes a browser window's style with its title hidden. Its title bar is as tall as the card's margin and toolbar together, so macOS's buttons sit centered on the toolbar, and the toolbar starts after them.
+  - The pop-up layout insets the toolbar and the page by the card's margin and rounds the card. The frame paints the theme around it, as in a regular window.
+  - The navigator sends a little window's new-tab links to the window used last on its workspace, and places them with `TabOrganizationController::LinksFromAnotherApp`.
+  - Cmd+Shift+T: `UnloadController` records a little window that showed a page, and `BrowserLiveTabContext` saves its workspace under `uw.little_window` and brings it back as one.
+  - `IDC_OPEN_FILE` in a little window runs Move to Workspace. On Windows, `IDC_SHOW_BOOKMARK_MANAGER` there opens the workspace menu.
+  - Option+Cmd-click reaches Chromium as `NEW_SPLIT_VIEW` from a page, which `BrowserWebContentsDelegate` turns into a little window. A link's menu adds Open Link in Little Window.
+- Move to Workspace takes the page out of the little window with `DetachTabAtForInsertion` and puts it in the target window with `InsertDetachedTabAt`. With no window on the workspace, `WorkspaceWindow::OpenWindow` opens one first.
+- `LittleWindowKeyListener` registers the key with Chromium's `GlobalAcceleratorListener`, the one extensions' global keys use, which needs no permission. macOS and Windows then give uw the key even while uw is in front, so the listener also honors the in-uw switch. Browser tests never take the key from other apps unless a test asks.
+- On Windows, `ToUnicodeEx` with Ctrl and Alt down says whether the keyboard types a letter with AltGr and the key's letter.
+- Each little window checks once a minute whether it has been unused for the set time.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board), built and checked on the Mac and on Windows.

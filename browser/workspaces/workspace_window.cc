@@ -49,6 +49,7 @@
 #include "ui/compositor/compositor.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
+#include "uw/browser/little_window/little_window_mark.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 
@@ -116,13 +117,18 @@ WorkspaceWindow::WorkspaceWindow(BrowserWindowInterface* window)
       group_(base::Uuid::GenerateRandomV4().AsLowercaseString()),
       user_data_(window->GetUnownedUserDataHost(), *this) {
   // A new window shows the workspace of the window in front when they share
-  // a profile, as after Cmd+N, and otherwise its profile's first one.
+  // a profile, as after Cmd+N, and otherwise its profile's first one. A
+  // little window in front gives its own workspace.
   BrowserWindowInterface* front =
       GetLastActiveBrowserWindowInterfaceWithAnyProfile();
   const WorkspaceWindow* in_front = From(front);
-  workspace_ = in_front && front->GetProfile() == window->GetProfile()
-                   ? in_front->workspace_
-                   : WorkspaceList::Get().FirstFor(window->GetProfile()).id;
+  const std::string little = front ? LittleWindowWorkspace(front) : "";
+  if (front && front->GetProfile() == window->GetProfile() &&
+      (in_front || !little.empty())) {
+    workspace_ = in_front ? in_front->workspace_ : little;
+  } else {
+    workspace_ = WorkspaceList::Get().FirstFor(window->GetProfile()).id;
+  }
 }
 
 void WorkspaceWindow::Start() {
@@ -683,6 +689,38 @@ int WorkspaceWindow::CountTabs(std::string_view id) {
 }
 
 // static
+// static
+void WorkspaceWindow::OpenWindow(std::string_view id, WindowCallback opened) {
+  const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
+  if (!workspace) {
+    return;
+  }
+  ProfileManager* manager = g_browser_process->profile_manager();
+  manager->LoadProfileByPath(
+      manager->user_data_dir().Append(workspace->profile),
+      /*incognito=*/false,
+      base::BindOnce(
+          [](std::string id, WindowCallback opened, Profile* profile) {
+            if (!profile || !WorkspaceList::Get().Find(id)) {
+              return;
+            }
+            BrowserWindowInterface* window = CreateBrowserWindow(
+                BrowserWindowCreateParams(*profile, /*from_user_gesture=*/true));
+            WorkspaceWindow* self = From(window);
+            if (!self) {
+              return;
+            }
+            if (self->workspace_ != id) {
+              self->workspace_ = id;
+              self->SaveSession();
+              self->changes_.Notify();
+              self->TakeTheme();
+            }
+            std::move(opened).Run(window);
+          },
+          std::string(id), std::move(opened)));
+}
+
 void WorkspaceWindow::MoveTab(tabs::TabInterface* tab, std::string_view id) {
   WorkspaceWindow* self = From(tab->GetBrowserWindowInterface());
   if (!self || tab->IsPinned() || id == self->workspace_) {

@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
@@ -16,10 +17,14 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "content/public/browser/web_ui_data_source.h"
+#include "ui/base/accelerators/accelerator.h"
 #include "ui/base/webui/web_ui_util.h"
+#include "ui/events/event_constants.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/branding/report_issue.h"
+#include "uw/browser/little_window/little_window_key.h"
+#include "uw/browser/little_window/little_window_prefs.h"
 #include "uw/browser/problem_reports/problem_reports.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/ui/glass/glass.h"
@@ -147,6 +152,27 @@ void UwOrganizationHandler::AddLoadTimeData(
       {"uwMiniPlayerFloat", IDS_UW_SETTINGS_MINI_PLAYER_FLOAT},
       {"uwMiniPlayerFloatDescription",
        IDS_UW_SETTINGS_MINI_PLAYER_FLOAT_DESCRIPTION},
+      {"uwLittleWindowsTitle", IDS_UW_SETTINGS_LITTLE_WINDOWS_TITLE},
+      {"uwLittleWindowsKeyInUw", IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_IN_UW},
+      {"uwLittleWindowsKeyInUwDescription",
+       IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_IN_UW_DESCRIPTION},
+      {"uwLittleWindowsKeyFromApps",
+       IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_FROM_APPS},
+      {"uwLittleWindowsKeyFromAppsDescription",
+       IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_FROM_APPS_DESCRIPTION},
+      {"uwLittleWindowsAltGr", IDS_UW_SETTINGS_LITTLE_WINDOWS_ALTGR},
+      {"uwLittleWindowsChangeKey", IDS_UW_SETTINGS_LITTLE_WINDOWS_CHANGE_KEY},
+      {"uwLittleWindowsLinks", IDS_UW_SETTINGS_LITTLE_WINDOWS_LINKS},
+      {"uwLittleWindowsLinksDescription",
+       IDS_UW_SETTINGS_LITTLE_WINDOWS_LINKS_DESCRIPTION},
+      {"uwLittleWindowsClose", IDS_UW_SETTINGS_LITTLE_WINDOWS_CLOSE},
+      {"uwLittleWindowsCloseDescription",
+       IDS_UW_SETTINGS_LITTLE_WINDOWS_CLOSE_DESCRIPTION},
+      {"uwLittleWindowsClose1Hour", IDS_UW_SETTINGS_LITTLE_WINDOWS_1_HOUR},
+      {"uwLittleWindowsClose6Hours", IDS_UW_SETTINGS_LITTLE_WINDOWS_6_HOURS},
+      {"uwLittleWindowsClose12Hours", IDS_UW_SETTINGS_LITTLE_WINDOWS_12_HOURS},
+      {"uwLittleWindowsClose1Day", IDS_UW_SETTINGS_LITTLE_WINDOWS_1_DAY},
+      {"uwLittleWindowsCloseNever", IDS_UW_SETTINGS_LITTLE_WINDOWS_NEVER},
       {"uwOrganizationPause1Hour", IDS_UW_PAUSE_1HOUR},
       {"uwOrganizationPauseUntilLaunch", IDS_UW_PAUSE_UNTIL_LAUNCH},
       {"uwOrganizationPauseIndefinite", IDS_UW_PAUSE_INDEFINITE},
@@ -251,6 +277,27 @@ mojom::StatePtr UwOrganizationHandler::CurrentState() const {
   for (const SiteWindowSite& site : SiteWindowSites(local_state)) {
     state->live_sites.push_back(mojom::LiveSite::New(site.site, site.live));
   }
+  const std::optional<ui::Accelerator> key = LittleWindowKey();
+  state->little_window_key =
+      key ? base::UTF16ToUTF8(key->GetShortcutText()) : std::string();
+  state->little_window_key_in_uw =
+      local_state->GetBoolean(kLittleWindowKeyInUwPref);
+  state->little_window_key_from_apps =
+      local_state->GetBoolean(kLittleWindowKeyFromAppsPref);
+  if (LittleWindowKeyListener* listener = LittleWindowKeyListener::Get()) {
+    // The keyboard may have changed since the key was last taken.
+    listener->Update();
+    state->little_window_altgr_character =
+        base::UTF16ToUTF8(listener->altgr_character());
+  }
+  if (key && !state->little_window_altgr_character.empty()) {
+    state->little_window_altgr_letter =
+        base::UTF16ToUTF8(ui::Accelerator(key->key_code(), ui::EF_NONE)
+                              .GetShortcutText());
+  }
+  state->little_window_links = local_state->GetBoolean(kLittleWindowLinksPref);
+  state->little_window_close_after =
+      local_state->GetInteger(kLittleWindowCloseAfterPref);
   return state;
 }
 
@@ -327,6 +374,33 @@ void UwOrganizationHandler::SetSiteLive(const std::string& site,
                                         bool live,
                                         SetSiteLiveCallback callback) {
   uw::SetSiteLive(g_browser_process->local_state(), site, live);
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetLittleWindow(mojom::LittleWindowSwitch which,
+                                            bool on,
+                                            SetLittleWindowCallback callback) {
+  const char* pref = kLittleWindowKeyInUwPref;
+  switch (which) {
+    case mojom::LittleWindowSwitch::kKeyInUw:
+      pref = kLittleWindowKeyInUwPref;
+      break;
+    case mojom::LittleWindowSwitch::kKeyFromApps:
+      pref = kLittleWindowKeyFromAppsPref;
+      break;
+    case mojom::LittleWindowSwitch::kLinks:
+      pref = kLittleWindowLinksPref;
+      break;
+  }
+  g_browser_process->local_state()->SetBoolean(pref, on);
+  std::move(callback).Run();
+}
+
+void UwOrganizationHandler::SetLittleWindowCloseAfter(
+    int32_t minutes,
+    SetLittleWindowCloseAfterCallback callback) {
+  g_browser_process->local_state()->SetInteger(kLittleWindowCloseAfterPref,
+                                               std::max(0, minutes));
   std::move(callback).Run();
 }
 

@@ -28,6 +28,15 @@ gfx::Insets PageCardMargins(const PrefService* local_state);
 gfx::RoundedCornersF PageCardCorners(const gfx::RectF& card,
                                      const gfx::RectF& window);
 
+// A little window has no sidebar, so its card has the margin on every side.
+// See docs/plans/little-window.md.
+inline constexpr gfx::Insets kLittleWindowMargins = gfx::Insets(8);
+// The little window's margin, or none while "Space around the page" is off.
+gfx::Insets LittleWindowMargins(const PrefService* local_state);
+// On the Mac, macOS's window buttons sit over a little window's toolbar,
+// which starts after them, this far in from the card's edge.
+int LittleWindowToolbarStart(const PrefService* local_state);
+
 // On Windows, minimize, maximize, and close are toolbar buttons at the
 // toolbar's end, after Chromium's toolbar divider, kWindowButtonsEnd in from
 // the card's edge.

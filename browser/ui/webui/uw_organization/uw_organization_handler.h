@@ -55,6 +55,12 @@ class UwOrganizationHandler : public mojom::OrganizationHandler {
   void SetSiteLive(const std::string& site,
                    bool live,
                    SetSiteLiveCallback callback) override;
+  void SetLittleWindow(mojom::LittleWindowSwitch which,
+                       bool on,
+                       SetLittleWindowCallback callback) override;
+  void SetLittleWindowCloseAfter(
+      int32_t minutes,
+      SetLittleWindowCloseAfterCallback callback) override;
   void SetMiniPlayer(mojom::MiniPlayerSwitch which,
                      bool on,
                      SetMiniPlayerCallback callback) override;

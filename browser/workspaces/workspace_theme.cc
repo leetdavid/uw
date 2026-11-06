@@ -27,6 +27,7 @@
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/look/page_color.h"
+#include "uw/browser/little_window/little_window_mark.h"
 #include "uw/browser/ui/look/theme_colors.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
@@ -66,10 +67,16 @@ BrowserWindowInterface* WindowOfWorkspace(std::string_view id) {
   return found;
 }
 
-// The workspace that `window` shows, or null.
+// The workspace that `window` shows, or that a little window belongs to, or
+// null.
 const WorkspaceList::Workspace* WorkspaceOf(BrowserWindowInterface* window) {
   const WorkspaceWindow* shown = WorkspaceWindow::From(window);
-  return shown ? WorkspaceList::Get().Find(shown->workspace()) : nullptr;
+  if (!shown) {
+    return IsLittleWindow(window)
+               ? WorkspaceList::Get().Find(LittleWindowWorkspace(window))
+               : nullptr;
+  }
+  return WorkspaceList::Get().Find(shown->workspace());
 }
 
 // Sets the colors of `theme` in `key`.

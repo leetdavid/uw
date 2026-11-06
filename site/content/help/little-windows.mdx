@@ -1,0 +1,70 @@
+---
+title: Little windows
+description: Take a quick look at a page in a small window with no sidebar, from uw or any other app, and keep the page if you want it.
+---
+
+## Open *a little window*
+
+Press <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>N</kbd>, in uw or in any other app while uw is running. A little window opens on the desktop you're looking at, with the [command bar](./command-bar.mdx). Type a search or an address and press <kbd>Return</kbd>, and the page opens in the little window. Press <kbd>Esc</kbd> before you pick anything, and the window closes again.
+
+<Figure caption="A little window over another app, with the command bar. Return opens the search in the little window.">
+  <Window bare height={330} cut>
+    <Page address="" move="🏠  Move to Personal" />
+    <Popup top={58} left={100} width={430}>
+      <Field icon="search" value="deglaze a pan" />
+      <Row icon="search" title="deglaze a pan" detail="Google" selected>
+        <Muted>Search</Muted>
+      </Row>
+      <Row icon="history" title="How to Deglaze a Pan" detail="seriouseats.com">
+        <Muted>History</Muted>
+      </Row>
+      <Row icon="bookmark" title="The Pan Sauce Formula" detail="bonappetit.com">
+        <Muted>Bookmark</Muted>
+      </Row>
+    </Popup>
+  </Window>
+</Figure>
+
+**New Little Window** is also in the **File** menu and in the menu of the **▾** at the bottom of the sidebar. Each one opens another little window.
+
+To open a link in a little window, hold <kbd>Option</kbd> <kbd>Cmd</kbd> as you click it, or right-click it and choose **Open Link in Little Window**.
+
+A little window has no sidebar, and it isn't in any workspace. It takes the theme of the workspace of the window you used last. Click the address, or press <kbd>Cmd</kbd> <kbd>L</kbd>, to go somewhere else in it.
+
+## Keep *the page*
+
+Click **Move to** and your workspace's name at the right of the toolbar, or press <kbd>Cmd</kbd> <kbd>O</kbd>. The page moves to the top of the Scratchpad in your workspace's window, as it is: what you scrolled to, what you typed, and its back and forward pages come along. The little window closes, and [automatic organization](./automatic-organization.mdx) files the tab from there.
+
+<Figure caption="The ▾ beside Move to Personal lists the workspaces the page can go to.">
+  <Window bare height={300} cut>
+    <Page address="seriouseats.com/how-to-deglaze-a-pan" move="🏠  Move to Personal" />
+    <Menu top={50} left={330}>
+      <MenuItem keys="Cmd+O">🏠  Personal</MenuItem>
+      <MenuItem>💼  Work</MenuItem>
+    </Menu>
+  </Window>
+</Figure>
+
+To move the page to another workspace, click the **▾**, or press <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>O</kbd>, and pick one. A workspace on another profile opens the page's address there instead.
+
+A link in a little window that opens a new tab, such as a <kbd>Cmd</kbd>-click, opens at the top of the Scratchpad in your workspace's window. The little window stays in front.
+
+## Close *it*
+
+Press <kbd>Cmd</kbd> <kbd>W</kbd>. <kbd>Shift</kbd> <kbd>Cmd</kbd> <kbd>T</kbd> brings it back as a little window. Little windows don't come back after you quit uw.
+
+A little window you haven't used for 6 hours closes on its own, unless its page is playing sound or would ask before you leave it.
+
+## Settings
+
+Under **Little windows** at `uw://settings/uwOrganization`:
+
+- **Open a little window with Option+Cmd+N in uw** and **from other apps** turn the key on or off in each place. While uw takes the key from other apps, they don't get it: Finder's New Smart Folder and Mail's New Viewer Window, for example. Change the key under **Keyboard shortcuts** at `uw://settings/shortcuts`.
+- **Open links from other apps in a little window** opens links from Mail, Slack, or a terminal in a little window instead of at the top of the Scratchpad. It's off at first.
+- **Close a little window after it's unused for** picks 1 hour, 6 hours, 12 hours, 1 day, or Never.
+
+## On Windows
+
+Press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd>, and use <kbd>Ctrl</kbd> where the Mac uses <kbd>Cmd</kbd>: <kbd>Ctrl</kbd> <kbd>O</kbd> keeps the page and <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>O</kbd> lists the workspaces. <kbd>Ctrl</kbd> <kbd>Alt</kbd>-click opens a link in a little window.
+
+On a keyboard that types a letter with <kbd>AltGr</kbd> <kbd>N</kbd>, such as "ń" on a Polish one, uw leaves <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd> to other apps, since Windows sends AltGr as Ctrl+Alt. Settings says so under the switch. The key still works in uw.

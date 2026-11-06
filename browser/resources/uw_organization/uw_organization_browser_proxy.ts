@@ -4,7 +4,7 @@
 
 /** @fileoverview Handles communication for the uw organization page. */
 
-import type {CommandState, MiniPlayerMode, MiniPlayerSwitch, MouseAction, PauseResult, ProblemReportsState, State, Thresholds} from './uw_organization.mojom-webui.js';
+import type {CommandState, LittleWindowSwitch, MiniPlayerMode, MiniPlayerSwitch, MouseAction, PauseResult, ProblemReportsState, State, Thresholds} from './uw_organization.mojom-webui.js';
 import {OrganizationHandler, OrganizationHandlerRemote} from './uw_organization.mojom-webui.js';
 
 export interface UwOrganizationBrowserProxy {
@@ -25,6 +25,8 @@ export interface UwOrganizationBrowserProxy {
   setMouseAction(action: MouseAction, on: boolean): Promise<void>;
   setMiniPlayerMode(mode: MiniPlayerMode): Promise<void>;
   setMiniPlayer(which: MiniPlayerSwitch, on: boolean): Promise<void>;
+  setLittleWindow(which: LittleWindowSwitch, on: boolean): Promise<void>;
+  setLittleWindowCloseAfter(minutes: number): Promise<void>;
   setSiteLive(site: string, live: boolean): Promise<void>;
 }
 
@@ -84,6 +86,14 @@ export class UwOrganizationBrowserProxyImpl implements
 
   async setMiniPlayer(which: MiniPlayerSwitch, on: boolean) {
     await this.handler.setMiniPlayer(which, on);
+  }
+
+  async setLittleWindow(which: LittleWindowSwitch, on: boolean) {
+    await this.handler.setLittleWindow(which, on);
+  }
+
+  async setLittleWindowCloseAfter(minutes: number) {
+    await this.handler.setLittleWindowCloseAfter(minutes);
   }
 
   getCommand() {

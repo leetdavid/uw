@@ -23,6 +23,7 @@
 #include "url/gurl.h"
 #include "uw/browser/agent/skill_folders.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/little_window/little_window_prefs.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/look/page_space_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
@@ -331,6 +332,43 @@ IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
                       "return true;"));
   EXPECT_TRUE(base::test::RunUntil(
       [&] { return MiniPlayerModeOf(local_state) == MiniPlayerMode::kOff; }));
+}
+
+// The Little windows section: both keys on, links off, and an unused window
+// closing after 6 hours, each of which changes.
+IN_PROC_BROWSER_TEST_F(UwOrganizationPageBrowserTest,
+                       TheLittleWindowSettingsStartAsAgreedAndChange) {
+  PrefService* local_state = g_browser_process->local_state();
+  EXPECT_TRUE(local_state->GetBoolean(kLittleWindowKeyInUwPref));
+  EXPECT_TRUE(local_state->GetBoolean(kLittleWindowKeyFromAppsPref));
+  EXPECT_FALSE(local_state->GetBoolean(kLittleWindowLinksPref));
+  EXPECT_EQ(6 * 60, local_state->GetInteger(kLittleWindowCloseAfterPref));
+  OpenPage();
+  ASSERT_EQ(true, Run("const toggle = part('littleWindowKeyInUwToggle');"
+                      "await until(() => toggle.checked);"
+                      "toggle.scrollIntoView({block: 'center'});"
+                      "toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !local_state->GetBoolean(kLittleWindowKeyInUwPref); }));
+  ASSERT_EQ(true, Run("const toggle = part('littleWindowLinksToggle');"
+                      "await until(() => !toggle.checked);"
+                      "toggle.click();"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return local_state->GetBoolean(kLittleWindowLinksPref); }));
+  ASSERT_EQ(true, Run("const select = part('littleWindowCloseSelect');"
+                      "select.value = '0';"
+                      "select.dispatchEvent(new Event('change'));"
+                      "return true;"));
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return local_state->GetInteger(kLittleWindowCloseAfterPref) == 0;
+  }));
+  // The switches name the key.
+  EXPECT_EQ(true,
+            Run("return part('littleWindowKeyInUwLabel').textContent"
+                "    .includes('N');"));
+  SaveWindowScreenshot(browser(), "settings-little-windows");
 }
 
 // The sites that opened their own window show newest first, each with its

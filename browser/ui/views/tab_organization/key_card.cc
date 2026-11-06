@@ -53,6 +53,7 @@
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
+#include "uw/browser/little_window/little_window_commands.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
@@ -315,6 +316,7 @@ constexpr RowSpec kBranchRows[] = {
 };
 constexpr RowSpec kBranchAlsoRows[] = {
     {Controller::kUndo, 0, IDS_UW_UNDO_ORGANIZATION_MAC},
+    {kNewLittleWindowCommand, 0, IDS_UW_NEW_LITTLE_WINDOW_MAC},
 };
 constexpr RowSpec kTaskRows[] = {
     {IDC_CREATE_NEW_TAB_GROUP, 0, IDS_UW_NEW_TASK_MAC},

@@ -261,6 +261,73 @@ export function getHtml(this: SettingsUwOrganizationPageElement) {
     </div>`)}
   </div>
   <div class="uw-section">
+    <h2 class="uw-heading">${this.i18n_('uwLittleWindowsTitle')}</h2>
+    <div class="uw-row">
+      <div id="littleWindowKeyInUwLabel" class="uw-field">
+        ${this.littleWindowKeyText_('uwLittleWindowsKeyInUw')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwLittleWindowsKeyInUwDescription')}
+        </div>
+      </div>
+      <cr-toggle id="littleWindowKeyInUwToggle"
+          aria-labelledby="littleWindowKeyInUwLabel"
+          ?checked="${!!this.state_?.littleWindowKeyInUw}"
+          @change="${this.onLittleWindowKeyInUwChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-row">
+      <div id="littleWindowKeyFromAppsLabel" class="uw-field">
+        ${this.littleWindowKeyText_('uwLittleWindowsKeyFromApps')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwLittleWindowsKeyFromAppsDescription')}
+        </div>
+        <div id="littleWindowAltGr" class="uw-secondary"
+            ?hidden="${!this.state_?.littleWindowAltgrCharacter}">
+          ${this.littleWindowAltGrText_()}
+        </div>
+      </div>
+      <cr-toggle id="littleWindowKeyFromAppsToggle"
+          aria-labelledby="littleWindowKeyFromAppsLabel"
+          ?checked="${this.littleWindowKeyFromApps_()}"
+          ?disabled="${!!this.state_?.littleWindowAltgrCharacter}"
+          @change="${this.onLittleWindowKeyFromAppsChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-row">
+      <div id="littleWindowLinksLabel" class="uw-field">
+        ${this.i18n_('uwLittleWindowsLinks')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwLittleWindowsLinksDescription')}
+        </div>
+      </div>
+      <cr-toggle id="littleWindowLinksToggle"
+          aria-labelledby="littleWindowLinksLabel"
+          ?checked="${!!this.state_?.littleWindowLinks}"
+          @change="${this.onLittleWindowLinksChange_}">
+      </cr-toggle>
+    </div>
+    <div class="uw-row">
+      <div id="littleWindowCloseLabel" class="uw-field">
+        ${this.i18n_('uwLittleWindowsClose')}
+        <div class="uw-secondary">
+          ${this.i18n_('uwLittleWindowsCloseDescription')}
+        </div>
+      </div>
+      <select id="littleWindowCloseSelect" class="md-select"
+          aria-labelledby="littleWindowCloseLabel"
+          @change="${this.onLittleWindowCloseChange_}">
+        ${this.littleWindowCloseOptions_().map(item => html`
+          <option value="${item.minutes}" ?selected="${item.selected}">
+            ${this.i18n_(item.label)}
+          </option>`)}
+      </select>
+    </div>
+    <a id="littleWindowChangeKey" class="uw-note"
+        href="chrome://settings/shortcuts">
+      ${this.i18n_('uwLittleWindowsChangeKey')}
+    </a>
+  </div>
+  <div class="uw-section">
     <h2 class="uw-heading">${this.i18n_('uwMouseTitle')}</h2>
     ${this.mouseActions_().map(row => html`
     <div class="uw-row">

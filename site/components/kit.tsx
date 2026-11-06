@@ -336,12 +336,15 @@ export function Page({
   eye,
   moved,
   terminal,
+  move,
   children,
 }: {
   address: string;
   eye?: boolean;
   moved?: boolean;
   terminal?: boolean;
+  // A little window's Move button, such as "🏠 Move to Personal".
+  move?: string;
   children?: ReactNode;
 }) {
   return (
@@ -355,6 +358,12 @@ export function Page({
           {eye && <Eye className="kit-eye" />}
           <Star />
         </span>
+        {move && (
+          <span className="kit-move">
+            <span className="kit-label">{move}</span>
+            <ChevronDown />
+          </span>
+        )}
       </div>
       <div className={classes("kit-body", terminal && "kit-shell")}>
         {children ?? (

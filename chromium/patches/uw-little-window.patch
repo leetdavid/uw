@@ -1,0 +1,928 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index 47206ed5ed68b38b984f5df2ac869c3bf4a140fd..af7ce8d0e5f1ebce54009b8d93caa564c78d6856 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -326,6 +326,11 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_KEY_CARD_CMD" desc="The Command key's name on a key cap of the key card, as Mac users say it.">Cmd</message>
+       <message name="IDS_UW_KEY_CARD_OPTION" desc="The Option key's name on a key cap of the key card.">Option</message>
+       <message name="IDS_UW_KEY_CARD_RETURN" desc="The Return key's name on a key cap of the key card on the Mac.">Return</message>
++      <message name="IDS_UW_NEW_LITTLE_WINDOW_MAC" desc="In Title Case: Item in the File menu and in the menu of the sidebar's new button. Opens a little window: a small, temporary window with no sidebar, for a quick look at one page.">New Little Window</message>
++      <message name="IDS_UW_LITTLE_WINDOW_MOVE_TO" desc="Label of the button in a little window's toolbar that moves its page into the window of a workspace, a named area of browsing such as work or personal. WORKSPACE is the workspace's name.">Move to <ph name="WORKSPACE">$1<ex>Personal</ex></ph></message>
++      <message name="IDS_UW_LITTLE_WINDOW_CHOOSE_WORKSPACE" desc="Tooltip and accessible name of the arrow beside a little window's Move button. Opens a menu of workspaces to move its page to.">Choose a workspace</message>
++      <message name="IDS_UW_LITTLE_WINDOW_MENU_TITLE" desc="Heading of the menu of workspaces a little window's page can move to.">Move this page to</message>
++      <message name="IDS_UW_SHORTCUTS_OPEN_FILE_OR_MOVE" desc="Name of one row in the Keyboard shortcuts settings. The same key opens a file, or, in a little window, moves its page to a workspace.">Open File…, or Move to Workspace in a little window</message>
+       <message name="IDS_UW_MOVE_TO_SCRATCHPAD_MAC" desc="In Title Case: Removes the selected tab branches from their task.">Move to Scratchpad</message>
+       <message name="IDS_UW_KEEP_HERE_MAC" desc="In Title Case: Keeps the selected tabs where they are, so automatic organization neither asks about them nor moves them.">Keep Here</message>
+       <message name="IDS_UW_STOP_KEEPING_HERE_MAC" desc="In Title Case: Lets automatic organization file the selected kept tabs again.">Stop Keeping Here</message>
+@@ -973,6 +978,9 @@ are declared in tools/grit/grit_args.gni.
+           <message name="IDS_CONTENT_CONTEXT_OPENLINKSPLITVIEW" desc="The name of the open a link in split view command">
+             Open link in split view
+           </message>
++          <message name="IDS_CONTENT_CONTEXT_OPENLINKLITTLEWINDOW" desc="The name of the command in a link's menu that opens the link in a little window, a small temporary window with no sidebar.">
++            Open link in little window
++          </message>
+           <message name="IDS_CONTENT_CONTEXT_OPENLINKLEFTVIEW" desc="The name of the open a link in left side of a split view command">
+             Open link in left view
+           </message>
+@@ -1326,6 +1334,9 @@ are declared in tools/grit/grit_args.gni.
+           <message name="IDS_CONTENT_CONTEXT_OPENLINKSPLITVIEW" desc="In Title Case: The name of the open a link in split view command">
+             Open Link in Split View
+           </message>
++          <message name="IDS_CONTENT_CONTEXT_OPENLINKLITTLEWINDOW" desc="In Title Case: The name of the command in a link's menu that opens the link in a little window, a small temporary window with no sidebar.">
++            Open Link in Little Window
++          </message>
+           <message name="IDS_CONTENT_CONTEXT_OPENLINKLEFTVIEW" desc="In Title Case: The name of the open a link in left side of a split view command">
+             Open Link in Left View
+           </message>
+diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
+index 7a17f664a8235e221f367ce14573ee871e9f8ce5..a871e54599e70822da5ac863f366f2bd046e73e4 100644
+--- a/chrome/app/settings_strings.grdp
++++ b/chrome/app/settings_strings.grdp
+@@ -4093,6 +4093,54 @@
+       <message name="IDS_UW_SETTINGS_MINI_PLAYER_FLOAT_DESCRIPTION" desc="Second line of the switch that floats the mini player once another app's windows cover it in the tab sidebar.">
+         It leaves the sidebar once another app's window covers it.
+       </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_TITLE" desc="Heading of the settings for little windows: small, temporary windows with no sidebar, for a quick look at a page.">
++        Little windows
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_IN_UW" desc="Label of a switch. KEY is the keyboard shortcut that opens a little window.">
++        Open a little window with <ph name="KEY">$1<ex>Option+Cmd+N</ex></ph> in uw
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_IN_UW_DESCRIPTION" desc="Second line of the switch for the little window's key inside uw.">
++        Works while uw is in front.
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_FROM_APPS" desc="Label of a switch. KEY is the keyboard shortcut that opens a little window.">
++        Open a little window with <ph name="KEY">$1<ex>Option+Cmd+N</ex></ph> from other apps
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_KEY_FROM_APPS_DESCRIPTION" desc="Second line of the switch for the little window's key in other apps.">
++        Works in any app while uw runs. Other apps don't get this key.
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_ALTGR" desc="Note under the switch for the little window's key in other apps, on Windows, when the keyboard types a letter with AltGr and the key's letter. CHARACTER is that letter, LETTER the key's letter, and KEY the shortcut.">
++        Your keyboard types “<ph name="CHARACTER">$1<ex>ń</ex></ph>” with AltGr+<ph name="LETTER">$2<ex>N</ex></ph>, which Windows sends as <ph name="KEY">$3<ex>Ctrl+Alt+N</ex></ph>, so uw leaves this key to other apps.
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_CHANGE_KEY" desc="Link to the Keyboard shortcuts settings, to change the key that opens a little window.">
++        Change the key in Keyboard shortcuts
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_LINKS" desc="Label of a switch.">
++        Open links from other apps in a little window
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_LINKS_DESCRIPTION" desc="Second line of the switch for links from other apps. The Scratchpad is the list of tabs in no task.">
++        Links from Mail, Slack, or a terminal open in a little window instead of at the top of the Scratchpad.
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_CLOSE" desc="Label of the choice of how long a little window stays open when it isn't used.">
++        Close a little window after it's unused for
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_CLOSE_DESCRIPTION" desc="Second line of the choice of how long an unused little window stays open.">
++        Not while it plays sound, or while its page would ask before you leave.
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_1_HOUR" desc="Choice: close an unused little window after one hour.">
++        1 hour
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_6_HOURS" desc="Choice: close an unused little window after six hours. The default.">
++        6 hours
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_12_HOURS" desc="Choice: close an unused little window after twelve hours.">
++        12 hours
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_1_DAY" desc="Choice: close an unused little window after one day.">
++        1 day
++      </message>
++      <message name="IDS_UW_SETTINGS_LITTLE_WINDOWS_NEVER" desc="Choice: never close an unused little window on its own.">
++        Never
++      </message>
+       <message name="IDS_UW_SETTINGS_SIDEBAR_EDGE_SUBLABEL" desc="Sub-label of the appearance setting that shows the hidden sidebar over the page when the pointer rests at the window's left edge.">
+         While the sidebar is hidden, rest the pointer at the window's left edge to show it over the page
+       </message>
+diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
+index 80ad27e3ddc3e87e1d33f507d4a4686b31bc51d0..9d4f1dd6130dd419978ea9ef62749579b6c52d99 100644
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -151,6 +151,7 @@
+ #include "ui/menus/cocoa/menu_controller.h"
+ #include "ui/native_theme/native_theme.h"
+ #include "url/gurl.h"
++#include "uw/browser/little_window/little_window_key.h"  // nogncheck
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ namespace {
+@@ -2639,6 +2640,14 @@ void OpenStartupTabsInBrowserWithProfile(const StartupTabs& tabs,
+                                          Profile* profile) {
+   if (!profile)
+     return;  // No suitable profile to open the URLs, do nothing.
++  // uw: with its switch on, links from other apps open in little windows.
++  // See docs/plans/little-window.md.
++  if (!tabs.empty() &&
++      std::ranges::all_of(tabs, [](const StartupTab& tab) {
++        return uw::OpenLinkFromAnotherAppInLittleWindow(tab.url);
++      })) {
++    return;
++  }
+   // Prefer a regular (non-incognito) profile
+   if (profile->IsIncognitoProfile()) {
+     profile = ProfileManager::MaybeForceOffTheRecordMode(
+diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
+index 868f83ecb13e900e917f4cc6f90f1ecbab37ba1b..2cac1cbaefe1f40558751b42a18e4843db48dc20 100644
+--- a/chrome/browser/global_keyboard_shortcuts_mac.mm
++++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
+@@ -24,6 +24,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/events/event_constants.h"
+ #include "ui/events/keycodes/keyboard_code_conversion_mac.h"
++#include "uw/browser/little_window/little_window_commands.h"  // nogncheck
+ #include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/commands.h"
+ #include "uw/browser/ui/views/command_bar/command_bar.h"
+@@ -124,6 +125,8 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+       // uw: Cmd+Option+arrows switch workspace, as in Arc.
+       {true,  false, false, true,  kVK_RightArrow,        uw::kNextWorkspace},
+       {true,  false, false, true,  kVK_LeftArrow,         uw::kPreviousWorkspace},
++      // uw: in a little window, Cmd+Shift+O opens its workspace menu.
++      {true,  true,  false, false, kVK_ANSI_O,            uw::kChooseWorkspaceCommand},
+       {false, true,  true,  false, kVK_PageDown,          IDC_MOVE_TAB_NEXT},
+       {false, true,  true,  false, kVK_PageUp,            IDC_MOVE_TAB_PREVIOUS},
+ 
+diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
+index 2f075ae072165ad6516754e19549bb660493e58b..166945b8bb978cb57c6f502545776d98a77bb2d3 100644
+--- a/chrome/browser/prefs/browser_prefs.cc
++++ b/chrome/browser/prefs/browser_prefs.cc
+@@ -561,6 +561,7 @@
+ #endif
+ 
+ #include "uw/browser/ai_providers/provider_sync.h"
++#include "uw/browser/little_window/little_window_prefs.h"  // nogncheck
+ #include "uw/browser/pins/pin_prefs.h"
+ #include "uw/browser/shortcuts/menu_keys.h"
+ #include "uw/browser/tab_organization/ai_connection.h"
+@@ -1758,6 +1759,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+   uw::RegisterMenuKeysPrefs(registry);
+   uw::RegisterMiniPlayerLocalStatePrefs(registry);
+   uw::RegisterPageSpaceLocalStatePrefs(registry);
++  uw::RegisterLittleWindowLocalStatePrefs(registry);
+ 
+   // This is intentionally last.
+   RegisterLocalStatePrefsForMigration(registry);
+diff --git a/chrome/browser/renderer_context_menu/render_view_context_menu.cc b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+index 835dd9a5fcbfa2b816b7468f89cd65c1b3545977..75de29b27035d6c175aea45be17fea5b69f2f479 100644
+--- a/chrome/browser/renderer_context_menu/render_view_context_menu.cc
++++ b/chrome/browser/renderer_context_menu/render_view_context_menu.cc
+@@ -106,6 +106,9 @@
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#if !BUILDFLAG(IS_ANDROID)
++#include "uw/browser/little_window/little_window.h"  // nogncheck
++#endif
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/browser_window/public/profile_browser_collection.h"
+@@ -2003,6 +2006,12 @@ void RenderViewContextMenu::AppendLinkItems() {
+                                            kOpenLinkInSplitMenuItem);
+       }
+     }
++    // uw: Open Link in Little Window, after the other Open Link items. See
++    // docs/plans/little-window.md.
++    if (GetBrowser() && !GetProfile()->IsOffTheRecord()) {
++      menu_model_.AddItemWithStringId(uw::kOpenLinkInLittleWindowCommand,
++                                      IDS_CONTENT_CONTEXT_OPENLINKLITTLEWINDOW);
++    }
+ #endif
+ 
+     if (params_.link_url.is_valid()) {
+@@ -3442,6 +3451,9 @@ bool RenderViewContextMenu::IsCommandIdEnabled(int id) const {
+              IsOpenLinkAllowedByDlp(params_.link_url);
+ 
+     case IDC_CONTENT_CONTEXT_OPENLINKSPLITVIEW:
++#if !BUILDFLAG(IS_ANDROID)
++    case uw::kOpenLinkInLittleWindowCommand:
++#endif
+       return navigation_allowed && params_.link_url.is_valid() &&
+              params_.link_url.IsStandard() &&
+              IsOpenLinkAllowedByDlp(params_.link_url);
+@@ -3822,6 +3834,12 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
+       OpenLinkInSplitView(split_tabs::SplitTabLayout::kSideBySide);
+ #endif  // !BUILDFLAG(IS_ANDROID)
+       break;
++#if !BUILDFLAG(IS_ANDROID)
++    case uw::kOpenLinkInLittleWindowCommand:
++      uw::OpenLinkInLittleWindow(GetBrowser(), params_.link_url,
++                                 source_web_contents_);
++      break;
++#endif
+     case IDC_CONTENT_CONTEXT_SAVELINKAS:
+       CheckSupervisedUserURLFilterAndSaveLinkAs();
+       break;
+diff --git a/chrome/browser/ui/accelerator_table.cc b/chrome/browser/ui/accelerator_table.cc
+index b770f4183f62dd6b208c748fa6b2c1be51b79c95..12e4b5f67ac343f24f1e0665084bfedab47cb550 100644
+--- a/chrome/browser/ui/accelerator_table.cc
++++ b/chrome/browser/ui/accelerator_table.cc
+@@ -31,6 +31,7 @@
+ #endif
+ 
+ #if BUILDFLAG(IS_WIN)
++#include "uw/browser/little_window/little_window_commands.h"  // nogncheck
+ #include "uw/browser/tab_organization/commands.h"  // nogncheck
+ #include "uw/browser/tab_organization/tab_organization_controller.h"  // nogncheck
+ #endif
+@@ -127,6 +128,10 @@ const AcceleratorMapping kAcceleratorMap[] = {
+     {ui::VKEY_OEM_6, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
+      uw::TabOrganizationController::kMoveToNextTask},
+     {ui::VKEY_N, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, IDC_CREATE_NEW_TAB_GROUP},
++    // uw: Ctrl+Alt+N opens a little window, as in Arc. See
++    // docs/plans/little-window.md.
++    {ui::VKEY_N, ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN,
++     uw::kNewLittleWindowCommand},
+     {ui::VKEY_R, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, uw::kRenameTask},
+     {ui::VKEY_1, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, uw::kGoToTask1},
+     {ui::VKEY_2, ui::EF_SHIFT_DOWN | ui::EF_ALT_DOWN, uw::kGoToTask1 + 1},
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index b7bd5b8d91e5814c3914835782fe94e0f8a39b42..661f8b16245af637a95275f725cae73fb390cb85 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -143,6 +143,9 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/events/keycodes/keyboard_codes.h"
++#include "uw/browser/little_window/little_window.h"  // nogncheck
++#include "uw/browser/little_window/little_window_key.h"  // nogncheck
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/pins/pin_sync.h"
+ #include "uw/browser/tab_organization/commands.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+@@ -1143,6 +1146,11 @@ void BrowserCommandController::HandleCommandWithDisposition(
+ 
+     // Show various bits of UI
+     case IDC_OPEN_FILE:
++      // uw: in a little window, Cmd+O moves its page to its workspace.
++      if (uw::LittleWindow* little = uw::LittleWindow::From(browser_)) {
++        little->MoveTo({});
++        break;
++      }
+       browser_->GetFeatures()
+           .browser_select_file_dialog_controller()
+           ->OpenFile();
+@@ -1254,6 +1262,14 @@ void BrowserCommandController::HandleCommandWithDisposition(
+                          kChromeUIHistorySyncedTabs);
+       break;
+     case IDC_SHOW_BOOKMARK_MANAGER:
++#if BUILDFLAG(IS_WIN)
++      // uw: in a little window, Ctrl+Shift+O opens its workspace menu, as
++      // Cmd+Shift+O does on the Mac. Elsewhere it stays the Bookmark Manager.
++      if (uw::LittleWindow* little = uw::LittleWindow::From(browser_)) {
++        little->ShowWorkspaceMenu();
++        break;
++      }
++#endif
+       ShowBookmarkManager(webui::GetBrowserForOpeningWebUi(browser_));
+       break;
+     case IDC_SHOW_BOOKMARK_SIDE_PANEL:
+@@ -1444,6 +1460,14 @@ void BrowserCommandController::HandleCommandWithDisposition(
+     case uw::kShellCommandBarCommand:
+       uw::CommandBar::OpenForShellCommand(browser_);
+       break;
++    case uw::kNewLittleWindowCommand:
++      uw::RunNewLittleWindowCommand();
++      break;
++    case uw::kChooseWorkspaceCommand:
++      if (uw::LittleWindow* little = uw::LittleWindow::From(browser_)) {
++        little->ShowWorkspaceMenu();
++      }
++      break;
+     case IDC_GROUP_UNGROUPED_TABS:
+       GroupAllUngroupedTabs(browser_);
+       base::RecordAction(
+@@ -1782,6 +1806,11 @@ void BrowserCommandController::InitCommandState() {
+       !profile()->IsOffTheRecord() &&
+           browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL);
+   command_updater_->UpdateCommandEnabled(uw::kShellCommandBarCommand, true);
++  command_updater_->UpdateCommandEnabled(uw::kNewLittleWindowCommand, true);
++  // Made while the little window is, before it is marked.
++  command_updater_->UpdateCommandEnabled(
++      uw::kChooseWorkspaceCommand,
++      uw::IsMakingLittleWindow() || uw::IsLittleWindow(browser_));
+ 
+   // Omnibox commands
+   command_updater_->UpdateCommandEnabled(IDC_SHOW_FULL_URLS, true);
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index fcb43cae0d9c521bafd8e1b2668433f5bd25ee58..7c4e87825c6fb1618c9c4c7ae427bc1b3e75eb02 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -61,6 +61,7 @@
+ #include "content/public/browser/web_contents.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/window_open_disposition.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/pins/pin_sync.h"
+ #include "uw/browser/workspaces/workspace_window.h"
+ 
+@@ -195,8 +196,12 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
+   }
+ 
+   // uw: Cmd+Shift+T brings the window back in its workspace, with the
+-  // windows it switches with.
++  // windows it switches with, and a little window back as one.
+   uw::WorkspaceWindow::AddRestoreData(&browser_.get(), data);
++  if (uw::IsLittleWindow(&browser_.get())) {
++    data[uw::kLittleWindowRestoreKey] =
++        uw::LittleWindowWorkspace(&browser_.get());
++  }
+ 
+   return data;
+ }
+@@ -514,7 +519,18 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+     const std::string& user_title,
+     const std::map<std::string, std::string>& extra_data) {
+   std::unique_ptr<BrowserWindowCreateParams> create_params;
+-  if (ShouldCreateAppWindowForAppName(profile, app_name)) {
++  // uw: a little window comes back as one, outside session restore, as it
++  // first opened. See ADR 0033.
++  std::optional<uw::ScopedMakingLittleWindow> little_window;
++  if (const auto little = extra_data.find(uw::kLittleWindowRestoreKey);
++      little != extra_data.end()) {
++    create_params = std::make_unique<BrowserWindowCreateParams>(
++        BrowserWindowInterface::TYPE_POPUP, *profile, true);
++    create_params->initial_bounds = bounds;
++    create_params->omit_from_session_restore = true;
++    create_params->should_trigger_session_restore = false;
++    little_window.emplace(little->second);
++  } else if (ShouldCreateAppWindowForAppName(profile, app_name)) {
+     // Only trusted app popup windows should ever be restored.
+     if (type == sessions::SessionWindow::TYPE_APP_POPUP) {
+       create_params = std::make_unique<BrowserWindowCreateParams>(
+diff --git a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
+index 7144eea9475bfccc16ad0a5c65785743158f53fa..7949581ab77d61c9a36cb70348bcb17a785db042 100644
+--- a/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
++++ b/chrome/browser/ui/browser_web_contents_delegate/browser_web_contents_delegate.cc
+@@ -35,6 +35,7 @@
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "uw/browser/little_window/little_window.h"  // nogncheck
+ #include "chrome/browser/ui/browser_window/public/desktop_browser_window_capabilities.h"
+ #include "chrome/browser/ui/exclusive_access/exclusive_access_manager.h"
+ #include "chrome/browser/ui/exclusive_access/keyboard_lock_controller.h"
+@@ -553,6 +554,16 @@ content::WebContents* BrowserWebContentsDelegate::OpenURLFromTab(
+                                   std::move(navigation_handle_callback));
+   }
+ 
++  // uw: Option+Cmd-click on a link, which Chromium gives to split view, opens
++  // the link in a little window, as in Arc. See docs/plans/little-window.md.
++  if (params.disposition == WindowOpenDisposition::NEW_SPLIT_VIEW && source &&
++      params.is_renderer_initiated && params.user_gesture) {
++    if (BrowserWindowInterface* little =
++            uw::OpenLinkInLittleWindow(&*browser_, params.url, source)) {
++      return little->GetTabStripModel()->GetActiveWebContents();
++    }
++  }
++
+   // If the source is already split, navigate the other pane instead of
+   // creating a new tab. Return |source| so that WebContentsImpl::OpenURL()
+   // sees new_contents == this and skips the DidOpenRequestedURL notification,
+diff --git a/chrome/browser/ui/browser_window/internal/BUILD.gn b/chrome/browser/ui/browser_window/internal/BUILD.gn
+index 7b3ad1a4b3ba0e2d988aa8b433d3e6b55b7261d6..a2f416b4b2cb64acbd2a4ebac90ec0575c340e50 100644
+--- a/chrome/browser/ui/browser_window/internal/BUILD.gn
++++ b/chrome/browser/ui/browser_window/internal/BUILD.gn
+@@ -62,6 +62,7 @@ source_set("internal") {
+       "//uw/browser/agent:scheduled_chats",
+       "//uw/browser/ai_providers",
+       "//uw/browser/connectors",
++      "//uw/browser/little_window",
+       "//uw/browser/pins",
+       "//uw/browser/tab_organization",
+       "//uw/browser/ui/views/command_bar",
+diff --git a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
+index 1060ad8df8266a3d2bc9ad369ac4887d6e09f827..5faa7a4ebc2194db70e41ad2819fa3b7ed8fe1ff 100644
+--- a/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
++++ b/chrome/browser/ui/browser_window/internal/embedder_browser_window_features.cc
+@@ -11,6 +11,9 @@
+ #include "uw/browser/agent/scheduled_chats.h"
+ #include "uw/browser/ai_providers/provider_sync.h"
+ #include "uw/browser/connectors/connectors.h"
++#include "uw/browser/little_window/little_window.h"
++#include "uw/browser/little_window/little_window_key.h"
++#include "uw/browser/little_window/little_window_mark.h"
+ #include "uw/browser/pins/pin_sync.h"
+ #include "uw/browser/tab_organization/automatic_organizer.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+@@ -35,6 +38,18 @@ EmbedderBrowserWindowFeatures* EmbedderBrowserWindowFeatures::From(
+ }
+ 
+ void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
++  // A little window, a pop-up drawn like a regular window without the
++  // sidebar, has its command bar. See ADR 0033.
++  if (uw::IsMakingLittleWindow()) {
++    // Its page can move to a regular window, which looks for the eye's action
++    // on every page, as the run window's pages do.
++    if (!browser->GetProfile()->IsOffTheRecord()) {
++      uw::WatchCard::AddAction(browser);
++    }
++    little_window_ = std::make_unique<uw::LittleWindow>(browser);
++    command_bar_ = std::make_unique<uw::CommandBar>(browser);
++    return;
++  }
+   if (browser->GetType() == BrowserWindowInterface::TYPE_NORMAL) {
+     // The eye's action is in the run window too, so a run's tab can move to
+     // a window the user sees.
+@@ -62,6 +77,8 @@ void EmbedderBrowserWindowFeatures::Init(BrowserWindowInterface* browser) {
+     // Connectors serve every window and profile. The first window starts
+     // them.
+     uw::Connectors::Get().Start();
++    // So does the little window's key in other apps.
++    uw::LittleWindowKeyListener::Start();
+     // So do the providers every profile shares.
+     uw::ProviderSync::Start();
+   }
+@@ -77,6 +94,11 @@ void EmbedderBrowserWindowFeatures::InitPostWindowConstruction(
+ 
+ void EmbedderBrowserWindowFeatures::InitPostBrowserViewConstruction(
+     BrowserView* browser_view) {
++  if (little_window_) {
++    page_colors_ = std::make_unique<uw::PageColors>(browser_view);
++    little_window_->AddViews(browser_view);
++    return;
++  }
+   if (browser_view->browser()->GetType() ==
+           BrowserWindowInterface::TYPE_NORMAL &&
+       !uw::IsMakingRunWindow()) {
+@@ -86,6 +108,9 @@ void EmbedderBrowserWindowFeatures::InitPostBrowserViewConstruction(
+ }
+ 
+ void EmbedderBrowserWindowFeatures::TearDownPreBrowserWindowDestruction() {
++  if (little_window_) {
++    little_window_->RemoveViews();
++  }
+   page_colors_.reset();
+   inactive_pins_.reset();
+   watch_card_.reset();
+diff --git a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
+index 18405c1ddd7f255c5b4114ceba32f1f4a8989992..44abe8b01f26db7f5bbdb0fcaa9393a84d7d1745 100644
+--- a/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
++++ b/chrome/browser/ui/browser_window/public/embedder_browser_window_features.h
+@@ -14,6 +14,7 @@ class AutomaticOrganizer;
+ class CloseWarning;
+ class CommandBar;
+ class InactivePinOverlay;
++class LittleWindow;
+ class PageColors;
+ class PinSync;
+ class TabOrganizationController;
+@@ -67,6 +68,7 @@ class EmbedderBrowserWindowFeatures {
+   std::unique_ptr<uw::PinSync> pin_sync_;
+   std::unique_ptr<uw::WorkspaceWindow> workspace_window_;
+   std::unique_ptr<uw::WatchCard> watch_card_;
++  std::unique_ptr<uw::LittleWindow> little_window_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_PUBLIC_EMBEDDER_BROWSER_WINDOW_FEATURES_H_
+diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+index 9145eb62bb2d5be7288be127c6159e14ff1518de..0c06fc20ca042ac1d4ffc61887ae89d4f6becf89 100644
+--- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
++++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+@@ -22,6 +22,7 @@
+ #include "uw/browser/tab_organization/commands.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/terminal/terminal_tab.h"
++#include "uw/browser/little_window/little_window_commands.h"  // nogncheck
+ 
+ namespace {
+ 
+@@ -46,6 +47,8 @@ const struct AcceleratorMapping {
+      ui::VKEY_N},
+     {IDC_NEW_TAB, ui::EF_COMMAND_DOWN, ui::VKEY_T},
+     {uw::kNewTerminalCommand, ui::EF_CONTROL_DOWN, ui::VKEY_OEM_3},
++    {uw::kNewLittleWindowCommand, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN,
++     ui::VKEY_N},
+     {uw::TabOrganizationController::kNest,
+      ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN, ui::VKEY_RIGHT},
+     {uw::TabOrganizationController::kOutdent,
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index 7a299b63a83196ebbbd43bdc94dbd4e0bddb5dea..d8107079a451dbc79dd6620822864b5b19a5e41b 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -34,6 +34,7 @@
+ #include "uw/browser/agent/chat_tab.h"
+ #include "uw/browser/terminal/terminal_tab.h"
+ #include "uw/browser/workspaces/workspace_commands.h"
++#include "uw/browser/little_window/little_window_commands.h"  // nogncheck
+ 
+ #if !defined(__MAC_27_0)
+ 
+@@ -153,6 +154,9 @@ NSMenuItem* BuildFileMenu(NSApplication* nsapp,
+               Item(IDS_NEW_INCOGNITO_WINDOW_MAC)
+                   .command_id(IDC_NEW_INCOGNITO_WINDOW)
+                   .remove_if(is_pwa),
++              Item(IDS_UW_NEW_LITTLE_WINDOW_MAC)
++                  .command_id(uw::kNewLittleWindowCommand)
++                  .remove_if(is_pwa),
+               Item(IDS_NEW_ISOLATED_WINDOW_MAC)
+                   .command_id(IDC_NEW_ISOLATED_WINDOW)
+                   .remove_if(is_pwa),
+diff --git a/chrome/browser/ui/navigator/BUILD.gn b/chrome/browser/ui/navigator/BUILD.gn
+index 7c047d338db64ce993b63d20a5081f4e5787c176..f935a831bdc41037c83246527ddac0148a12cb3e 100644
+--- a/chrome/browser/ui/navigator/BUILD.gn
++++ b/chrome/browser/ui/navigator/BUILD.gn
+@@ -89,6 +89,7 @@ source_set("impl") {
+     ]
+ 
+     deps += [
++      "//uw/browser/little_window",
+       "//uw/browser/tab_organization",
+       "//chrome/browser/apps/app_service",
+       "//chrome/browser/apps/link_capturing",
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index 974b4dc4766a5ebe678af80302866df6a194c1f5..7db509297449c6e6e509d7cec9f5615e3599a85c 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -3,6 +3,8 @@
+ // found in the LICENSE file.
+ 
+ #include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "uw/browser/little_window/little_window.h"
++#include "uw/browser/little_window/little_window_mark.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ 
+ #include <algorithm>
+@@ -289,6 +291,14 @@ std::tuple<BrowserWindowInterface*, int> GetBrowserAndTabForDisposition(
+       if (WindowCanOpenTabs(params)) {
+         return {params.browser, -1};
+       }
++      // uw: a little window's links open in the window used last on its
++      // workspace.
++      if (uw::IsLittleWindow(params.browser)) {
++        if (BrowserWindowInterface* window =
++                uw::WindowForLittleWindow(params.browser)) {
++          return {window, -1};
++        }
++      }
+ 
+       // Find a compatible window and re-execute this command in it. Otherwise
+       // re-run with NEW_WINDOW.
+@@ -770,6 +780,15 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+     return nullptr;
+   }
+ 
++  // uw: a link from a little window that opens in front brings its window
++  // forward. One that opens behind leaves the little window in front.
++  if (source_browser && uw::IsLittleWindow(source_browser) &&
++      params->browser != source_browser &&
++      params->disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB &&
++      params->window_action == NavigateParams::WindowAction::kNoAction) {
++    params->window_action = NavigateParams::WindowAction::kShowWindow;
++  }
++
+   // Trying to open a background tab when in a non-tabbed app browser results in
+   // focusing a regular browser window and opening a tab in the background
+   // of that window. Change the disposition to NEW_FOREGROUND_TAB so that
+@@ -1000,6 +1019,16 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+                                        ui::PAGE_TRANSITION_LINK)
+               ? params->source_contents.get()
+               : nullptr);
++    } else if (source_browser && uw::IsLittleWindow(source_browser) &&
++               (params->disposition ==
++                    WindowOpenDisposition::NEW_FOREGROUND_TAB ||
++                params->disposition ==
++                    WindowOpenDisposition::NEW_BACKGROUND_TAB)) {
++      // uw: it opens at the top of the Scratchpad, as a link from another app
++      // does.
++      uw::TabOrganizationController::LinksFromAnotherApp links;
++      uw::TabOrganizationController::DidOpenTab(
++          params->browser, contents_to_navigate_or_insert, nullptr);
+     }
+ 
+     // For NEW_SPLIT_VIEW, pair the new tab with the active tab. The
+diff --git a/chrome/browser/ui/unload_controller.cc b/chrome/browser/ui/unload_controller.cc
+index 479a7cd3d248530d2635e2c3fd9b033520970f6e..067711e5476b394817c9510bf5292a02e22c4ef7 100644
+--- a/chrome/browser/ui/unload_controller.cc
++++ b/chrome/browser/ui/unload_controller.cc
+@@ -47,6 +47,7 @@
+ #include "content/public/browser/render_view_host.h"
+ #include "content/public/browser/web_contents.h"
+ #include "extensions/buildflags/buildflags.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/pins/pin_sync.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/terminal/close_guard.h"
+@@ -196,6 +197,15 @@ void UnloadController::OnWindowClosing() {
+   // nothing of it to bring back.
+   notify_restore_service &=
+       !uw::TabOrganizationController::ClosesNoTabs(browser_);
++  // uw: Cmd+Shift+T brings a little window back as one, unless it never
++  // showed a page.
++  if (uw::IsLittleWindow(browser_) && browser_->GetTabStripModel()->count() &&
++      !browser_->GetTabStripModel()
++           ->GetActiveWebContents()
++           ->GetLastCommittedURL()
++           .IsAboutBlank()) {
++    notify_restore_service = true;
++  }
+ 
+   if (tab_restore_service && notify_restore_service) {
+     tab_restore_service->BrowserClosing(
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 82cdd3bb8411dea5d933c65377160daecf8db762..845e3ce63120e1cf89d689bbbb0ee9e8f187dd92 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -67,6 +67,7 @@
+ #include "ui/views/layout/layout_types.h"
+ #include "ui/views/widget/widget.h"
+ #include "ui/gfx/scoped_canvas.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/glass/glass.h"
+ #include "uw/browser/ui/look/tint_painter.h"
+ #include "uw/browser/workspaces/workspace_theme.h"
+@@ -499,14 +500,18 @@ BrowserFrameViewMac::GetCaptionButtonBounds() const {
+ // views::View:
+ 
+ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
++  // uw: a little window draws the theme around its page card too. See ADR
++  // 0033.
++  const bool card = GetBrowserView()->ShouldDrawVerticalTabStrip() ||
++                    uw::IsLittleWindow(GetBrowserView()->browser());
+   if (!GetBrowserView()->GetIsNormalType() &&
+-      !GetBrowserView()->GetIsWebAppType()) {
++      !GetBrowserView()->GetIsWebAppType() &&
++      !uw::IsLittleWindow(GetBrowserView()->browser())) {
+     return;
+   }
+ 
+   SkColor frame_color = GetFrameColor(BrowserFrameActiveState::kUseCurrent);
+-  if (is_glass_frame_eligible_ &&
+-      GetBrowserView()->ShouldDrawVerticalTabStrip()) {
++  if (is_glass_frame_eligible_ && card) {
+     // uw: the theme over the glass around the page card, whose toolbar lays
+     // its own color over the glass.
+     BrowserView* const browser_view = GetBrowserView();
+@@ -526,7 +531,7 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+                                     : kBrowserFrameAlphaLight;
+     canvas->DrawColor(SkColorSetA(frame_color, frame_alpha));
+   } else {
+-    if (GetBrowserView()->ShouldDrawVerticalTabStrip()) {
++    if (card) {
+       uw::PaintTint(canvas, this, GetBrowserView(), frame_color,
+                     uw::ThemeOfWindow(GetBrowserView()->browser()));
+       uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+index de6d2b8a3a374b430515b061dd7fe4fd03c0f157..83accaef283626a8712e487f71174050f0ef0cbd 100644
+--- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+@@ -69,7 +69,11 @@
+ #include "ui/native_theme/native_theme.h"
+ #import "ui/views/cocoa/native_widget_mac_ns_window_host.h"
+ #include "ui/views/interaction/element_tracker_views.h"
++#include "chrome/browser/browser_process.h"  // nogncheck
++#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/glass/glass.h"
++#include "uw/browser/ui/look/page_card.h"
+ #include "uw/browser/tab_organization/commands.h"
+ #include "uw/browser/ui/views/tab_organization/floating_sidebar.h"
+ #include "uw/browser/ui/views/tab_organization/window_commands.h"
+@@ -268,6 +272,14 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
+     if (!browser_view_->ShouldDrawTabStrip()) {
+       *titlebar_height += kWebAppMenuMargin * 2;
+     }
++    // uw: a little window's window buttons sit on its toolbar, centered on
++    // it, inside the page card's margin. See ADR 0033.
++    if (uw::IsLittleWindow(browser_view_->browser()) &&
++        browser_view_->toolbar()) {
++      *titlebar_height =
++          2 * uw::LittleWindowMargins(g_browser_process->local_state()).top() +
++          browser_view_->toolbar()->GetPreferredSize().height();
++    }
+   } else {
+     *override_titlebar_height = false;
+     *titlebar_height = 0;
+@@ -726,15 +738,18 @@ void BrowserNativeWidgetMac::PopulateCreateWindowParams(
+                          NSWindowStyleMaskTitled | NSWindowStyleMaskResizable;
+     params->window_title_hidden = true;
+   } else if (browser_view_->GetIsNormalType() ||
+-             browser_view_->GetIsWebAppType()) {
++             browser_view_->GetIsWebAppType() ||
++             uw::IsLittleWindow(browser_view_->browser())) {
+     params->window_class = remote_cocoa::mojom::WindowClass::kBrowser;
+     params->style_mask |= NSWindowStyleMaskFullSizeContentView;
+ 
+     // Ensure tabstrip/profile button are visible.
+     params->titlebar_appears_transparent = true;
+ 
+-    // Hosted apps draw their own window title.
+-    if (browser_view_->GetIsWebAppType()) {
++    // Hosted apps draw their own window title, and a little window shows
++    // none.
++    if (browser_view_->GetIsWebAppType() ||
++        uw::IsLittleWindow(browser_view_->browser())) {
+       params->window_title_hidden = true;
+     }
+   } else {
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.cc
+index a44e84e3d40ecbf6dcb35a075d622d6ba556fe4a..66553d5a88ebdb6b7a2231d847ad5e0283cdff77 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.cc
+@@ -4,10 +4,15 @@
+ 
+ #include "chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.h"
+ 
++#include "chrome/browser/browser_process.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/custom_corners_background.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/infobars/infobar_container_view.h"
+ #include "ui/views/controls/separator.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
++#include "uw/browser/ui/look/page_card.h"  // nogncheck
+ 
+ BrowserViewPopupLayoutImpl::BrowserViewPopupLayoutImpl(
+     std::unique_ptr<BrowserViewLayoutDelegate> delegate,
+@@ -61,6 +66,12 @@ BrowserViewPopupLayoutImpl::CalculateProposedLayout(
+   }
+ 
+   BrowserLayoutParams params = browser_params;
++  // uw: a little window's toolbar and page sit in the page card, with the
++  // theme in the margin around it, as in a regular window without the
++  // sidebar.
++  if (IsLittleWindow() && !is_fullscreen(delegate().GetBrowserWindowState())) {
++    params.Inset(uw::LittleWindowMargins(g_browser_process->local_state()));
++  }
+ 
+   // Lay out the top container if it's in the browser (even if it's empty).
+   // This is required for certain things like hit-testing.
+@@ -114,10 +125,13 @@ gfx::Rect BrowserViewPopupLayoutImpl::CalculateTopContainerLayout(
+   const int original_top = params.visual_client_area.y();
+ 
+   // Layout starts beneath the caption buttons because title is laid out by the
+-  // OS in popup mode.
+-  params.SetTop(base::ClampCeil(
+-      std::max(params.leading_exclusion.ContentWithPadding().height(),
+-               params.trailing_exclusion.ContentWithPadding().height())));
++  // OS in popup mode. uw: a little window has no title, and macOS's window
++  // buttons sit on its toolbar.
++  if (!IsLittleWindow()) {
++    params.SetTop(base::ClampCeil(
++        std::max(params.leading_exclusion.ContentWithPadding().height(),
++                 params.trailing_exclusion.ContentWithPadding().height())));
++  }
+ 
+   // Lay out the standard toolbar if present. This is used in tab fullscreen
+   // when custom tabs are present.
+@@ -154,3 +168,41 @@ gfx::Rect BrowserViewPopupLayoutImpl::CalculateTopContainerLayout(
+                    params.visual_client_area.width(),
+                    params.visual_client_area.y() - original_top);
+ }
++
++void BrowserViewPopupLayoutImpl::DoPostLayoutVisualAdjustments(
++    const BrowserLayoutParams& params) {
++  if (!IsLittleWindow()) {
++    return;
++  }
++  // uw: round the page card, which holds the toolbar and the page, unless it
++  // meets the window's edges.
++  const bool card =
++      !is_fullscreen(delegate().GetBrowserWindowState()) &&
++      !uw::LittleWindowMargins(g_browser_process->local_state()).IsEmpty();
++  if (views().toolbar && views().toolbar->background()) {
++    if (auto* const toolbar_background =
++            views().toolbar->background()->AsA<CustomCornersBackground>()) {
++      CustomCornersBackground::Corners corners;
++      if (card) {
++        corners[CornerOrientation::kTopLeading] = {
++            CustomCornersBackground::CornerType::kRoundedWithBackground,
++            uw::kPageCardRadius};
++        corners[CornerOrientation::kTopTrailing] = {
++            CustomCornersBackground::CornerType::kRoundedWithBackground,
++            uw::kPageCardRadius};
++      }
++      toolbar_background->SetCorners(corners);
++    }
++  }
++  views().multi_contents_view->SetBackgroundRadii(
++      card ? gfx::RoundedCornersF(0, 0, uw::kPageCardRadius,
++                                  uw::kPageCardRadius)
++           : gfx::RoundedCornersF());
++}
++
++bool BrowserViewPopupLayoutImpl::IsLittleWindow() const {
++  // The layout's host is always the BrowserView.
++  return views().browser_view &&
++         uw::IsLittleWindow(
++             static_cast<BrowserView*>(views().browser_view.get())->browser());
++}
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.h b/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.h
+index e95a5e57eec282d2e442c29a36d7829f12c15603..5bbc736d1c7c536581753d90439dcda8fe0b16b4 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.h
++++ b/chrome/browser/ui/views/frame/layout/browser_view_popup_layout_impl.h
+@@ -27,6 +27,13 @@ class BrowserViewPopupLayoutImpl : public BrowserViewLayoutImpl {
+   gfx::Rect CalculateTopContainerLayout(ProposedLayout& layout,
+                                         BrowserLayoutParams params,
+                                         bool needs_exclusion) const override;
++  void DoPostLayoutVisualAdjustments(
++      const BrowserLayoutParams& params) override;
++
++ private:
++  // uw: whether this is a little window, which lays out like a regular
++  // window without the sidebar. See ADR 0033.
++  bool IsLittleWindow() const;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_POPUP_LAYOUT_IMPL_H_
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 1ff640be9bc7c48d06d53cd82fc9022981e86dfc..0f15195ff87ec47378986a8af032de2be3b6f922 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -167,6 +167,8 @@
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/tooltip_manager.h"
+ #include "ui/views/widget/widget.h"
++#include "chrome/browser/browser_process.h"  // nogncheck
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ #include "uw/browser/ui/look/page_card.h"
+ 
+ #if BUILDFLAG(IS_WIN)
+@@ -194,8 +196,10 @@ ToolbarView::DisplayMode GetDisplayMode(Browser* browser) {
+     return ToolbarView::DisplayMode::kCustomTab;
+   }
+ 
++  // uw: a little window has a regular window's toolbar. See ADR 0033.
+   if (WindowFeatureController::From(browser)->SupportsWindowFeature(
+-          WindowFeatureController::WindowFeature::kFeatureTabStrip)) {
++          WindowFeatureController::WindowFeature::kFeatureTabStrip) ||
++      uw::IsLittleWindow(browser)) {
+     return ToolbarView::DisplayMode::kNormal;
+   }
+ 
+@@ -1709,12 +1713,22 @@ void ToolbarView::LayoutCommon() {
+       interior_margin.set_right(0);
+     }
+   }
++#if BUILDFLAG(IS_MAC)
++  // uw: a little window's toolbar starts after macOS's window buttons, which
++  // sit over it. See uw/browser/ui/look/page_card.h.
++  if (browser_view_ && uw::IsLittleWindow(browser_) &&
++      !browser_view_->IsFullscreen()) {
++    interior_margin.set_left(
++        uw::LittleWindowToolbarStart(g_browser_process->local_state()));
++  }
++#endif
+ #if BUILDFLAG(IS_WIN)
+   // uw: Windows' minimize, maximize, and close sit at the toolbar's end:
+   // uw's own inside the page card, or Windows' own, 45px each and 1px apart,
+   // while the card has no margin. See
+   // BrowserFrameViewWin::LayoutCaptionButtons().
+-  if (browser_view_ && browser_view_->GetSupportsTabStrip() &&
++  if (browser_view_ &&
++      (browser_view_->GetSupportsTabStrip() || uw::IsLittleWindow(browser_)) &&
+       !browser_view_->IsFullscreen()) {
+     interior_margin.set_right(
+         !uw::PageCardMargins(g_browser_process->local_state()).IsEmpty()
+diff --git a/chrome/browser/ui/window_feature_controller/window_feature_controller.cc b/chrome/browser/ui/window_feature_controller/window_feature_controller.cc
+index ec7bd3ea6cd00a5093b9bac2cfca9fe1a0bc4bfb..09997de7d99f945158582049d5bcaed0f79a3e80 100644
+--- a/chrome/browser/ui/window_feature_controller/window_feature_controller.cc
++++ b/chrome/browser/ui/window_feature_controller/window_feature_controller.cc
+@@ -9,6 +9,7 @@
+ #include "build/build_config.h"
+ #include "chrome/browser/ui/fullscreen/browser_window_fullscreen_controller.h"
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
++#include "uw/browser/little_window/little_window_mark.h"  // nogncheck
+ 
+ DEFINE_USER_DATA(WindowFeatureController);
+ 
+@@ -22,9 +23,17 @@ WindowFeatureController::WindowFeatureController(
+       app_controller_(app_controller),
+       browser_type_(browser_type),
+       is_trusted_source_(is_trusted_source),
+-      scoped_unowned_user_data_(host, *this) {}
++      scoped_unowned_user_data_(host, *this) {
++  // uw: a little window is a pop-up with a regular window's toolbar. See
++  // ADR 0033.
++  if (uw::IsMakingLittleWindow()) {
++    uw::MarkLittleWindowPart(this);
++  }
++}
+ 
+-WindowFeatureController::~WindowFeatureController() = default;
++WindowFeatureController::~WindowFeatureController() {
++  uw::UnmarkLittleWindowPart(this);
++}
+ 
+ // static
+ WindowFeatureController* WindowFeatureController::From(
+@@ -93,6 +102,20 @@ bool WindowFeatureController::NormalBrowserSupportsWindowFeature(
+ bool WindowFeatureController::PopupBrowserSupportsWindowFeature(
+     WindowFeature feature,
+     bool check_can_support) const {
++  // uw: a little window has the full toolbar and an address that changes, and
++  // draws no title bar of macOS's.
++  if (uw::IsLittleWindowPart(this)) {
++    switch (feature) {
++      case WindowFeature::kFeatureToolbar:
++      case WindowFeature::kFeatureLocationBar:
++        return check_can_support || !IsFullscreen();
++      case WindowFeature::kFeatureTitleBar:
++      case WindowFeature::kFeatureTabStrip:
++      case WindowFeature::kFeatureBookmarkBar:
++      case WindowFeature::kFeatureNone:
++        return false;
++    }
++  }
+   switch (feature) {
+     case WindowFeature::kFeatureTitleBar:
+     case WindowFeature::kFeatureLocationBar:

@@ -71,6 +71,7 @@ source_set("tab_organization") {
     "//uw/browser/tab_organization",
   ]
   deps = [
+    "//uw/browser/little_window:mark",
     "//cc/paint",
     "//chrome:strings",
     "//chrome/app/vector_icons",

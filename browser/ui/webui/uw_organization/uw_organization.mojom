@@ -55,6 +55,18 @@ struct State {
   // The sites that have opened their own picture-in-picture window, newest
   // first.
   array<LiveSite> live_sites;
+  // The little windows' settings, for all of uw. The key as the menu bar
+  // writes it, such as "Option+Cmd+N", or empty when it has none.
+  string little_window_key;
+  bool little_window_key_in_uw;
+  bool little_window_key_from_apps;
+  // On Windows, what the keyboard types with AltGr and the key's letter,
+  // when it types something, so uw leaves the key to other apps.
+  string little_window_altgr_character;
+  string little_window_altgr_letter;
+  bool little_window_links;
+  // Minutes an unused little window stays open. Zero keeps it open.
+  int32 little_window_close_after;
 };
 
 // A site that has opened its own picture-in-picture window, and whether that
@@ -78,6 +90,13 @@ enum MiniPlayerMode {
   kDock,
   kDontDock,
   kOff,
+};
+
+// The little windows' switches.
+enum LittleWindowSwitch {
+  kKeyInUw,
+  kKeyFromApps,
+  kLinks,
 };
 
 // The mini player's switches.
@@ -140,6 +159,8 @@ interface OrganizationHandler {
   // For all of uw. A mini player that shows moves at once.
   SetMiniPlayerMode(MiniPlayerMode mode) => ();
   SetMiniPlayer(MiniPlayerSwitch which, bool on) => ();
+  SetLittleWindow(LittleWindowSwitch which, bool on) => ();
+  SetLittleWindowCloseAfter(int32 minutes) => ();
   SetSiteLive(string site, bool live) => ();
   // For all of uw. Installing links the command, through macOS's password
   // prompt when needed, and opens uw's channel for it; uninstalling closes it.

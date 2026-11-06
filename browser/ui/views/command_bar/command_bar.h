@@ -95,6 +95,8 @@ class CommandBar : public views::WidgetObserver {
   std::unique_ptr<Page> contents_;
   base::WeakPtr<WebUIBubbleDialogView> bubble_;
   base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};
+  // True while a pick, an ask, or a terminal command closes the command bar.
+  bool opening_ = false;
   std::optional<tab_groups::TabGroupId> task_;
   tabs::TabHandle pane_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;
