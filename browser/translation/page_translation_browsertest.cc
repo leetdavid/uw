@@ -7,7 +7,9 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/test/run_until.h"
+#include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/profiles/profile.h"
@@ -19,11 +21,15 @@
 #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/on_device_translation/features.h"
+#include "components/on_device_translation/public/mojom/on_device_translation_service.mojom.h"
 #include "components/on_device_translation/service/test/test_util.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/translate/core/browser/translate_manager.h"
 #include "components/translate/core/browser/translate_metrics_logger.h"
+#include "content/public/browser/browser_child_process_host_iterator.h"
+#include "content/public/browser/child_process_data.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/process_type.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/dns/mock_host_resolver.h"
@@ -31,6 +37,7 @@
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "uw/browser/translation/device_translator.h"
 #include "uw/browser/translation/page_translator.h"
 #include "uw/browser/translation/translation_engine.h"
 
@@ -245,6 +252,32 @@ IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,
   }));
   EXPECT_FALSE(manager()->GetLanguageState()->IsPageTranslated());
   EXPECT_EQ(first, Text("#first"));
+}
+
+// Chromium ends the engine's service when a download changes what is
+// installed, which can cut off a batch on its way to the engine.
+IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,
+                       ABatchTheServiceCutsOffGoesToANewTranslator) {
+  DeviceTranslator translator(browser()->GetProfile(), base::DoNothing());
+  base::test::TestFuture<SegmentTranslator::Result> first;
+  translator.Translate({"Hello"}, "en", "ja", first.GetCallback());
+  ASSERT_EQ(std::vector<std::string>{"JA:Hello"}, first.Get().translations);
+  int ended = 0;
+  for (content::BrowserChildProcessHostIterator it(
+           content::PROCESS_TYPE_UTILITY);
+       !it.Done(); ++it) {
+    if (it.GetData().metrics_name ==
+        on_device_translation::mojom::OnDeviceTranslationService::Name_) {
+      it.GetData().GetProcess().Terminate(0, /*wait=*/false);
+      ++ended;
+    }
+  }
+  ASSERT_EQ(1, ended);
+  // Sent in the same task, before the translator hears its service ended.
+  base::test::TestFuture<SegmentTranslator::Result> second;
+  translator.Translate({"Again"}, "en", "ja", second.GetCallback());
+  EXPECT_EQ(SegmentTranslator::Result::Problem::kNone, second.Get().problem);
+  EXPECT_EQ(std::vector<std::string>{"JA:Again"}, second.Get().translations);
 }
 
 IN_PROC_BROWSER_TEST_F(PageTranslationBrowserTest,

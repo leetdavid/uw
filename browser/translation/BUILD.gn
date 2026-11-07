@@ -77,6 +77,7 @@ source_set("browser_tests") {
     "//components/on_device_translation/service:test_support",
     "//components/translate/core/browser",
     "//content/public/browser",
+    "//content/public/common",
     "//content/test:test_support",
     "//net:test_support",
     "//testing/gtest",

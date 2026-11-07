@@ -6,6 +6,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/functional/callback.h"
@@ -27,7 +28,9 @@ namespace uw {
 
 // Translates with Chromium's on-device engine, TranslateKit, which the
 // component updater downloads with a language pack per language. Keeps one
-// translator for the last pair of languages.
+// translator for the last pair of languages. Chromium ends the engine's
+// service when a download changes what is installed; a request it cuts off
+// goes to a new translator.
 class DeviceTranslator
     : public SegmentTranslator,
       public on_device_translation::OnDeviceTranslationInstaller::Observer {
@@ -59,7 +62,14 @@ class DeviceTranslator
     ~Request();
     std::vector<std::string> segments;
     ResultCallback callback;
+    std::string source;
+    std::string target;
+    // How many more times the request may go to a new translator after the
+    // service ends under it.
+    int retries = 2;
   };
+  // A segment's index and its translation, or nullopt when it failed.
+  using Translated = std::pair<size_t, std::optional<std::string>>;
 
   void OnCanTranslate(
       on_device_translation::OnDeviceTranslationController::CanTranslateResult
@@ -69,7 +79,10 @@ class DeviceTranslator
           mojo::PendingRemote<on_device_translation::mojom::OnDeviceTranslator>,
           on_device_translation::OnDeviceTranslationController::
               CreateTranslatorError> result);
+  void Queue(Request request);
   void Run(Request request);
+  void OnRun(Request request, int lost, std::vector<Translated> translated);
+  void OnDisconnect();
   void FailAll(Result result);
 
   // OnDeviceTranslationInstaller::Observer:
@@ -90,11 +103,15 @@ class DeviceTranslator
   bool creating_ = false;
   std::vector<Request> waiting_;
   mojo::Remote<on_device_translation::mojom::OnDeviceTranslator> translator_;
+  // How many times the service ended under a translator.
+  int lost_ = 0;
   base::ScopedObservation<
       on_device_translation::OnDeviceTranslationInstaller,
       on_device_translation::OnDeviceTranslationInstaller::Observer>
       installer_observation_{this};
   base::WeakPtrFactory<DeviceTranslator> weak_factory_{this};
+  // For requests sent to a translator, which outlive a change of languages.
+  base::WeakPtrFactory<DeviceTranslator> run_weak_factory_{this};
 };
 
 }  // namespace uw

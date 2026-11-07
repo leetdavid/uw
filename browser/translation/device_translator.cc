@@ -2,6 +2,7 @@
 
 #include "uw/browser/translation/device_translator.h"
 
+#include <algorithm>
 #include <utility>
 
 #include "base/barrier_callback.h"
@@ -92,7 +93,13 @@ void DeviceTranslator::Translate(std::vector<std::string> segments,
     std::move(request.callback).Run(std::move(result));
     return;
   }
-  if (*source == source_ && *target == target_) {
+  request.source = *source;
+  request.target = *target;
+  Queue(std::move(request));
+}
+
+void DeviceTranslator::Queue(Request request) {
+  if (request.source == source_ && request.target == target_) {
     if (translator_.is_bound()) {
       Run(std::move(request));
       return;
@@ -107,8 +114,8 @@ void DeviceTranslator::Translate(std::vector<std::string> segments,
   installer_observation_.Reset();
   downloading_.clear();
   translator_.reset();
-  source_ = *source;
-  target_ = *target;
+  source_ = request.source;
+  target_ = request.target;
   waiting_.push_back(std::move(request));
   auto* manager =
       on_device_translation::ServiceControllerManagerFactory::GetInstance()
@@ -170,6 +177,18 @@ void DeviceTranslator::OnTranslatorCreated(
   creating_ = false;
   installer_observation_.Reset();
   downloading_.clear();
+  if (!result.has_value() &&
+      result.error() == CreateTranslatorError::kServiceCrashed) {
+    std::vector<Request> waiting = std::move(waiting_);
+    for (Request& request : waiting) {
+      if (request.retries-- > 0) {
+        Queue(std::move(request));
+      } else {
+        std::move(request.callback).Run(Result::Failed(std::string()));
+      }
+    }
+    return;
+  }
   if (!result.has_value()) {
     FailAll(result.error() == CreateTranslatorError::kNotSupportedLanguage
                 ? Result::Unsupported(source_ == "en" ? target_ : source_)
@@ -177,7 +196,8 @@ void DeviceTranslator::OnTranslatorCreated(
     return;
   }
   translator_.Bind(std::move(result.value()));
-  translator_.reset_on_disconnect();
+  translator_.set_disconnect_handler(base::BindOnce(
+      &DeviceTranslator::OnDisconnect, weak_factory_.GetWeakPtr()));
   std::vector<Request> waiting = std::move(waiting_);
   for (Request& request : waiting) {
     Run(std::move(request));
@@ -189,28 +209,14 @@ void DeviceTranslator::Run(Request request) {
     std::move(request.callback).Run(Result());
     return;
   }
-  using Translated = std::pair<size_t, std::optional<std::string>>;
+  const std::vector<std::string> segments = request.segments;
   auto done = base::BarrierCallback<Translated>(
-      request.segments.size(),
-      base::BindOnce(
-          [](std::vector<std::string> segments, ResultCallback callback,
-             std::vector<Translated> translated) {
-            Result result;
-            result.translations = std::move(segments);
-            bool any = false;
-            for (auto& [index, text] : translated) {
-              if (text) {
-                result.translations[index] = std::move(*text);
-                any = true;
-              }
-            }
-            std::move(callback).Run(any ? std::move(result)
-                                        : Result::Failed(std::string()));
-          },
-          request.segments, std::move(request.callback)));
-  for (size_t index = 0; index < request.segments.size(); ++index) {
+      segments.size(),
+      base::BindOnce(&DeviceTranslator::OnRun, run_weak_factory_.GetWeakPtr(),
+                     std::move(request), lost_));
+  for (size_t index = 0; index < segments.size(); ++index) {
     translator_->Translate(
-        request.segments[index],
+        segments[index],
         mojo::WrapCallbackWithDefaultInvokeIfNotRun(
             base::BindOnce(
                 [](size_t index, base::RepeatingCallback<void(Translated)> done,
@@ -220,6 +226,35 @@ void DeviceTranslator::Run(Request request) {
                 index, done),
             std::nullopt));
   }
+}
+
+void DeviceTranslator::OnRun(Request request,
+                             int lost,
+                             std::vector<Translated> translated) {
+  const bool cut_off =
+      lost != lost_ && !std::ranges::all_of(translated, [](const auto& item) {
+        return item.second.has_value();
+      });
+  if (cut_off && request.retries-- > 0) {
+    Queue(std::move(request));
+    return;
+  }
+  Result result;
+  result.translations = std::move(request.segments);
+  bool any = false;
+  for (auto& [index, text] : translated) {
+    if (text) {
+      result.translations[index] = std::move(*text);
+      any = true;
+    }
+  }
+  std::move(request.callback)
+      .Run(any ? std::move(result) : Result::Failed(std::string()));
+}
+
+void DeviceTranslator::OnDisconnect() {
+  translator_.reset();
+  ++lost_;
 }
 
 void DeviceTranslator::FailAll(Result result) {
