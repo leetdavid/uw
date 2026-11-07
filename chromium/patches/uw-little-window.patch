@@ -804,7 +804,7 @@ index 82cdd3bb8411dea5d933c65377160daecf8db762..845e3ce63120e1cf89d689bbbb0ee9e8
                      uw::ThemeOfWindow(GetBrowserView()->browser()));
        uw::PaintPageCardEdge(canvas, this, GetBrowserView()->toolbar(),
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_win.cc b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
-index 857cc8320ffa2540220ee75f3db627cf47ccfc74..db13c1fd4d4feb143f7b30e012f5490e4982d817 100644
+index 857cc8320ffa2540220ee75f3db627cf47ccfc74..2e444f26b233f08037b0e677126bf1049fdd7b20 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_win.cc
 @@ -61,6 +61,7 @@
@@ -859,7 +859,19 @@ index 857cc8320ffa2540220ee75f3db627cf47ccfc74..db13c1fd4d4feb143f7b30e012f5490e
      // uw: the theme fills the window around the page card, with its grain and
      // the card's edge, as BrowserFrameViewMac paints it.
      uw::PaintTint(canvas, this, browser_view,
-@@ -781,14 +788,17 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
+@@ -526,7 +533,10 @@ int BrowserFrameViewWin::FrameBorderThickness() const {
+ int BrowserFrameViewWin::FrameTopBorderThickness(bool restored) const {
+   const bool is_fullscreen =
+       (browser_widget()->IsFullscreen() || IsMaximized()) && !restored;
+-  if (!is_fullscreen && GetBrowserView()->GetTabStripVisible()) {
++  // uw: a little window has no title bar, as a tabbed window has none, so the
++  // theme does not show above its toolbar. See ADR 0033.
++  if (!is_fullscreen && (GetBrowserView()->GetTabStripVisible() ||
++                         uw::IsLittleWindow(GetBrowserView()->browser()))) {
+     // Restored windows have a smaller top resize handle than the system
+     // default. When maximized, the OS sizes the window such that the border
+     // extends beyond the screen edges. In that case, we must return the
+@@ -781,14 +791,17 @@ void BrowserFrameViewWin::LayoutCaptionButtons() {
    // the toolbar's end and as tall as the toolbar.
    const gfx::Insets margins =
        uw::PageCardMargins(g_browser_process->local_state());
@@ -1044,7 +1056,7 @@ index e95a5e57eec282d2e442c29a36d7829f12c15603..5bbc736d1c7c536581753d90439dcda8
  
  #endif  // CHROME_BROWSER_UI_VIEWS_FRAME_LAYOUT_BROWSER_VIEW_POPUP_LAYOUT_IMPL_H_
 diff --git a/chrome/browser/ui/views/frame/windows_caption_button.cc b/chrome/browser/ui/views/frame/windows_caption_button.cc
-index d15aab299a90a00cf0e9949a80307d3c6e47659c..21f2238f15d476f35c804da0ce523109f704757a 100644
+index d15aab299a90a00cf0e9949a80307d3c6e47659c..a05d18ec4b4047e681d9986b5c40f1d947579938 100644
 --- a/chrome/browser/ui/views/frame/windows_caption_button.cc
 +++ b/chrome/browser/ui/views/frame/windows_caption_button.cc
 @@ -26,6 +26,7 @@
@@ -1065,6 +1077,19 @@ index d15aab299a90a00cf0e9949a80307d3c6e47659c..21f2238f15d476f35c804da0ce523109
           !uw::PageCardMargins(g_browser_process->local_state()).IsEmpty();
  }
  
+@@ -138,8 +140,10 @@ SkColor WindowsCaptionButton::GetBaseForegroundColor() const {
+   }
+   // uw: without the margin, Windows' own buttons sit over the toolbar, which
+   // takes the page's color. kColorCaptionButtonOnToolbar comes from the theme,
+-  // as for a pop-up's title bar. See uw/browser/ui/look/theme_colors.cc.
+-  if (frame_view_->GetBrowserView()->GetSupportsTabStrip()) {
++  // as for a pop-up's title bar. See uw/browser/ui/look/theme_colors.cc. A
++  // little window's buttons sit over its toolbar too.
++  if (frame_view_->GetBrowserView()->GetSupportsTabStrip() ||
++      uw::IsLittleWindow(frame_view_->GetBrowserView()->browser())) {
+     return GetColorProvider()->GetColor(kColorToolbarText);
+   }
+   // On Windows, the caption buttons are always on the right. If the horizontal
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 index 1ff640be9bc7c48d06d53cd82fc9022981e86dfc..0f15195ff87ec47378986a8af032de2be3b6f922 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
