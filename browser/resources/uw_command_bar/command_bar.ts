@@ -10,7 +10,7 @@ import {Calculator} from './calculator.js';
 import type {Calculation, Ink, MathJsLibrary} from './calculator.js';
 import {TimeMath} from './time.js';
 import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
-import type {SelectedPage} from './uw_command_bar.mojom-webui.js';
+import type {BarCommand, BarTask, SelectedPage} from './uw_command_bar.mojom-webui.js';
 
 // mathjs, which command_bar.html loads first.
 declare const math: MathJsLibrary;
@@ -55,6 +55,9 @@ const SVG = 'http://www.w3.org/2000/svg';
 // The line the searchbox reads as the typed text with no row picked.
 const NO_ROW = 255;
 const PLACEHOLDER = field.placeholder;
+// At most this many command and task rows show among Chromium's.
+const MOST_OWN_ROWS = 4;
+const MOVE_TO_NEW_TASK = 'Move to New Task';
 
 const calculator = new Calculator(math);
 const timeMath = new TimeMath(calculator);
@@ -68,8 +71,11 @@ let typed = '';
 // The rest of the address being typed, drawn after the caret but not in the
 // field, so the caret stays where the typing goes.
 let completion = '';
-// Each shown row, and the line Chromium knows it by.
-let rows: Array<{match: AutocompleteMatch, line: number}> = [];
+// A row of Chromium's, with the line Chromium knows it by, or one of uw's.
+type MatchRow = {kind: 'match', match: AutocompleteMatch, line: number};
+type Row = MatchRow|{kind: 'command', command: BarCommand}|
+    {kind: 'task', task: BarTask}|{kind: 'newTask'};
+let rows: Row[] = [];
 // The typed text the shown rows are for.
 let shownFor = '';
 // The selected row, or -1 for the calculator's answer.
@@ -82,6 +88,15 @@ let pendingReturn = false;
 let shell = false;
 // After a `@`, the text is a question about this page.
 let page: SelectedPage|null = null;
+// After Option+Cmd+M, the rows are the tasks the selected tabs can move to.
+let moving = false;
+// The commands that can run and the tasks, as of the bar showing, and the
+// selected tab's task, empty for the Scratchpad.
+let commands: BarCommand[] = [];
+let tasks: BarTask[] = [];
+let selectedTask = '';
+// The latest request for them, which Chromium's rows wait for.
+let lists = Promise.resolve();
 
 const keywords = new KeywordModeManager({
   onKeywordModelChanged: showChip,
@@ -98,20 +113,23 @@ const keywords = new KeywordModeManager({
 
 function showChip() {
   const keyword = keywords.isInKeywordMode;
-  chip.hidden = !shell && !page && !keyword;
+  chip.hidden = !shell && !page && !moving && !keyword;
   chip.classList.toggle('shell', shell);
   chip.classList.toggle('page', !!page);
   if (page) {
     chip.replaceChildren(favicon(page.url), text('', page.title));
   } else {
-    chip.textContent =
-        shell ? '>' : (keywords.inputKeywordModel?.displayText ?? '');
+    chip.textContent = shell ? '>' :
+        moving               ? 'Move to task' :
+                               (keywords.inputKeywordModel?.displayText ?? '');
   }
   field.placeholder = shell ? 'Type a shell command' :
       page                  ? 'Ask about this page' :
+      moving                ? 'Type a task\'s name' :
                               PLACEHOLDER;
   keys.classList.toggle('shell', shell);
   keys.classList.toggle('page', !!page);
+  keys.classList.toggle('moving', moving);
 }
 
 function svgIcon(id: string): SVGSVGElement {
@@ -122,15 +140,18 @@ function svgIcon(id: string): SVGSVGElement {
   return svg;
 }
 
-function icon(match: AutocompleteMatch): HTMLElement {
+function icon(content: Element): HTMLElement {
   const box = document.createElement('span');
   box.className = 'icon';
-  if (match.type === 'search') {
-    box.append(svgIcon('search'));
-    return box;
-  }
-  box.append(favicon(match.destinationUrl));
+  box.append(content);
   return box;
+}
+
+// A task's folder in its color, or the Scratchpad's tray.
+function taskIcon(task: BarTask): SVGSVGElement {
+  const svg = svgIcon(task.id ? 'folder' : 'scratchpad');
+  svg.style.color = task.color;
+  return svg;
 }
 
 function favicon(url: string): HTMLImageElement {
@@ -163,6 +184,168 @@ function describe(match: AutocompleteMatch): [string, string] {
   return [match.description, site];
 }
 
+// The task an open tab is in, found by the address it shows.
+function place(url: string): HTMLElement {
+  const span = text('place', '');
+  const task = tasks.find(task => task.urls.includes(url));
+  if (task?.id) {
+    span.append(taskIcon(task), text('', task.name));
+  } else if (task) {
+    span.textContent = task.name;
+  }
+  return span;
+}
+
+function caps(keys: string[]): HTMLElement {
+  const span = document.createElement('span');
+  span.className = 'caps';
+  span.append(...keys.map(key => {
+    const cap = document.createElement('kbd');
+    cap.textContent = key;
+    return cap;
+  }));
+  return span;
+}
+
+function cells(row: Row): HTMLElement[] {
+  switch (row.kind) {
+    case 'match': {
+      const [title, detail] = describe(row.match);
+      return [
+        icon(row.match.type === 'search' ? svgIcon('search') :
+                                           favicon(row.match.destinationUrl)),
+        text('title', title),
+        text('detail', detail),
+        ...(row.match.type === 'tab' ? [place(row.match.destinationUrl)] : []),
+        text('kind', KINDS[row.match.type] ?? ''),
+      ];
+    }
+    case 'command':
+      return [
+        icon(svgIcon('command')),
+        text('title', row.command.name),
+        text('detail', ''),
+        caps(row.command.keys),
+        text('kind', 'Command'),
+      ];
+    case 'task': {
+      const count = row.task.tabCount;
+      return [
+        icon(taskIcon(row.task)),
+        text('title', row.task.name),
+        text('detail', `${count} ${count === 1 ? 'tab' : 'tabs'}`),
+        text('kind', moving ? '' : 'Task'),
+      ];
+    }
+    case 'newTask':
+      return [
+        icon(svgIcon('folder-plus')),
+        text('title', MOVE_TO_NEW_TASK),
+        text('detail', ''),
+      ];
+  }
+}
+
+function nameOf(row: Exclude<Row, MatchRow>): string {
+  switch (row.kind) {
+    case 'command':
+      return row.command.name;
+    case 'task':
+      return row.task.name;
+    case 'newTask':
+      return MOVE_TO_NEW_TASK;
+  }
+}
+
+function words(value: string): string[] {
+  return value.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+// 2 when the typed text starts `name`, 1 when each typed word starts one of
+// its words, and 0 when it does not match.
+function nameMatch(name: string): number {
+  const typedWords = words(typed);
+  const own = words(name);
+  if (!typedWords.length ||
+      !typedWords.every(word => own.some(part => part.startsWith(word)))) {
+    return 0;
+  }
+  return name.toLowerCase().startsWith(typed.trimStart().toLowerCase()) ? 2 :
+                                                                          1;
+}
+
+// Commands and tasks among Chromium's rows: an address being completed, a
+// command or task whose name the typed text starts, the open tabs, the other
+// commands and tasks, then history, bookmarks, and searches.
+function withOwnRows(matches: MatchRow[]): Row[] {
+  const own = [
+    ...tasks.filter(task => task.id)
+        .map(task => ({row: {kind: 'task', task} as Row, how: nameMatch(task.name)})),
+    ...commands.map(
+        command =>
+            ({row: {kind: 'command', command} as Row, how: nameMatch(command.name)})),
+  ].filter(found => found.how)
+                  .sort((a, b) => b.how - a.how)
+                  .slice(0, MOST_OWN_ROWS);
+  const first = matches[0]?.match;
+  const completing =
+      !!first?.allowedToBeDefaultMatch && !!first.inlineAutocompletion;
+  const rest = completing ? matches.slice(1) : matches;
+  return [
+    ...matches.slice(0, completing ? 1 : 0),
+    ...own.filter(found => found.how === 2).map(found => found.row),
+    ...rest.filter(row => row.match.type === 'tab'),
+    ...own.filter(found => found.how === 1).map(found => found.row),
+    ...rest.filter(row => row.match.type !== 'tab'),
+  ];
+}
+
+function drawRows() {
+  results.replaceChildren(...rows.map((row, index) => {
+    const item = document.createElement('li');
+    item.setAttribute('role', 'option');
+    item.append(...cells(row));
+    item.addEventListener('mousemove', () => {
+      if (selected !== index) {
+        select(index);
+      }
+    });
+    item.addEventListener('click', () => open(index, false));
+    return item;
+  }));
+}
+
+// After Option+Cmd+M: Move to New Task, the other tasks, then the Scratchpad,
+// those whose names match the typed text.
+function showMoveRows() {
+  const all: Row[] = [
+    {kind: 'newTask'},
+    ...tasks.filter(task => task.id !== selectedTask)
+        .map(task => ({kind: 'task', task}) as Row),
+  ];
+  rows = typed.trim() ?
+      all.filter(row => row.kind !== 'match' && nameMatch(nameOf(row))) :
+      all;
+  shownFor = typed;
+  drawRows();
+  select(0);
+}
+
+function actionName(row: Row|undefined): string {
+  switch (row?.kind) {
+    case 'command':
+      return 'Run';
+    case 'task':
+      return moving ? 'Move here' : 'Go to task';
+    case 'newTask':
+      return 'Move here';
+    case 'match':
+      return row.match.type === 'tab' ? 'Switch to tab' : 'Open';
+    default:
+      return 'Open';
+  }
+}
+
 function answered(): boolean {
   return !!calculation && !calculation.why;
 }
@@ -176,8 +359,7 @@ function select(index: number) {
     row.setAttribute('aria-selected', String(i === index));
   });
   action.textContent = index === -1 ? `Copy ${calculation?.copy ?? ''}` :
-      rows[index]?.match.type === 'tab' ? 'Switch to tab' :
-                                          'Open';
+                                      actionName(rows[index]);
 }
 
 // Draws numbers in full ink, units lighter, operators lightest, and what was
@@ -195,7 +377,7 @@ function draw(element: HTMLElement, ink: Ink[]) {
 
 // Time math first, and math for text with nothing about time in it.
 function workOut(): Calculation|null {
-  if (shell || page || !typed) {
+  if (shell || page || moving || !typed) {
     return null;
   }
   const timed = timeMath.calculate(typed);
@@ -282,6 +464,12 @@ function paint() {
 // edit it. The first row and the calculator's card bring back what was typed.
 function fill() {
   const row = rows[selected];
+  if (row && row.kind !== 'match') {
+    setField(nameOf(row));
+    completion = '';
+    paint();
+    return;
+  }
   const first = row?.line === 0 && row.match.allowedToBeDefaultMatch;
   setField(
       row && !first ?
@@ -305,34 +493,23 @@ function setField(value: string) {
   field.scrollLeft = field.scrollWidth;
 }
 
-function show(result: AutocompleteResult) {
-  if (shell || page || result.input !== typed) {
+async function show(result: AutocompleteResult) {
+  await lists;
+  if (shell || page || moving || result.input !== typed) {
     return;
   }
   shownFor = typed;
-  rows = result.matches.map((match, line) => ({match, line}))
-             .filter(row => !row.match.isHidden);
-  results.replaceChildren(...rows.map(({match}, index) => {
-    const row = document.createElement('li');
-    row.setAttribute('role', 'option');
-    const [title, detail] = describe(match);
-    row.append(
-        icon(match), text('title', title), text('detail', detail),
-        text('kind', KINDS[match.type] ?? ''));
-    row.addEventListener('mousemove', () => {
-      if (selected !== index) {
-        select(index);
-      }
-    });
-    row.addEventListener('click', () => open(index, false));
-    return row;
-  }));
+  rows = withOwnRows(
+      result.matches.map((match, line) => ({kind: 'match' as const, match, line}))
+          .filter(row => !row.match.isHidden));
+  drawRows();
   select(answered() ? -1 : 0);
-  keywords.onSelectedMatchChanged(rows[0]?.match ?? null);
+  const top = rows[0];
+  const first = top?.kind === 'match' ? top.match : null;
+  keywords.onSelectedMatchChanged(first);
 
   // Complete the typed text with the first row, as the address bar does,
   // while the caret is at the end of what was typed. A sum is not completed.
-  const first = rows[0]?.match;
   completion = !answered() && first?.allowedToBeDefaultMatch &&
           field.value === typed && field.selectionStart === typed.length ?
       first.inlineAutocompletion :
@@ -347,6 +524,22 @@ function show(result: AutocompleteResult) {
 
 function open(index: number, viaKeyboard: boolean) {
   const row = rows[index];
+  if (row?.kind === 'command') {
+    calculatorHandler.runCommand(row.command.id);
+    return;
+  }
+  if (row?.kind === 'task') {
+    if (moving) {
+      calculatorHandler.moveToTask(row.task.id);
+    } else {
+      calculatorHandler.goToTask(row.task.id);
+    }
+    return;
+  }
+  if (row?.kind === 'newTask') {
+    calculatorHandler.moveToNewTask();
+    return;
+  }
   if (!row && !field.value) {
     return;
   }
@@ -379,7 +572,7 @@ function query(preventInlineAutocomplete: boolean) {
       completed.slice(typed.length) :
       '';
   paint();
-  if (shell || page) {
+  if (shell || page || moving) {
     return;
   }
   if (!typed && !keywords.isInKeywordMode) {
@@ -388,6 +581,8 @@ function query(preventInlineAutocomplete: boolean) {
     return;
   }
   showRows(true);
+  // What can run changes with the selected tab, so each query asks again.
+  refreshLists();
   handler.queryAutocomplete(
       ++queryId, typed, preventInlineAutocomplete,
       field.selectionStart ?? typed.length, SuggestInventory.kDefault,
@@ -474,7 +669,30 @@ async function refreshPage() {
   }
 }
 
+function refreshLists() {
+  lists = fetchLists();
+}
+
+// The commands and tasks for the rows, and whether the bar opened to move
+// the selected tabs.
+async function fetchLists() {
+  const [{commands: listed}, {tasks: list}] = await Promise.all(
+      [calculatorHandler.getCommands(), calculatorHandler.getTasks()]);
+  commands = listed;
+  tasks = list.tasks;
+  selectedTask = list.selected;
+  if (list.moving) {
+    moving = true;
+    leaveRows();
+    showChip();
+    showMoveRows();
+  } else if (moving) {
+    clear();
+  }
+}
+
 function clear() {
+  moving = false;
   field.value = '';
   typed = '';
   completion = '';
@@ -491,6 +709,12 @@ function clear() {
 router.autocompleteResultChanged.addListener(show);
 
 field.addEventListener('input', event => {
+  if (moving) {
+    typed = field.value;
+    paint();
+    showMoveRows();
+    return;
+  }
   if (hasTerminal && !shell && field.value === '>' &&
       !keywords.isInKeywordMode) {
     field.value = '';
@@ -522,7 +746,9 @@ field.addEventListener('keydown', event => {
     if (count > 0) {
       const step = event.key === 'ArrowDown' ? 1 : -1;
       select((selected - top + step + count) % count + top);
-      fill();
+      if (!moving) {
+        fill();
+      }
     }
   } else if (
       (event.key === 'ArrowRight' || event.key === 'End') &&
@@ -532,10 +758,11 @@ field.addEventListener('keydown', event => {
   } else if (event.key === 'Tab' && !event.shiftKey) {
     // Tab turns a completion into typed text, or starts a site search.
     event.preventDefault();
+    const row = rows[selected];
     if (completion) {
       accept();
     } else {
-      keywords.acceptTab(rows[selected]?.match ?? null, selected);
+      keywords.acceptTab(row?.kind === 'match' ? row.match : null, selected);
     }
   } else if (event.key === 'Backspace') {
     if (shell && !field.value) {
@@ -549,7 +776,9 @@ field.addEventListener('keydown', event => {
     }
   } else if (event.key === 'Enter') {
     event.preventDefault();
-    if (page) {
+    if (moving) {
+      open(selected, true);
+    } else if (page) {
       askAboutPage();
     } else if (isMac ? event.metaKey : event.ctrlKey) {
       sendText({metaKey: true});
@@ -575,6 +804,7 @@ field.addEventListener('keydown', event => {
 router.setInputText.addListener((input: string) => {
   clear();
   setShell(input === '>');
+  refreshLists();
 });
 
 // The bar is frosted glass while its window's glass is on.
@@ -583,15 +813,15 @@ async function refreshFrost() {
   document.body.classList.toggle('frosted', frosted);
 }
 
-// Escape empties the command bar, and closes it once the field is empty. The
-// browser has the page forget its text whenever the panel closes for anything
-// but a click elsewhere.
+// Escape empties the command bar, and closes it once the field is empty, or at
+// once while it lists tasks to move to. The browser has the page forget its
+// text whenever the panel closes for anything but a click elsewhere.
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') {
     return;
   }
   event.preventDefault();
-  if (field.value) {
+  if (field.value && !moving) {
     clear();
   } else {
     calculatorHandler.close();
@@ -608,7 +838,9 @@ window.addEventListener('focus', () => {
   refreshCurrencies();
   refreshClock();
   refreshPage();
+  refreshLists();
 });
+
 window.addEventListener('blur', () => field.blur());
 // Moving the caret off the end of what was typed drops the completion.
 field.addEventListener('selectionchange', () => {
@@ -630,6 +862,7 @@ card.addEventListener('click', copyAnswer);
 
 refreshCurrencies();
 refreshClock();
+refreshLists();
 if (document.hasFocus()) {
   field.focus();
 }

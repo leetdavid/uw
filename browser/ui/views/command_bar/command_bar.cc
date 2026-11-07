@@ -9,13 +9,18 @@
 #include "base/auto_reset.h"
 #include "base/containers/circular_deque.h"
 #include "base/functional/bind.h"
+#include "base/no_destructor.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/new_tab_grouping_user_data.h"  // nogncheck
+#include "chrome/browser/ui/tabs/tab_group_model.h"
+#include "chrome/browser/ui/tabs/tab_group_theme.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/bubble/webui_bubble_dialog_view.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -26,6 +31,8 @@
 #include "components/input/native_web_keyboard_event.h"
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
+#include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/focused_node_details.h"
@@ -38,7 +45,10 @@
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
+#include "ui/base/l10n/l10n_util.h"
 #include "ui/base/window_open_disposition.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/views/bubble/bubble_border.h"
@@ -49,6 +59,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/little_window/little_window_mark.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/glass/glass.h"
@@ -79,6 +90,62 @@ void CloseLittleWindowIfBlank(BrowserWindowInterface* window) {
     return;
   }
   window->GetWindow()->Close();
+}
+
+CommandBar::CommandSource& Source() {
+  static base::NoDestructor<CommandBar::CommandSource> source;
+  return *source;
+}
+
+// The workspace's tasks in sidebar order, then the Scratchpad, each with the
+// addresses its tabs in `window` show.
+mojom::BarTasksPtr ListTasks(BrowserWindowInterface* window, bool moving) {
+  auto list = mojom::BarTasks::New();
+  list->moving = moving;
+  const TabOrganizationController* controller =
+      TabOrganizationController::From(window);
+  const TabGroupModel* groups = window->GetTabStripModel()->group_model();
+  if (!controller || !groups) {
+    return list;
+  }
+  const ui::ColorProvider* colors =
+      BrowserView::GetBrowserViewForBrowser(window)->GetColorProvider();
+  std::vector<std::string> tasks = controller->tree().Tasks();
+  tasks.emplace_back();
+  for (const std::string& key : tasks) {
+    auto task = mojom::BarTask::New();
+    task->id = key;
+    if (key.empty()) {
+      task->name = l10n_util::GetStringUTF8(IDS_UW_SCRATCHPAD);
+    } else {
+      const std::optional<tab_groups::TabGroupId> group =
+          controller->GroupFor(key);
+      if (!group || !groups->ContainsTabGroup(*group)) {
+        continue;
+      }
+      task->name = base::UTF16ToUTF8(controller->TaskTitle(key));
+      task->color = color_utils::SkColorToRgbaString(
+          colors->GetColor(GetTabGroupTabStripColorId(
+              groups->GetTabGroup(*group)->visual_data()->color(),
+              /*active_frame=*/true)));
+    }
+    for (const Page& page : controller->tree().pages()) {
+      if (page.task != key) {
+        continue;
+      }
+      ++task->tab_count;
+      if (const tabs::TabInterface* tab = controller->TabFor(page.id)) {
+        task->urls.push_back(
+            tab->GetContents()->GetLastCommittedURL().spec());
+      }
+    }
+    list->tasks.push_back(std::move(task));
+  }
+  const tabs::TabInterface* selected = window->GetActiveTabInterface();
+  if (selected && selected->GetGroup()) {
+    list->selected = controller->KeyOf(*selected->GetGroup());
+  }
+  return list;
 }
 
 }  // namespace
@@ -149,6 +216,33 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
   content::WebContents* SelectedPage() override {
     tabs::TabInterface* page = bar_->SelectedPage();
     return page ? page->GetContents() : nullptr;
+  }
+  std::vector<mojom::BarCommandPtr> Commands() override {
+    std::vector<mojom::BarCommandPtr> listed;
+    if (!Source()) {
+      return listed;
+    }
+    for (const Command& command : Source().Run(bar_->window_)) {
+      std::vector<std::string> keys;
+      for (const std::u16string& key : command.keys) {
+        keys.push_back(base::UTF16ToUTF8(key));
+      }
+      listed.push_back(mojom::BarCommand::New(
+          command.id, base::UTF16ToUTF8(command.name), std::move(keys)));
+    }
+    return listed;
+  }
+  mojom::BarTasksPtr Tasks() override {
+    return ListTasks(bar_->window_, bar_->moving_);
+  }
+  void RunCommand(int command) override { bar_->RunCommand(command); }
+  void GoToTask(const std::string& task) override { bar_->GoToTask(task); }
+  void MoveToTask(const std::string& task) override {
+    bar_->MoveToTask(task);
+  }
+  void MoveToNewTask() override {
+    bar_->CloseForPick();
+    chrome::ExecuteCommand(bar_->window_, TabOrganizationController::kNewTask);
   }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
@@ -241,6 +335,10 @@ CommandBar::~CommandBar() {
   }
 }
 
+void CommandBar::SetCommandSource(CommandSource source) {
+  Source() = std::move(source);
+}
+
 CommandBar* CommandBar::From(BrowserWindowInterface* window) {
   return window ? Get(window->GetUnownedUserDataHost()) : nullptr;
 }
@@ -252,6 +350,7 @@ bool CommandBar::Open(BrowserWindowInterface* window) {
   }
   bar->task_.reset();
   bar->pane_ = tabs::TabHandle();
+  bar->moving_ = false;
   bar->Show();
   return true;
 }
@@ -263,6 +362,7 @@ bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
   }
   bar->task_.reset();
   bar->pane_ = tabs::TabHandle();
+  bar->moving_ = false;
   ResetCommandBar(bar->page(), /*shell=*/true);
   bar->Show();
   return true;
@@ -276,6 +376,7 @@ bool CommandBar::OpenForTask(BrowserWindowInterface* window,
   }
   bar->task_ = task;
   bar->pane_ = tabs::TabHandle();
+  bar->moving_ = false;
   bar->Show();
   return true;
 }
@@ -288,6 +389,21 @@ bool CommandBar::OpenForPane(BrowserWindowInterface* window,
   }
   bar->task_.reset();
   bar->pane_ = pane->GetHandle();
+  bar->moving_ = false;
+  bar->Show();
+  return true;
+}
+
+bool CommandBar::OpenToMoveTabs(BrowserWindowInterface* window) {
+  CommandBar* bar = From(window);
+  if (!bar || !bar->contents_) {
+    return false;
+  }
+  bar->task_.reset();
+  bar->pane_ = tabs::TabHandle();
+  bar->moving_ = true;
+  // The page asks for the tasks as it empties.
+  ResetCommandBar(bar->page(), /*shell=*/false);
   bar->Show();
   return true;
 }
@@ -368,6 +484,7 @@ void CommandBar::Show() {
 void CommandBar::OnWidgetClosing(views::Widget* widget) {
   panel_.Reset();
   if (widget->closed_reason() != views::Widget::ClosedReason::kLostFocus) {
+    moving_ = false;
     ResetCommandBar(page(), /*shell=*/false);
     // Esc before anything was picked closes an empty little window.
     if (!opening_) {
@@ -381,10 +498,7 @@ void CommandBar::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void CommandBar::OpenPicked(const content::OpenURLParams& params) {
-  if (bubble_) {
-    base::AutoReset<bool> opening(&opening_, true);
-    bubble_->CloseUI();
-  }
+  CloseForPick();
   NavigateParams navigate(window_, params.url, params.transition);
   navigate.FillNavigateParamsFromOpenURLParams(params);
   navigate.source_contents = nullptr;
@@ -435,10 +549,7 @@ tabs::TabInterface* CommandBar::SelectedPage() {
 }
 
 void CommandBar::Ask(const std::string& text, tabs::TabInterface* page) {
-  if (bubble_) {
-    base::AutoReset<bool> opening(&opening_, true);
-    bubble_->CloseUI();
-  }
+  CloseForPick();
   AskInNewChat(window_, page, text);
   PlaceInTask();
   PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
@@ -446,13 +557,55 @@ void CommandBar::Ask(const std::string& text, tabs::TabInterface* page) {
 }
 
 void CommandBar::RunInTerminal(const std::string& text) {
+  CloseForPick();
+  OpenTerminalTabRunning(window_, text);
+  PlaceInTask();
+  PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
+}
+
+void CommandBar::RunCommand(int command) {
+  std::vector<Command> listed;
+  if (Source()) {
+    listed = Source().Run(window_);
+  }
+  if (!std::ranges::contains(listed, command, &Command::id)) {
+    return;
+  }
+  // Move to Task… lists the tasks in the command bar, which stays.
+  if (command != kMoveToTask) {
+    CloseForPick();
+  }
+  chrome::ExecuteCommand(window_, command);
+}
+
+void CommandBar::GoToTask(const std::string& task) {
+  CloseForPick();
+  if (TabOrganizationController* controller =
+          TabOrganizationController::From(window_)) {
+    controller->SelectTask(task);
+  }
+}
+
+void CommandBar::MoveToTask(const std::string& task) {
+  CloseForPick();
+  TabOrganizationController* controller =
+      TabOrganizationController::From(window_);
+  if (!controller) {
+    return;
+  }
+  if (task.empty()) {
+    controller->MoveToScratchpad(controller->SelectionFor());
+  } else if (const std::optional<tab_groups::TabGroupId> group =
+                 controller->GroupFor(task)) {
+    controller->MoveToTask(controller->SelectionFor(), *group);
+  }
+}
+
+void CommandBar::CloseForPick() {
   if (bubble_) {
     base::AutoReset<bool> opening(&opening_, true);
     bubble_->CloseUI();
   }
-  OpenTerminalTabRunning(window_, text);
-  PlaceInTask();
-  PlaceInPane(window_->GetTabStripModel()->GetActiveTab());
 }
 
 void CommandBar::PlaceInTask() {

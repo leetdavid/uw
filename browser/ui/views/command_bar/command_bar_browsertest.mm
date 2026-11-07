@@ -551,6 +551,202 @@ IN_PROC_BROWSER_TEST_F(CommandBarForATaskBrowserTest,
   EXPECT_FALSE(tabs()->GetActiveTab()->GetGroup());
 }
 
+// A task, "Plan trip", holding the first tab, which shows a page titled
+// "Title Of Awesomeness", and the selected tab in the Scratchpad. See
+// docs/plans/command-bar.md#what-it-finds.
+class CommandBarRowsBrowserTest : public CommandBarBrowserTest {
+ protected:
+  void MakeATask() {
+    ASSERT_TRUE(embedded_test_server()->Start());
+    ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+    ASSERT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), embedded_test_server()->GetURL("/title2.html")));
+    chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+    Settle();
+    TabOrganizationController* controller =
+        TabOrganizationController::From(browser());
+    task_ = controller->MoveToNewTask(
+        {*controller->IdFor(tabs()->GetTabAtIndex(0))}, u"Plan trip");
+    Settle();
+    ASSERT_FALSE(tabs()->GetActiveTab()->GetGroup());
+  }
+
+  // Each row's `part`, such as its title, in order.
+  std::string Each(std::string_view part) {
+    return content::EvalJs(bar()->page(),
+                           content::JsReplace(
+                               "[...document.querySelectorAll('#results li')]"
+                               ".map(row => row.querySelector($1)?.textContent"
+                               " ?? '').join(',')",
+                               part))
+        .ExtractString();
+  }
+
+  // The first row's key caps, joined by "+".
+  std::string FirstKeys() {
+    return content::EvalJs(bar()->page(),
+                           "[...document.querySelectorAll('#results li "
+                           ".caps kbd')].map(cap => cap.textContent).join('+')")
+        .ExtractString();
+  }
+
+  TabStripModel* tabs() { return browser()->tab_strip_model(); }
+
+  std::optional<tab_groups::TabGroupId> task_;
+};
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, ACommandShowsItsKeyAndRuns) {
+  MakeATask();
+  tabs()->ActivateTabAt(0);
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  ASSERT_TRUE(bar()->IsShowing());
+  Type("move to scr");
+
+  ASSERT_TRUE(Eventually([&] {
+    return Each(".title").starts_with("Move to Scratchpad,");
+  })) << "The rows are: " << Each(".title");
+  EXPECT_TRUE(Kinds().starts_with("Command,"));
+  EXPECT_EQ("Option+Cmd+S", FirstKeys());
+  EXPECT_EQ("Run", content::EvalJs(bar()->page(),
+                                   "document.querySelector('#action').textContent"));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    return !tabs()->GetActiveTab()->GetGroup() && !bar()->IsShowing();
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
+                       ACommandThatCannotRunIsNotListed) {
+  MakeATask();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("close task");
+
+  ASSERT_TRUE(Eventually([&] { return Rows() > 0; }));
+  EXPECT_EQ(std::string::npos, Each(".title").find("Close Task"));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, ATaskRowGoesToTheTask) {
+  MakeATask();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("plan");
+
+  ASSERT_TRUE(Eventually([&] {
+    return Each(".title").starts_with("Plan trip,");
+  })) << "The rows are: " << Each(".title");
+  EXPECT_TRUE(Kinds().starts_with("Task,"));
+  EXPECT_TRUE(Each(".detail").starts_with("1 tab,"));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] { return tabs()->active_index() == 0; }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, ATabRowNamesItsTask) {
+  MakeATask();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+
+  EXPECT_TRUE(Eventually(
+      [&] {
+        Type("awesomeness");
+        Wait(base::Milliseconds(100));
+        return Each(".place").find("Plan trip") != std::string::npos;
+      },
+      base::Seconds(5)))
+      << "The rows are: " << Kinds();
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
+                       MoveToTaskListsTheOtherTasksAndMovesThere) {
+  MakeATask();
+  chrome::ExecuteCommand(browser(), kMoveToTask);
+
+  ASSERT_TRUE(Eventually([&] {
+    return bar()->IsShowing() && Chip() == "Move to task" &&
+           Each(".title") == "Move to New Task,Plan trip";
+  })) << Chip() << " " << Each(".title");
+  Type("pla");
+  EXPECT_EQ("Plan trip", Each(".title"));
+  EXPECT_EQ("Move here",
+            content::EvalJs(bar()->page(),
+                            "document.querySelector('#action').textContent"));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    return tabs()->GetActiveTab()->GetGroup() == task_ &&
+           tabs()->active_index() == 1 && !bar()->IsShowing();
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
+                       MoveToTaskLeavesOutTheTabsOwnTask) {
+  MakeATask();
+  tabs()->ActivateTabAt(0);
+  chrome::ExecuteCommand(browser(), kMoveToTask);
+
+  EXPECT_TRUE(Eventually([&] {
+    return bar()->IsShowing() &&
+           Each(".title") == "Move to New Task,Scratchpad";
+  })) << Each(".title");
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, MoveToNewTaskComesFirst) {
+  MakeATask();
+  chrome::ExecuteCommand(browser(), kMoveToTask);
+  ASSERT_TRUE(Eventually([&] {
+    return Each(".title").starts_with("Move to New Task,");
+  }));
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    const std::optional<tab_groups::TabGroupId> group =
+        tabs()->GetActiveTab()->GetGroup();
+    return group && group != task_;
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, EscapeMovesNothing) {
+  MakeATask();
+  chrome::ExecuteCommand(browser(), kMoveToTask);
+  ASSERT_TRUE(Eventually([&] { return Chip() == "Move to task"; }));
+  Type("pla");
+  PressInField("Escape");
+
+  EXPECT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  EXPECT_FALSE(tabs()->GetActiveTab()->GetGroup());
+}
+
+// Pictures of command, task, and move rows, to compare with the canvas.
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, MANUAL_TheRows) {
+  MakeATask();
+  tabs()->ActivateTabAt(0);
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  views::Widget* panel = views::Widget::GetTopLevelWidgetForNativeView(
+      bar()->page()->GetNativeView());
+  for (auto [text, name] : {std::pair{"move", "command-bar-commands"},
+                            std::pair{"plan", "command-bar-tasks"}}) {
+    ASSERT_TRUE(Eventually(
+        [&] {
+          Type(text);
+          Wait(base::Milliseconds(100));
+          return Kinds().find("Command") != std::string::npos ||
+                 Kinds().find("Task") != std::string::npos;
+        },
+        base::Seconds(5)));
+    Wait(base::Milliseconds(300));
+    SaveWidgetScreenshot(panel, name);
+  }
+  PressInField("Escape");
+  PressInField("Escape");
+  ASSERT_TRUE(Eventually([&] { return !bar()->IsShowing(); }));
+  tabs()->ActivateTabAt(1);
+  chrome::ExecuteCommand(browser(), kMoveToTask);
+  ASSERT_TRUE(Eventually([&] { return Chip() == "Move to task"; }));
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
+                           bar()->page()->GetNativeView()),
+                       "command-bar-move");
+}
+
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnOpenTabRowSwitchesToIt) {
   ASSERT_TRUE(embedded_test_server()->Start());
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));

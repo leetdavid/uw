@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "chrome/browser/ui/webui/top_chrome/top_chrome_web_ui_controller.h"
 #include "chrome/browser/ui/webui/top_chrome/top_chrome_webui_config.h"
@@ -39,6 +40,15 @@ class CommandBarActions {
   virtual void RunInTerminal(const std::string& text) = 0;
   // The selected tab's contents when it shows a web page, or null.
   virtual content::WebContents* SelectedPage() = 0;
+  // The commands that can run now, and the workspace's tasks.
+  virtual std::vector<mojom::BarCommandPtr> Commands() = 0;
+  virtual mojom::BarTasksPtr Tasks() = 0;
+  // Each closes the command bar first, but Move to Task…, which lists the
+  // tasks in it.
+  virtual void RunCommand(int command) = 0;
+  virtual void GoToTask(const std::string& task) = 0;
+  virtual void MoveToTask(const std::string& task) = 0;
+  virtual void MoveToNewTask() = 0;
 
  protected:
   virtual ~CommandBarActions() = default;
@@ -107,6 +117,12 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void IsFrosted(IsFrostedCallback callback) override;
   void GetSelectedPage(GetSelectedPageCallback callback) override;
   void AskAboutPage(const std::string& text) override;
+  void GetCommands(GetCommandsCallback callback) override;
+  void GetTasks(GetTasksCallback callback) override;
+  void RunCommand(int32_t id) override;
+  void GoToTask(const std::string& id) override;
+  void MoveToTask(const std::string& id) override;
+  void MoveToNewTask() override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
   std::unique_ptr<ProblemReporter> problem_reporter_;

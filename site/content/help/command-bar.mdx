@@ -9,24 +9,27 @@ description: Open pages, switch tabs, ask uw, or run a shell command from one bo
 2. Type a few letters of a page you visited or have open.
 3. Press <kbd>Return</kbd>, or pick another row with the arrow keys or the mouse.
 
-The rows are your open tabs, history, bookmarks, and a search for what you typed, labeled **Tab**, **History**, **Bookmark**, and **Search**. A **Tab** row switches to that tab. Any other row opens in a new tab, where <kbd>Cmd</kbd> <kbd>T</kbd>'s blank tab would have gone. Text with no row picked opens as an address, or as a search.
+The rows are your open tabs, your [tasks](./tasks.mdx), uw's commands, history, bookmarks, and a search for what you typed, labeled **Tab**, **Task**, **Command**, **History**, **Bookmark**, and **Search**. A **Tab** row switches to that tab, and names the task it's in. A **Task** row goes back to the tab you used last in that task. Any other row opens in a new tab, where <kbd>Cmd</kbd> <kbd>T</kbd>'s blank tab would have gone. Text with no row picked opens as an address, or as a search.
 
-<Figure caption="The command bar over the page. Each row says whether it's a tab, history, a bookmark, or a search.">
-  <Window bare height={330} cut>
+<Figure caption="The command bar over the page. Each row says whether it's a tab, a task, history, a bookmark, or a search, and a tab row names its task.">
+  <Window bare height={390} cut>
     <Page address="stayaway.com/alfama/flat-12" />
     <Popup top={58} left={100} width={430}>
-      <Field icon="search" value="lisbon ho" />
+      <Field icon="search" value="lisbon" />
       <Row tile="Hotels in Baixa, Lisbon" title="Hotels in Baixa, Lisbon" detail="booking.com" selected>
-        <Muted>Tab</Muted>
+        <Muted>Plan Lisbon trip · Tab</Muted>
+      </Row>
+      <Row icon="folder" title="Plan Lisbon trip" detail="4 tabs">
+        <Muted>Task</Muted>
+      </Row>
+      <Row icon="search" title="lisbon">
+        <Muted>Search</Muted>
       </Row>
       <Row icon="history" title="Lisbon hotels with a rooftop pool" detail="cntraveler.com">
         <Muted>History</Muted>
       </Row>
       <Row icon="bookmark" title="Hostels in Lisbon" detail="hostelworld.com">
         <Muted>Bookmark</Muted>
-      </Row>
-      <Row icon="search" title="lisbon ho">
-        <Muted>Search</Muted>
       </Row>
     </Popup>
   </Window>
@@ -44,7 +47,17 @@ Type the start of an address you've typed before, such as `git` for github.com. 
 
 Type a site search keyword and press <kbd>Tab</kbd> to search that site, as in Chromium's address bar.
 
-## Ask uw or *run a command*
+## Run a *command*
+
+Type a few letters of a command's name, such as `move to scr` for **Move to Scratchpad**, and press <kbd>Return</kbd>. It runs on the tab you were on. The row shows the command's keys, so next time you can press them instead. A command that can't run on that tab isn't listed. Besides uw's own commands, there are common browser ones, such as **Reopen Closed Tab**, **History**, and **Developer Tools**.
+
+## Move tabs *to a task*
+
+Press <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>M</kbd>. The panel lists **Move to New Task**, then your other tasks, then the Scratchpad. Type a few letters of a task's name and press <kbd>Return</kbd>: the tab you were on, and the tabs under it, move to the end of that task. <kbd>Esc</kbd> closes the panel and moves nothing.
+
+With the command bar turned off, <kbd>Option</kbd> <kbd>Cmd</kbd> <kbd>M</kbd> opens the tab's **Move to Task** menu beside it in the sidebar. On Windows, press <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>M</kbd>.
+
+## Ask uw or *run a shell command*
 
 - <kbd>Cmd</kbd> <kbd>Return</kbd> asks uw. A [chat](./chats.mdx) opens with your text as its first message.
 - To ask about the page you're on, type `@` first. A chip shows the page's icon and title, and <kbd>Return</kbd> asks uw with that page as the agent's tab 1. The agent reads it first and can act in it, with the same approvals as in its own tabs. <kbd>Backspace</kbd> in the empty field removes the chip. On a chat, a terminal, or a uw page, `@` is just text.

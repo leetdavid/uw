@@ -6,8 +6,10 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "base/callback_list.h"
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -43,6 +45,18 @@ class CommandBar : public views::WidgetObserver {
   CommandBar& operator=(const CommandBar&) = delete;
   ~CommandBar() override;
 
+  // A command the command bar lists, with its key as caps, such as
+  // {"Option", "Cmd", "S"}.
+  struct Command {
+    int id;
+    std::u16string name;
+    std::vector<std::u16string> keys;
+  };
+  // The commands that can run now in a window.
+  using CommandSource =
+      base::RepeatingCallback<std::vector<Command>(BrowserWindowInterface*)>;
+  static void SetCommandSource(CommandSource source);
+
   static CommandBar* From(BrowserWindowInterface* window);
   // Shows the command bar of `window`. False when the setting is off, and
   // Cmd+T opens a blank tab instead.
@@ -58,6 +72,10 @@ class CommandBar : public views::WidgetObserver {
   // the place of `pane`.
   static bool OpenForPane(BrowserWindowInterface* window,
                           tabs::TabInterface* pane);
+
+  // Shows it with only the tasks the selected tabs can move to, as
+  // Option+Cmd+M does.
+  static bool OpenToMoveTabs(BrowserWindowInterface* window);
 
   bool IsShowing() const;
   // Null while the setting is off.
@@ -82,6 +100,18 @@ class CommandBar : public views::WidgetObserver {
   void Ask(const std::string& text, tabs::TabInterface* page);
   // Closes the command bar and runs `text` in a new terminal.
   void RunInTerminal(const std::string& text);
+  // Closes the command bar, then runs `command`, when the command bar lists
+  // it.
+  void RunCommand(int command);
+  // Closes the command bar, then goes to `task`, or to the Scratchpad when
+  // it is empty.
+  void GoToTask(const std::string& task);
+  // Closes the command bar, then moves the selected tabs, each with the tabs
+  // under it, to the end of `task`, or of the Scratchpad when it is empty.
+  void MoveToTask(const std::string& task);
+  // Closes the command bar for a pick, an ask, or a command, so an empty
+  // little window stays for what it opens.
+  void CloseForPick();
   // Moves the tab just opened to the end of the task the command bar was
   // opened for, if any.
   void PlaceInTask();
@@ -97,6 +127,8 @@ class CommandBar : public views::WidgetObserver {
   base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};
   // True while a pick, an ask, or a terminal command closes the command bar.
   bool opening_ = false;
+  // True while it lists the tasks the selected tabs can move to.
+  bool moving_ = false;
   std::optional<tab_groups::TabGroupId> task_;
   tabs::TabHandle pane_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;

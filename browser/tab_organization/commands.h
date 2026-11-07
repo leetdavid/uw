@@ -43,7 +43,9 @@ enum WindowCommand {
   kMoveOutOfSplit,
   kSeparatePanes,
   kMaximizePane,
-  kLastWindowCommand = kMaximizePane,
+  // Lists the tasks the selected tabs can move to, in the command bar.
+  kMoveToTask,
+  kLastWindowCommand = kMoveToTask,
 };
 
 bool IsWindowCommand(int command);

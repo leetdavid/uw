@@ -10,10 +10,13 @@
 #include "base/functional/callback_helpers.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/singleton_tabs.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/grit/generated_resources.h"
@@ -27,8 +30,10 @@
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/split_view/split_commands.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
+#include "uw/browser/ui/views/tab_organization/move_to_task_menu.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/watch_card/watch_card.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -102,6 +107,11 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
   // Pausing means nothing while automatic organization is off.
   const bool on = prefs->GetBoolean(kOrganizationEnabledPref);
   switch (command) {
+    // Move to New Task is always on the list.
+    case kMoveToTask:
+      return controller->CanExecute(
+          TabOrganizationController::kNewTask,
+          controller->TargetsFor(TabOrganizationController::kNewTask));
     case kGoToScratchpad:
       return std::ranges::any_of(
           controller->tree().pages(),
@@ -143,6 +153,23 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
   }
 }
 
+bool CanRunCommand(BrowserWindowInterface* window, int command) {
+  if (IsWindowCommand(command)) {
+    return CanRunWindowCommand(window, command);
+  }
+  const tabs::TabInterface* tab = window->GetActiveTabInterface();
+  const TabGroupModel* groups = window->GetTabStripModel()->group_model();
+  switch (command) {
+    case IDC_CLOSE_TAB_GROUP:
+      return tab && tab->GetGroup().has_value();
+    case IDC_FOCUS_NEXT_TAB_GROUP:
+    case IDC_FOCUS_PREV_TAB_GROUP:
+      return groups && !groups->ListTabGroups().empty();
+    default:
+      return chrome::IsCommandEnabled(window, command);
+  }
+}
+
 void RunWindowCommand(BrowserWindowInterface* window, int command) {
   if (!CanRunWindowCommand(window, command)) {
     return;
@@ -167,6 +194,11 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
   }
   PrefService* prefs = window->GetProfile()->GetPrefs();
   switch (command) {
+    case kMoveToTask:
+      if (!CommandBar::OpenToMoveTabs(window)) {
+        ShowMoveToTaskMenu(window);
+      }
+      break;
     case kGoToScratchpad:
       controller->SelectTask(std::string());
       break;

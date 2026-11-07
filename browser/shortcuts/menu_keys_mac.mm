@@ -63,6 +63,7 @@ constexpr struct {
     {kSeparatePanes, "separate_panes"},
     {IDC_CREATE_NEW_TAB_GROUP, "new_task"},
     {Controller::kNewTask, "move_to_new_task"},
+    {kMoveToTask, "move_to_task"},
     {Controller::kMoveToPreviousTask, "move_to_previous_task"},
     {Controller::kMoveToNextTask, "move_to_next_task"},
     {Controller::kScratchpad, "move_to_scratchpad"},

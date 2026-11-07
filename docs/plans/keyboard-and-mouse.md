@@ -82,6 +82,7 @@ Agreed on 2026-11-07 as T356. It needs the command bar's task rows, T61.
 - Option+Cmd+M opens the [command bar](command-bar.md) with "Move to task…" in the field. It lists Move to New Task first, then the workspace's other tasks in sidebar order, then the Scratchpad. The selected tab's own task is left out.
 - Typing filters by name. Return moves the selected tab and the tabs under it to the end of that task, as Move to Task in the tab's menu does. Esc closes it and moves nothing.
 - With the command bar switched off, the key opens the tab's Move to Task menu beside its row in the sidebar.
+- Built on 2026-11-07 and in review. "Move to task" is a chip in the field, as `>` is, and the empty field says "Type a task's name". The Option+Cmd [key card](#key-card) lists it first.
 
 ### Key card
 

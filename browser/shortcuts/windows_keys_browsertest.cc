@@ -61,6 +61,7 @@ IN_PROC_BROWSER_TEST_F(WindowsKeysBrowserTest, KeysSayTheirScope) {
       {ui::VKEY_OEM_PERIOD, kCtrlAlt, Controller::kToggleBranch},
       {ui::VKEY_OEM_4, kCtrlAlt, Controller::kMoveToPreviousTask},
       {ui::VKEY_OEM_6, kCtrlAlt, Controller::kMoveToNextTask},
+      {ui::VKEY_M, kCtrlAlt, kMoveToTask},
       {ui::VKEY_W, kCtrlAlt, Controller::kCloseBranch},
       {ui::VKEY_Z, kCtrlAlt, Controller::kUndo},
       {ui::VKEY_N, kAltShift, IDC_CREATE_NEW_TAB_GROUP},

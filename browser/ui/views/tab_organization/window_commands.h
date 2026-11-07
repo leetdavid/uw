@@ -17,6 +17,9 @@ namespace uw {
 // Runs the commands IsWindowCommand accepts. The menu bar, the keys, and the
 // Organize menu all come through here.
 bool CanRunWindowCommand(BrowserWindowInterface* window, int command);
+// The same for any command: Chromium's too, and the tab group commands uw
+// runs on tasks.
+bool CanRunCommand(BrowserWindowInterface* window, int command);
 void RunWindowCommand(BrowserWindowInterface* window, int command);
 bool IsWindowCommandChecked(BrowserWindowInterface* window, int command);
 // The menu bar title of `command` when it depends on the selected tabs.

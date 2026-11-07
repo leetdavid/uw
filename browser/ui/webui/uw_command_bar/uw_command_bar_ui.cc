@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "base/strings/utf_string_conversions.h"
@@ -197,6 +198,45 @@ void UwCommandBarUI::AskAboutPage(const std::string& text) {
   if (CommandBarActions* actions =
           GetCommandBarActions(web_ui()->GetWebContents())) {
     actions->AskAboutPage(text);
+  }
+}
+
+void UwCommandBarUI::GetCommands(GetCommandsCallback callback) {
+  CommandBarActions* actions = GetCommandBarActions(web_ui()->GetWebContents());
+  std::move(callback).Run(actions ? actions->Commands()
+                                  : std::vector<mojom::BarCommandPtr>());
+}
+
+void UwCommandBarUI::GetTasks(GetTasksCallback callback) {
+  CommandBarActions* actions = GetCommandBarActions(web_ui()->GetWebContents());
+  std::move(callback).Run(actions ? actions->Tasks() : mojom::BarTasks::New());
+}
+
+void UwCommandBarUI::RunCommand(int32_t id) {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->RunCommand(id);
+  }
+}
+
+void UwCommandBarUI::GoToTask(const std::string& id) {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->GoToTask(id);
+  }
+}
+
+void UwCommandBarUI::MoveToTask(const std::string& id) {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->MoveToTask(id);
+  }
+}
+
+void UwCommandBarUI::MoveToNewTask() {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->MoveToNewTask();
   }
 }
 

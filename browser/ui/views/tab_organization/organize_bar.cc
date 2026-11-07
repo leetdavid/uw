@@ -40,6 +40,7 @@
 #include "uw/browser/ui/views/mini_player/mini_player_dock.h"
 #include "uw/browser/ui/views/mini_player/playback_controls.h"
 #include "uw/browser/ui/views/tab_organization/activity_card.h"
+#include "uw/browser/ui/views/tab_organization/command_bar_commands.h"
 #include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
 #include "uw/browser/ui/views/tab_organization/organize_card.h"
@@ -71,6 +72,7 @@ constexpr int kFootGap = 6;
 OrganizeBar::OrganizeBar(BrowserWindowInterface* window)
     : window_(window), theme_picker_(std::make_unique<ThemePicker>(window)) {
   KeyCard::Watch();
+  CommandBar::SetCommandSource(base::BindRepeating(&ListCommandBarCommands));
   SetOrientation(views::LayoutOrientation::kVertical);
   // The card, the mini player, and the playback controls sit 6px apart and
   // 6px above the row: touching margins share their space.

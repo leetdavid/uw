@@ -16,6 +16,36 @@ struct SelectedPage {
   string url;
 };
 
+// A command the command bar can run now, with its key, one cap per part,
+// such as ["Option", "Cmd", "S"].
+struct BarCommand {
+  int32 id;
+  string name;
+  array<string> keys;
+};
+
+// A task of the window's workspace, or the Scratchpad.
+struct BarTask {
+  // The task's key, empty for the Scratchpad.
+  string id;
+  string name;
+  // The folder's color, as CSS, empty for the Scratchpad.
+  string color;
+  int32 tab_count;
+  // The addresses its tabs show, which name the task of a tab row.
+  array<string> urls;
+};
+
+struct BarTasks {
+  // The tasks in sidebar order, then the Scratchpad.
+  array<BarTask> tasks;
+  // The selected tab's task, empty for the Scratchpad.
+  string selected;
+  // True when the command bar opened to move the selected tabs, as
+  // Option+Cmd+M does.
+  bool moving;
+};
+
 // What the command bar's page asks of its window.
 interface CalculatorHandler {
   // The last rates uw downloaded, if any, and the currency a bare amount
@@ -36,4 +66,16 @@ interface CalculatorHandler {
   GetSelectedPage() => (SelectedPage? page);
   // Asks `text` in a new chat, with the selected page handed to the agent.
   AskAboutPage(string text);
+  // The commands that can run now, and the workspace's tasks.
+  GetCommands() => (array<BarCommand> commands);
+  GetTasks() => (BarTasks tasks);
+  // Each closes the command bar first, but Move to Task…, which lists the
+  // tasks in it. A command runs on the selected tab.
+  RunCommand(int32 id);
+  // Selects the tab used last in task `id`, or in the Scratchpad.
+  GoToTask(string id);
+  // Moves the selected tabs, each with the tabs under it, to the end of task
+  // `id`, or of the Scratchpad, or to a new task.
+  MoveToTask(string id);
+  MoveToNewTask();
 };

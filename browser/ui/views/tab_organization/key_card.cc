@@ -209,22 +209,36 @@ std::optional<ui::Accelerator> KeyIn(BrowserWindowInterface* window,
   return key;
 }
 
-bool CanRun(BrowserWindowInterface* window, int command) {
-  if (IsWindowCommand(command)) {
-    return CanRunWindowCommand(window, command);
+}  // namespace
+
+std::vector<std::u16string> KeyCaps(const ui::Accelerator& key) {
+  std::vector<std::u16string> caps;
+  if (key.IsCtrlDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_APP_CTRL_KEY));
   }
-  const tabs::TabInterface* tab = window->GetActiveTabInterface();
-  const TabGroupModel* groups = window->GetTabStripModel()->group_model();
-  switch (command) {
-    case IDC_CLOSE_TAB_GROUP:
-      return tab && tab->GetGroup().has_value();
-    case IDC_FOCUS_NEXT_TAB_GROUP:
-    case IDC_FOCUS_PREV_TAB_GROUP:
-      return groups && !groups->ListTabGroups().empty();
-    default:
-      return true;
+#if BUILDFLAG(IS_MAC)
+  if (key.IsAltDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_UW_KEY_CARD_OPTION));
   }
+  if (key.IsShiftDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_APP_SHIFT_KEY));
+  }
+  if (key.IsCmdDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_UW_KEY_CARD_CMD));
+  }
+#else
+  if (key.IsAltDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_APP_ALT_KEY));
+  }
+  if (key.IsShiftDown()) {
+    caps.push_back(l10n_util::GetStringUTF16(IDS_APP_SHIFT_KEY));
+  }
+#endif
+  caps.push_back(KeyName(key.key_code()));
+  return caps;
 }
+
+namespace {
 
 std::unique_ptr<views::Label> MakeCap(const std::u16string& text, bool held) {
   auto cap = std::make_unique<views::Label>(text);
@@ -306,6 +320,7 @@ struct RowSpec {
 };
 
 constexpr RowSpec kBranchRows[] = {
+    {kMoveToTask, 0, IDS_UW_MOVE_TO_TASK_PICKER_MAC},
     {Controller::kMoveToPreviousTask, Controller::kMoveToNextTask,
      IDS_UW_KEY_CARD_PREVIOUS_NEXT_TASK},
     {Controller::kScratchpad, 0, IDS_UW_MOVE_TO_SCRATCHPAD_MAC},
@@ -470,10 +485,10 @@ class KeyCardView : public views::View {
 
   bool Dimmed(const RowSpec& spec) {
     if (spec.command == kGoToTask1) {
-      return !CanRun(window_, kGoToTask1);
+      return !CanRunCommand(window_, kGoToTask1);
     }
-    return !CanRun(window_, spec.command) &&
-           !(spec.second && CanRun(window_, spec.second));
+    return !CanRunCommand(window_, spec.command) &&
+           !(spec.second && CanRunCommand(window_, spec.second));
   }
 
   // `skip_go_to` leaves out the rows that go to a task by number, which the
@@ -521,7 +536,7 @@ class KeyCardView : public views::View {
             KeyIn(window_, kGoToScratchpad, scope_)) {
       AddChildView(MakeRow({KeyName(key->key_code())},
                            l10n_util::GetStringUTF16(IDS_UW_SCRATCHPAD),
-                           !CanRun(window_, kGoToScratchpad)));
+                           !CanRunCommand(window_, kGoToScratchpad)));
     }
     if (children().size() > before) {
       AddChildViewAt(

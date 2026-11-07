@@ -4,6 +4,8 @@
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_KEY_CARD_H_
 
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/functional/callback_forward.h"
@@ -17,6 +19,10 @@ class BrowserWindowInterface;
 
 namespace tabs {
 class TabInterface;
+}
+
+namespace ui {
+class Accelerator;
 }
 
 namespace views {
@@ -46,6 +52,9 @@ class KeyCard {
   static views::Widget* WidgetForTesting();
   static void SetDelayForTesting(base::TimeDelta delay);
 };
+
+// The caps that spell `key`, modifiers first, such as {"Option", "Cmd", "M"}.
+std::vector<std::u16string> KeyCaps(const ui::Accelerator& key);
 
 // The tint of a sidebar row the shown card's keys act on: `tab`'s row, or
 // with `tab` null, the row of `task`. Transparent for any other row.
