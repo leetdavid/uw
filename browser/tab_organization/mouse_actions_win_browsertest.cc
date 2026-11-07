@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include <functional>
+#include <optional>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -21,6 +22,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
@@ -42,8 +44,10 @@
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/ai_connection.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
+#include "uw/browser/ui/views/tab_organization/task_name_field.h"
 
 namespace uw {
 namespace {
@@ -99,6 +103,13 @@ class MouseActionsWinBrowserTest : public headless::HeadlessModeBrowserTest {
       auto* row = views::AsViewClass<TabView>(view);
       return row && row->GetTabInterface() == tab && row->IsDrawn();
     });
+  }
+  views::View* RowOf(const tab_groups::TabGroupId& task) {
+    views::View* field = Find([&](views::View* view) {
+      auto* field = views::AsViewClass<TaskNameField>(view);
+      return field && field->group() == task && field->parent()->IsDrawn();
+    });
+    return field ? field->parent() : nullptr;
   }
   // The part of class T on the row of `tab`.
   template <typename T>
@@ -174,6 +185,14 @@ class MouseActionsWinBrowserTest : public headless::HeadlessModeBrowserTest {
         InPixels(widget()->GetWindowBoundsInScreen().CenterPoint());
     ASSERT_TRUE(::SetCursorPos(away.x(), away.y()));
     Wait(base::Milliseconds(200));
+    // A new row grows into place, so wait until its middle is its own.
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      widget()->LayoutRootViewIfNecessary();
+      gfx::Point middle = view->GetLocalBounds().CenterPoint();
+      views::View::ConvertPointToWidget(view, &middle);
+      return view->Contains(
+          widget()->GetRootView()->GetEventHandlerForPoint(middle));
+    }));
     const gfx::Point point = InPixels(view->GetBoundsInScreen().CenterPoint());
     ASSERT_TRUE(::SetCursorPos(point.x(), point.y()));
     Wait(base::Milliseconds(200));
@@ -310,6 +329,31 @@ IN_PROC_BROWSER_TEST_F(MouseActionsWinBrowserTest,
   EXPECT_TRUE(
       base::test::RunUntil([&] { return tabs()->count() == count + 1; }));
   EXPECT_FALSE(widget()->IsMaximized());
+}
+
+// Run in the Windows VM with --run-manual --headful-mode. A real middle-click
+// on a task's row closes the task.
+IN_PROC_BROWSER_TEST_F(MouseActionsWinBrowserTest,
+                       MANUAL_MiddleClickOnATaskRowInARealWindow) {
+  tabs::TabInterface* parent = tabs()->GetTabAtIndex(0);
+  OpenLinkFrom(parent);
+  chrome::NewTab(browser(), NewTabTypes::kNewTabCommand);
+  Settle();
+  tabs::TabInterface* other = tabs()->GetActiveTab();
+  TabOrganizationController* controller =
+      TabOrganizationController::From(browser());
+  const std::optional<tab_groups::TabGroupId> task =
+      controller->MoveToNewTask({*controller->IdFor(parent)}, u"Plan");
+  ASSERT_TRUE(task);
+  Settle();
+  BringToFront();
+
+  PointAt(RowOf(*task));
+  Send({Button(MOUSEEVENTF_MIDDLEDOWN), Button(MOUSEEVENTF_MIDDLEUP)});
+  EXPECT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 1; }))
+      << tabs()->count();
+  EXPECT_FALSE(tabs()->group_model()->ContainsTabGroup(*task));
+  EXPECT_EQ(tabs()->GetTabAtIndex(0), other);
 }
 
 }  // namespace
