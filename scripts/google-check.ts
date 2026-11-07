@@ -165,6 +165,7 @@ const HELP = `Run the built uw headless and fail when it contacts Google outside
 Usage: pnpm run google-check [options]
   --seconds NUMBER      How long uw runs; default: 300. Background requests start 1 to 4 minutes in.
   --checkout-dir PATH   Chromium checkout; default: $UW_CHROMIUM_ROOT or .chromium
+  --binary PATH         uw to run instead of the checkout's, such as an installed Windows uw
   --help, -h            Show this help
 
 The kept requests are listed in docs/plans/google-requests.md, "Kept".
@@ -174,13 +175,17 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   try {
     const { values } = parseArgs({
       args: argv, strict: true, allowPositionals: false,
-      options: { seconds: { type: "string" }, "checkout-dir": { type: "string" }, help: { type: "boolean", short: "h" } },
+      options: {
+        seconds: { type: "string" }, "checkout-dir": { type: "string" }, binary: { type: "string" },
+        help: { type: "boolean", short: "h" },
+      },
     });
     if (values.help) { console.log(HELP); return 0; }
     const seconds = Number(values.seconds ?? "300");
     if (!Number.isSafeInteger(seconds) || seconds < 1) throw new BuildError("--seconds must be a positive integer", 2);
-    const layout = layoutAt(values["checkout-dir"] ?? (process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium")));
-    return await check(layout.binary, seconds) ? 0 : 1;
+    const binary = values.binary ??
+      layoutAt(values["checkout-dir"] ?? (process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"))).binary;
+    return await check(binary, seconds) ? 0 : 1;
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     if (error instanceof BuildError) return error.exitCode;
