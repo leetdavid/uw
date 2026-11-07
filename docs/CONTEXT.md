@@ -419,7 +419,7 @@ _Avoid_: CLI, command-line tool, terminal app.
 A user-requested change to a website's appearance or behavior.
 
 **Preview**:
-A uw release anyone can download from GitHub or the website, marked as rough, with no support promise. Each has its own uw version, such as 0.1.0, and updates itself.
+A uw release anyone can download from GitHub or the website, marked as rough, with no support promise. Each has its own uw version, such as 0.1.0, shared by its Mac and Windows builds, and updates itself.
 _Avoid_: Test build, beta, nightly.
 
 **uw dev**:

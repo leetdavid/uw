@@ -31,17 +31,17 @@ A check or download already under way, from the page or the schedule, shows its 
 
 ## Release pipeline
 
-Agreed: previews are built on the owner's Mac in the `~/dev/uw-release` worktree, not in CI. Free GitHub runners stop a job after 6 hours, which is too short for a Chromium build. One command, `pnpm run release <sha>`, runs every step: check out, build, smoke test, sign and notarize with Chromium's `sign_chrome.py`, make the DMG, sign the Sparkle feed entry, and publish the GitHub release. `sign_chrome.py` is upstream Python, like the rest of Chromium's build tools.
+Agreed: previews are built on the owner's Mac in the `~/dev/uw-release` worktree, not in CI. Free GitHub runners stop a job after 6 hours, which is too short for a Chromium build. One command, `pnpm run release <sha>`, runs every step: check out, build, smoke test, sign and notarize with Chromium's `sign_chrome.py`, make the DMG, sign the Sparkle feed entry, and publish the GitHub release. `sign_chrome.py` is upstream Python, like the rest of Chromium's build tools. From 0.1.9 the same command has the owner's Linux workstation build Windows from the same commit; see [Windows](windows.md#distribution).
 
 ## Versions
 
-Agreed: uw has its own version, starting at 0.1.0 for the first public preview. Tags are `v0.1.0` and so on. `pnpm run release` writes the version into the app bundle's `Info.plist` before signing, as Chromium's own signing scripts change the plist for each channel. The About page then reads "Version 0.1.0 (Chromium 153.0.8010.53)", and the release notes name the Chromium version too. Daily builds carry Chromium's version and show it as before. The user agent and everything websites and extensions see keep Chromium's version.
+Agreed: uw has its own version, starting at 0.1.0 for the first public preview. Tags are `v0.1.0` and so on. `pnpm run release` writes the version into the app bundle's `Info.plist` before signing, as Chromium's own signing scripts change the plist for each channel. The About page then reads "Version 0.1.0 (Chromium 153.0.8010.53)", and the release notes name the Chromium version too. A release's Windows build carries the same version. Daily builds carry Chromium's version and show it as before. The user agent and everything websites and extensions see keep Chromium's version.
 
 There is one channel. Each preview is a normal GitHub release rather than a prerelease, so `releases/latest/download/appcast.xml` always finds the newest feed. The release title says it is a preview.
 
 ## Platforms and package
 
-Agreed: Apple silicon only, macOS 13 or later. Each release is one notarized DMG that opens to the usual drag-to-Applications window, and Sparkle installs updates from the same DMG. Intel Macs are not supported; a universal build would double the build time.
+Agreed: Apple silicon only, macOS 13 or later. Each release is one notarized DMG that opens to the usual drag-to-Applications window, and Sparkle installs updates from the same DMG. Intel Macs are not supported; a universal build would double the build time. From 0.1.9 each release also carries an installer for Windows 11 on x64; see [Windows](windows.md#distribution).
 
 ## Homebrew
 
