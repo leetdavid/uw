@@ -448,6 +448,31 @@ test("a Linux host cross-builds Windows uw with the packaged toolchain", (t) => 
   assert.equal(basename(f.layout.binary), "chrome.exe");
 });
 
+test("a Windows release adds its arguments and installer, and numbers chrome/VERSION only while it builds", (t) => {
+  const toolchain = temporary(t);
+  writeFileSync(join(toolchain, "abc123.zip"), "packaged toolchain fixture");
+  const f = new Fixture(t, "linux", "x64",
+    { DEPOT_TOOLS_WIN_TOOLCHAIN_BASE_URL: toolchain, GYP_MSVS_HASH_3bfcb536c8: "abc123" });
+  f.browser.sync(2);
+  f.calls.length = 0;
+  const version = join(f.layout.source, "chrome/VERSION");
+  const chromium = readFileSync(version, "utf8");
+  const execute = f.execute.bind(f);
+  let building = "";
+  f.execute = (command, options) => {
+    if (basename(command[0]!) === "autoninja") building = readFileSync(version, "utf8");
+    return execute(command, options);
+  };
+  f.browser.build(2, true, true, { args: ['uw_release_version = "0.1.11"'], patch: 5312 });
+  assert.equal(building, chromium.replace(/^PATCH=\d+$/m, "PATCH=5312"));
+  assert.notEqual(building, chromium);
+  assert.equal(readFileSync(version, "utf8"), chromium);
+  const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
+  assert.match(gen.find((arg) => arg.startsWith("--args="))!, /^uw_release_version = "0\.1\.11"$/m);
+  const ninja = f.calls.find(({ command }) => basename(command[0]!) === "autoninja")!.command;
+  assert.deepEqual(ninja.slice(-2), ["chrome", "mini_installer"]);
+});
+
 test("a Linux host without the packaged Windows toolchain or FUSE fails its checks", (t) => {
   const f = new Fixture(t, "linux", "x64");
   f.fuseReady = false;

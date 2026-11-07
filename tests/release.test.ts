@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,11 +9,16 @@ import { BuildError } from "../scripts/chromium.ts";
 import type { CommandOptions, Runtime } from "../scripts/chromium.ts";
 import {
   CRASH_REPORT_URL, DMG, FEED_URL, NOTARY_PROFILE, POSTHOG_HOST, Release, SENTRY_CLI_SHA256,
-  SPARKLE_PUBLIC_KEY, SPARKLE_SHA256, TEAM_ID, draftNotes, newer, posthogKey,
+  SPARKLE_PUBLIC_KEY, SPARKLE_SHA256, TEAM_ID, WINDOWS_FEED, WINDOWS_INSTALLER, draftNotes, newer, posthogKey, signedByUpdateKey,
+  windowsVersion,
 } from "../scripts/release.ts";
 
 const SHA = "c".repeat(40);
 const HASH = "A".repeat(40);
+const INSTALLER = "installer";
+// Stands in for the Sparkle key that signs Windows uw's update feed.
+const updateKeys = generateKeyPairSync("ed25519");
+const UPDATE_KEY = updateKeys.publicKey.export({ format: "der", type: "spki" }).subarray(-32).toString("base64");
 
 interface Setup {
   previous?: string;
@@ -21,10 +27,14 @@ interface Setup {
   checksum?: string;
   cliChecksum?: string;
   token?: string;
+  windowsFeed?: string;
+  windowsFails?: boolean;
+  badSignature?: boolean;
 }
 
 function fixture(t: TestContext, {
   previous = "", pushed = true, subjects = [], checksum = SPARKLE_SHA256, cliChecksum = SENTRY_CLI_SHA256, token = "sntrys_test",
+  windowsFeed, windowsFails = false, badSignature = false,
 }: Setup = {}) {
   const worktree = mkdtempSync(join(tmpdir(), "uw-release-test-"));
   t.after(() => rmSync(worktree, { recursive: true, force: true }));
@@ -49,6 +59,18 @@ function fixture(t: TestContext, {
       writeFileSync(join(output, "uw-153.0.8010.53.dmg"), "dmg");
     }
     if (line.startsWith("gh release create")) return "https://github.com/leetdavid/uw/releases/tag/untagged-1";
+    if (line.startsWith("git show")) return JSON.stringify({ version: "153.0.8010.53" });
+    if (line.startsWith("gh api")) return windowsFeed ? "v0.1.10" : "";
+    if (line.startsWith("gh release download")) return windowsFeed ?? "";
+    if (command[0] === "ssh" && command.at(-1)!.includes("until [ -e")) {
+      if (windowsFails) throw new BuildError("ssh failed with exit 1: the Windows build failed");
+      const sha256 = createHash("sha256").update(INSTALLER).digest("hex");
+      return JSON.stringify({ version: "153.0.8010.5300", size: INSTALLER.length, sha256 });
+    }
+    if (command[0] === "scp") writeFileSync(command.at(-1)!, INSTALLER);
+    if (command[0]?.endsWith("bin/sign_update")) {
+      return badSignature ? "AAAA" : sign(null, readFileSync(command.at(-1)!), updateKeys.privateKey).toString("base64");
+    }
     return "";
   };
   const runtime: Runtime = {
@@ -57,7 +79,7 @@ function fixture(t: TestContext, {
     memoryBytes: 64 * 1024 ** 3, freeBytes: () => 0, addresses: () => [], log: () => {},
   };
   const release = (version = "0.1.0") =>
-    new Release({ version, worktree, jobs: 8, envFile: join(worktree, "no.env") }, runtime);
+    new Release({ version, worktree, jobs: 8, envFile: join(worktree, "no.env"), updateKey: UPDATE_KEY }, runtime);
   const find = (prefix: string) => calls.map(({ command }) => command).filter((command) => command.join(" ").startsWith(prefix));
   return { worktree, calls, release, find };
 }
@@ -140,10 +162,63 @@ test("a release is built in the worktree, signed, notarized, and drafted on GitH
     "--maximum-deltas", "0", "-o", join(directory, "appcast.xml"), join(directory, "feed"),
   ]);
   assert.match(readFileSync(join(directory, "notes.md"), "utf8"), /The first public preview\./);
+  const remote = find("ssh").map((command) => command.at(-1)!.replace(/^.* && fnm use --log-level quiet && /, ""));
+  assert.deepEqual(remote.slice(0, 2), ["git status --porcelain", "pgrep -f '[w]indows-release.ts build' || true"]);
+  assert.match(remote[2]!, new RegExp(`^git fetch -q origin && git checkout -q --detach ${SHA} && pnpm install`));
+  assert.match(remote[2]!, /setsid nohup node scripts\/windows-release\.ts build 0\.1\.0 --patch 5300 --posthog-key phc_test --jobs 16 /);
+  assert.deepEqual(remote.slice(4), ["node scripts/windows-release.ts symbols 0.1.0", "node scripts/windows-release.ts check 0.1.0"]);
+  const symbols = calls.find(({ command }) => command.at(-1)!.endsWith("windows-release.ts symbols 0.1.0"));
+  assert.equal(symbols?.options.input, "sntrys_test");
+  const windows = join(directory, "windows");
+  const feed = join(windows, WINDOWS_FEED);
+  assert.equal(readFileSync(feed, "utf8"), JSON.stringify({
+    version: "153.0.8010.5300", installer: WINDOWS_INSTALLER, size: INSTALLER.length,
+    sha256: createHash("sha256").update(INSTALLER).digest("hex"),
+  }));
+  assert.ok(signedByUpdateKey(readFileSync(feed), readFileSync(`${feed}.sig`, "utf8"), UPDATE_KEY));
   const [draft] = find("gh release create");
   assert.ok(draft);
-  assert.deepEqual(draft.slice(0, 7), ["gh", "release", "create", "v0.1.0", dmg, join(directory, "appcast.xml"), "--draft"]);
+  assert.deepEqual(draft.slice(0, 10), [
+    "gh", "release", "create", "v0.1.0", dmg, join(directory, "appcast.xml"), join(windows, WINDOWS_INSTALLER), feed,
+    `${feed}.sig`, "--draft",
+  ]);
   assert.equal(draft[draft.indexOf("--target") + 1], SHA);
+});
+
+test("each Windows release numbers itself from Chromium's version, after the last one", () => {
+  assert.equal(windowsVersion("153.0.8010.53"), "153.0.8010.5300");
+  assert.equal(windowsVersion("153.0.8010.53", "153.0.8010.5311"), "153.0.8010.5312");
+  assert.equal(windowsVersion("153.0.8010.60", "153.0.8010.5311"), "153.0.8010.6000");
+  assert.equal(windowsVersion("154.0.8100.20", "153.0.8010.5311"), "154.0.8100.2000");
+  assert.throws(() => windowsVersion("153.0.8010.53", "153.0.8010.5399"), /no room left/);
+});
+
+test("the Windows build follows the newest release that carries Windows' update feed", (t) => {
+  const { release, find } = fixture(t, { windowsFeed: JSON.stringify({ version: "153.0.8010.5311" }) });
+
+  release().publish();
+
+  assert.deepEqual(find("gh release download"), [["gh", "release", "download", "v0.1.10", "--pattern", WINDOWS_FEED, "--output", "-"]]);
+  assert.match(find("ssh").map((command) => command.at(-1)!).join("\n"), /--patch 5312 /);
+});
+
+test("a failed Windows build drafts no release", (t) => {
+  const { release, find } = fixture(t, { windowsFails: true });
+
+  assert.throws(() => release().publish(), /the Windows build failed/);
+  assert.deepEqual(find("gh release create"), []);
+});
+
+test("an update feed that the update key does not sign drafts no release", (t) => {
+  const { release, find } = fixture(t, { badSignature: true });
+
+  assert.throws(() => release().publish(), /does not match uw's update key/);
+  assert.deepEqual(find("gh release create"), []);
+});
+
+test("the real update key checks a feed's signature", () => {
+  assert.equal(signedByUpdateKey(Buffer.from("{}"), Buffer.alloc(64).toString("base64")), false);
+  assert.equal(Buffer.from(SPARKLE_PUBLIC_KEY, "base64").length, 32);
 });
 
 test("a release needs the Sentry token before it builds", (t) => {

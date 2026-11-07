@@ -473,16 +473,30 @@ export class Chromium {
     this.runtime.log("Prepared uw customizations from chromium/patches/series");
   }
 
-  build(jobs: number, symbols = false, release = false): void {
+  /**
+   * `windows` adds a Windows release's arguments and installer, and numbers the
+   * build's last version part `patch` while it builds, per
+   * docs/adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md.
+   */
+  build(jobs: number, symbols = false, release = false, windows?: { args: string[]; patch: number }): void {
     this.requireHost();
     this.requireJobsForMemory(jobs);
     this.prepare();
     const gnArgs = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
     // Without it, the build is uw dev. See docs/adr/0028-local-builds-are-uw-dev.md.
     const identity = release ? ["uw_release = true"] : [];
-    const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols), ...identity].join("\n");
-    this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args}`, "--fail-on-unused-args"], this.layout.source);
-    this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome"], this.layout.source);
+    const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols), ...identity, ...windows?.args ?? []];
+    const version = join(this.layout.source, "chrome/VERSION");
+    const unstamped = windows ? readFileSync(version, "utf8") : "";
+    if (windows) writeFileSync(version, unstamped.replace(/^PATCH=\d+$/m, `PATCH=${windows.patch}`));
+    try {
+      this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args.join("\n")}`, "--fail-on-unused-args"],
+        this.layout.source);
+      this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome", ...windows ? ["mini_installer"] : []],
+        this.layout.source);
+    } finally {
+      if (windows) writeFileSync(version, unstamped);
+    }
     if (!existsSync(this.layout.binary)) throw new BuildError(`Build returned successfully but ${this.layout.binary} is missing`);
     this.runtime.log(`Built ${this.layout.binary}`);
   }

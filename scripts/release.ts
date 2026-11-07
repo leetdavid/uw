@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash, createPublicKey, verify } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -26,6 +27,23 @@ export const CRASH_REPORT_URL =
 export const POSTHOG_HOST = "https://e.uwbrowser.com";
 const REPOSITORY = "https://github.com/leetdavid/uw";
 export const FEED_URL = `${REPOSITORY}/releases/latest/download/appcast.xml`;
+// Each release also carries Windows uw, built on a Linux host in a release
+// checkout of its own: a clone of uw with its own .chromium. Windows previews
+// read only the latest release. See "Distribution" in docs/plans/windows.md.
+export const WINDOWS_HOST = "workstation";
+export const WINDOWS_CHECKOUT = "uw-windows-release";
+export const WINDOWS_INSTALLER = "uw-windows-x64-setup.exe";
+export const WINDOWS_FEED = "uw-windows-update.json";
+export const WINDOWS_FEED_URL = "https://api.github.com/repos/leetdavid/uw/releases/latest";
+// What scripts/windows-release.ts build leaves in the release's folder there.
+export const WINDOWS_BUILT = "windows.json";
+export const WINDOWS_FAILED = "windows-failed.txt";
+// Shells that ssh starts there get Node and pnpm only from fnm and Homebrew,
+// and the Windows toolchain's variables only from ~/win-toolchain/env.sh.
+const WINDOWS_SHELL = 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && eval "$(fnm env --shell bash)" && ' +
+  `source ~/win-toolchain/env.sh && cd ~/${WINDOWS_CHECKOUT} && fnm use --log-level quiet`;
+const WINDOWS_JOBS = 16;
+const WINDOWS_WAIT = 8 * 60 * 60_000;
 const BRANCH = "origin/main";
 const NETWORK_TIMEOUT = 300_000;
 const LSREGISTER =
@@ -38,6 +56,8 @@ export interface ReleaseOptions {
   jobs: number;
   // The git-ignored file the release's secrets come from; default: the repo's .env.
   envFile?: string;
+  // The public key Windows uw checks its update feed with; default: Sparkle's.
+  updateKey?: string;
 }
 
 /**
@@ -70,12 +90,35 @@ export function newer(version: string, than: string): boolean {
   return false;
 }
 
+/**
+ * The next Windows build's four-part version on Chromium `chromium`, after the
+ * newest Windows release, `previous`: Chromium's last part times 100 plus a
+ * count. See docs/adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md.
+ */
+export function windowsVersion(chromium: string, previous?: string): string {
+  const parts = chromium.split(".");
+  const first = Number(parts[3]) * 100;
+  const last = previous?.split(".");
+  const same = last?.slice(0, 3).join(".") === parts.slice(0, 3).join(".") && Math.floor(Number(last?.[3]) / 100) === Number(parts[3]);
+  const next = same ? Number(last![3]) + 1 : first;
+  if (next >= first + 100) throw new BuildError(`Chromium ${chromium} has no room left for another Windows release`);
+  return [...parts.slice(0, 3), next].join(".");
+}
+
+/** Whether `signature` is the Sparkle key's signature of `data`, as Windows uw checks its update feed. */
+export function signedByUpdateKey(data: Buffer, signature: string, key = SPARKLE_PUBLIC_KEY): boolean {
+  const spki = Buffer.concat([Buffer.from("302a300506032b6570032100", "hex"), Buffer.from(key, "base64")]);
+  return verify(null, data, createPublicKey({ key: spki, format: "der", type: "spki" }), Buffer.from(signature.trim(), "base64"));
+}
+
 export function draftNotes(version: string, chromium: string, subjects: readonly string[] | undefined): string {
   const changes = subjects === undefined
     ? "The first public preview.\n"
     : subjects.filter((subject) => /^(feat|fix)(\(|:)/.test(subject)).map((subject) => `- ${subject}\n`).join("");
-  return `uw ${version} is an early preview for Macs with Apple silicon on macOS 13 or later, built on Chromium ${chromium}. ` +
-    "It may break, and it comes with no support promise.\n\n## Changes\n\n" + changes;
+  return `uw ${version} is an early preview for Macs with Apple silicon on macOS 13 or later and for 64-bit PCs on Windows 11, ` +
+    `built on Chromium ${chromium}. It may break, and it comes with no support promise.\n\n` +
+    "The Windows installer isn't signed yet. On its first run Windows says \"Windows protected your PC\": choose **More info**, " +
+    "then **Run anyway**. Smart App Control blocks it.\n\n## Changes\n\n" + changes;
 }
 
 export class Release {
@@ -102,6 +145,61 @@ export class Release {
 
   private environment(): NodeJS.ProcessEnv {
     return { ...this.runtime.env, PATH: `${this.tools}${delimiter}${this.runtime.env.PATH ?? ""}`, DEPOT_TOOLS_UPDATE: "0" };
+  }
+
+  /** Runs `command` in the release checkout on the Windows build host. */
+  private remote(command: string, { timeout = NETWORK_TIMEOUT, input, inherit }: { timeout?: number; input?: string; inherit?: boolean } = {}): string {
+    return this.runtime.run(["ssh", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=60", WINDOWS_HOST, `${WINDOWS_SHELL} && ${command}`],
+      { cwd: REPO, env: this.environment(), timeout, input, inherit });
+  }
+
+  /** The newest Windows release's four-part version, from its update feed. */
+  previousWindowsVersion(): string | undefined {
+    const tag = this.capture(["gh", "api", "repos/leetdavid/uw/releases?per_page=30", "--jq",
+      `[.[] | select(any(.assets[]; .name == "${WINDOWS_FEED}")) | .tag_name][0] // ""`], REPO, NETWORK_TIMEOUT);
+    if (!tag) return undefined;
+    const feed = this.capture(["gh", "release", "download", tag, "--pattern", WINDOWS_FEED, "--output", "-"], REPO, NETWORK_TIMEOUT);
+    return (JSON.parse(feed) as { version: string }).version;
+  }
+
+  /** Starts the Windows build on its host, where it runs while the Mac builds. */
+  private startWindows(sha: string, windows: string, posthogToken: string): void {
+    const folder = `.chromium/releases/${this.options.version}`;
+    if (this.remote("git status --porcelain")) throw new BuildError(`${WINDOWS_HOST}:~/${WINDOWS_CHECKOUT} has local changes`);
+    if (this.remote("pgrep -f '[w]indows-release.ts build' || true")) {
+      throw new BuildError(`A Windows release build is still running on ${WINDOWS_HOST}`);
+    }
+    this.remote(`git fetch -q origin && git checkout -q --detach ${sha} && pnpm install --frozen-lockfile --ignore-scripts && ` +
+      `mkdir -p ${folder} && (setsid nohup node scripts/windows-release.ts build ${this.options.version} ` +
+      `--patch ${windows.split(".")[3]} --posthog-key ${posthogToken} --jobs ${WINDOWS_JOBS} > ${folder}/windows-build.log 2>&1 < /dev/null &)`);
+    this.runtime.log(`Building Windows uw ${windows} on ${WINDOWS_HOST}. Log: ~/${WINDOWS_CHECKOUT}/${folder}/windows-build.log`);
+  }
+
+  /** Waits for the Windows build, uploads its symbols, checks it in the VM, and signs its update feed. */
+  private finishWindows(directory: string, sentryToken: string, sparkle: string): string[] {
+    const { version } = this.options;
+    const folder = `.chromium/releases/${version}`;
+    const built = JSON.parse(this.remote(
+      `until [ -e ${folder}/${WINDOWS_BUILT} ] || [ -e ${folder}/${WINDOWS_FAILED} ]; do sleep 30; done; ` +
+      `cat ${folder}/${WINDOWS_BUILT} 2>/dev/null || { cat ${folder}/${WINDOWS_FAILED} >&2; exit 1; }`,
+      { timeout: WINDOWS_WAIT })) as { version: string; size: number; sha256: string };
+    this.remote(`node scripts/windows-release.ts symbols ${version}`, { timeout: 2 * 60 * 60_000, input: sentryToken });
+    this.remote(`node scripts/windows-release.ts check ${version}`, { timeout: 60 * 60_000, inherit: true });
+    const windows = join(directory, "windows");
+    mkdirSync(windows);
+    const installer = join(windows, WINDOWS_INSTALLER);
+    this.capture(["scp", "-q", `${WINDOWS_HOST}:${WINDOWS_CHECKOUT}/${folder}/${WINDOWS_INSTALLER}`, installer], REPO, NETWORK_TIMEOUT);
+    if (createHash("sha256").update(readFileSync(installer)).digest("hex") !== built.sha256) {
+      throw new BuildError(`The Windows installer copied from ${WINDOWS_HOST} does not match its build`);
+    }
+    const feed = join(windows, WINDOWS_FEED);
+    writeFileSync(feed, JSON.stringify({ version: built.version, installer: WINDOWS_INSTALLER, size: built.size, sha256: built.sha256 }));
+    const signature = this.capture([join(sparkle, "bin/sign_update"), "-p", feed]);
+    if (!signedByUpdateKey(readFileSync(feed), signature, this.options.updateKey)) {
+      throw new BuildError("sign_update's signature of the Windows update feed does not match uw's update key");
+    }
+    writeFileSync(`${feed}.sig`, `${signature}\n`);
+    return [installer, feed, `${feed}.sig`];
   }
 
   private succeeds(command: readonly string[]): boolean {
@@ -177,8 +275,11 @@ export class Release {
     const posthogToken = posthogKey(this.runtime.env, this.options.envFile);
     const sentryToken = this.sentryToken();
     const cli = this.sentryCli();
+    const chromium = (JSON.parse(this.capture(["git", "show", `${sha}:chromium/pins.json`])) as { version: string }).version;
+    const windows = windowsVersion(chromium, this.previousWindowsVersion());
 
     if (this.capture(["git", "status", "--porcelain"], worktree)) throw new BuildError(`${worktree} has local changes`);
+    this.startWindows(sha, windows, posthogToken);
     this.step(["git", "checkout", "--detach", sha], worktree);
     this.step(["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"], worktree);
     this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols", "--release"], worktree);
@@ -253,12 +354,12 @@ export class Release {
       "--maximum-deltas", "0", "-o", appcast, feed,
     ], directory);
 
-    const chromium = JSON.parse(readFileSync(join(worktree, "chromium/pins.json"), "utf8")).version as string;
+    const windowsFiles = this.finishWindows(directory, sentryToken, sparkle);
     const subjects = previous ? this.capture(["git", "log", "--format=%s", `${previous}..${sha}`]).split("\n") : undefined;
     const notes = join(directory, "notes.md");
     writeFileSync(notes, draftNotes(version, chromium, subjects));
     const url = this.capture([
-      "gh", "release", "create", tag, dmg, appcast, "--draft", "--title", `uw ${version} preview`,
+      "gh", "release", "create", tag, dmg, appcast, ...windowsFiles, "--draft", "--title", `uw ${version} preview`,
       "--notes-file", notes, "--target", sha,
     ], REPO, NETWORK_TIMEOUT);
     this.runtime.log(`Drafted ${url}\nReview the notes there, then publish the release.`);
@@ -266,7 +367,8 @@ export class Release {
   }
 }
 
-const HELP = `Build, sign, and notarize a uw preview, then publish it as a draft GitHub release.
+const HELP = `Build, sign, and notarize a uw preview for the Mac, have the Linux host "${WINDOWS_HOST}" build and check
+it for Windows, then publish both as a draft GitHub release.
 
 Usage: node scripts/release.ts <version> [options]
   --sha SHA         Commit to release; default: GitHub's main. It must be pushed.
