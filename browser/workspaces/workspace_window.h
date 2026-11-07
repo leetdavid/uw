@@ -113,6 +113,9 @@ class WorkspaceWindow : public views::WidgetObserver,
   // it draws unseen and its page loads, and returns it. Neither window plays
   // macOS's animation while both are on screen. Null when it is not open yet.
   WorkspaceWindow* Prepare(std::string_view id);
+  // As Prepare, for a picture of the window's sidebar only: its views draw,
+  // and its page stays hidden, so it neither draws nor loads.
+  WorkspaceWindow* PrepareSidebar(std::string_view id);
   // As Prepare, opening the window first if there is none yet.
   void Preload(std::string_view id);
   // Sends the windows Prepare put under this one behind again, unless one is
@@ -177,9 +180,10 @@ class WorkspaceWindow : public views::WidgetObserver,
   // Brings this window to the front and hides `shown`.
   void Present(base::WeakPtr<WorkspaceWindow> shown);
   void LoadActiveTab();
+  WorkspaceWindow* PrepareFor(std::string_view id, bool page);
   // Orders this hidden window in just under `shown`, at its place and size,
-  // with its page drawing and loading.
-  void GoUnder(WorkspaceWindow* shown);
+  // with its page drawing and loading, or with `page` false, hidden.
+  void GoUnder(WorkspaceWindow* shown, bool page);
   // Undoes GoUnder.
   void GoBehind();
   views::Widget* GetWidget();

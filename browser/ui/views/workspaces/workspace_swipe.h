@@ -62,10 +62,9 @@ class WorkspaceWindow;
 //
 // Ahead of any slide, the window that shows gets every other workspace ready,
 // one at a time, nearest first, once its own page has drawn: its window opens
-// if it has none, goes in under this one, loads its page, has its sidebar
-// pictured, and goes behind again. A sidebar that changes behind is pictured
-// again a second after the changes stop. A window whose page Memory Saver
-// unloaded is left as it is.
+// if it has none, goes in under this one with its page hidden, has its sidebar
+// pictured, and goes behind again. No page loads for it. A sidebar that
+// changes behind is pictured again a second after the changes stop.
 class WorkspaceSwipe : public ui::EventHandler,
                        public gfx::AnimationDelegate,
                        public views::ViewObserver,
@@ -238,14 +237,12 @@ class WorkspaceSwipe : public ui::EventHandler,
   void OnReadyPartner(int step,
                       const std::string& id,
                       BrowserWindowInterface* window);
-  void TakeReadyPicture(int step, base::WeakPtr<WorkspaceSwipe> other);
   // Sends the window just readied behind, and goes on to the next.
   void EndReadyStep(int step);
   // Stops getting ready, as when a slide starts.
   void StopReady();
   // Whether this window, behind its partner, still needs getting ready: its
-  // sidebar has no picture or an old one, or its page has not loaded, unless
-  // Memory Saver unloaded it.
+  // sidebar has no picture, or an old one.
   bool NeedsReady() const;
   // This window's sidebar changed while it is behind its partner.
   void OnSidebarChanged();

@@ -256,12 +256,20 @@ void WorkspaceWindow::WithPartner(std::string_view id, WindowCallback found) {
 }
 
 WorkspaceWindow* WorkspaceWindow::Prepare(std::string_view id) {
+  return PrepareFor(id, /*page=*/true);
+}
+
+WorkspaceWindow* WorkspaceWindow::PrepareSidebar(std::string_view id) {
+  return PrepareFor(id, /*page=*/false);
+}
+
+WorkspaceWindow* WorkspaceWindow::PrepareFor(std::string_view id, bool page) {
   if (hidden_) {
     return nullptr;
   }
   for (WorkspaceWindow* partner : Partners()) {
     if (partner->workspace_ == id) {
-      partner->GoUnder(this);
+      partner->GoUnder(this, page);
       SetAnimates(false);
       return partner;
     }
@@ -433,7 +441,7 @@ void WorkspaceWindow::Reveal(base::OnceClosure revealed) {
   revealing_ = true;
   ++reveals_;
   shown->SetAnimates(false);
-  GoUnder(shown);
+  GoUnder(shown, /*page=*/true);
   const auto present = base::BindRepeating(
       [](base::WeakPtr<WorkspaceWindow> self,
          base::WeakPtr<WorkspaceWindow> shown, int reveal) {
@@ -512,7 +520,7 @@ void WorkspaceWindow::LoadActiveTab() {
   }
 }
 
-void WorkspaceWindow::GoUnder(WorkspaceWindow* shown) {
+void WorkspaceWindow::GoUnder(WorkspaceWindow* shown, bool page) {
   if (!hidden_) {
     return;
   }
@@ -520,12 +528,18 @@ void WorkspaceWindow::GoUnder(WorkspaceWindow* shown) {
   SetAnimates(false);
   SetSeen(false);
   window_->GetWindow()->SetBounds(shown->window_->GetWindow()->GetBounds());
+  // Chromium loads a page once it shows, so the window's contents stay hidden
+  // for a picture of its sidebar. Its views still draw.
+  if (!page) {
+    OrderBelow(shown);
+    return;
+  }
   SetContentsHidden(false);
   OrderBelow(shown);
-  content::WebContents* page =
+  content::WebContents* active =
       window_->GetTabStripModel()->GetActiveWebContents();
-  if (page && !page_drawing_) {
-    page_drawing_ = page->IncrementCapturerCount(
+  if (active && !page_drawing_) {
+    page_drawing_ = active->IncrementCapturerCount(
         gfx::Size(), /*stay_hidden=*/true, /*stay_awake=*/false,
         /*is_activity=*/false);
   }

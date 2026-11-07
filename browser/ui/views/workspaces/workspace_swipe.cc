@@ -29,7 +29,6 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/viz/common/frame_sinks/copy_output_request.h"
 #include "components/viz/common/frame_sinks/copy_output_result.h"
-#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -82,7 +81,7 @@ constexpr base::TimeDelta kCoverWait = base::Seconds(1);
 // The other workspace's window opens once its profile loads.
 constexpr base::TimeDelta kGiveUp = base::Seconds(5);
 // Getting the other workspaces ready starts this long after the window shows.
-// It waits no longer than this for a page to draw or load, and gives a
+// It waits no longer than this for the window's own page to draw, and gives a
 // workspace no longer than this in all.
 constexpr base::TimeDelta kReadyAfterShowing = base::Milliseconds(300);
 constexpr base::TimeDelta kReadyPageWait = base::Seconds(3);
@@ -92,12 +91,6 @@ constexpr base::TimeDelta kReadyGiveUp = base::Seconds(8);
 constexpr base::TimeDelta kStaleAfter = base::Seconds(1);
 
 bool g_ready_in_tests = false;
-
-// Whether Memory Saver unloaded `page`, which then stays unloaded until a
-// slide or a switch heads to it.
-bool UnloadedByMemorySaver(content::WebContents* page) {
-  return page && page->WasDiscarded() && page->GetController().NeedsReload();
-}
 
 // Copies `layer` when it next draws, and gives `done` the part `area` covers,
 // in the layer's coordinates. Null when the copy fails.
@@ -237,28 +230,20 @@ class PageCover : public views::View {
 BEGIN_METADATA(PageCover)
 END_METADATA
 
-// Runs `done` once `page` has drawn or stopped loading, or with
-// `until_loaded` once it has stopped loading, and at the latest after
-// `wait`.
+// Runs `done` once `page` has drawn or stopped loading, and at the latest
+// after `wait`.
 class PageWait : public content::WebContentsObserver {
  public:
   PageWait(content::WebContents* page,
-           bool until_loaded,
            base::TimeDelta wait,
            base::OnceClosure done)
-      : content::WebContentsObserver(page),
-        until_loaded_(until_loaded),
-        done_(std::move(done)) {
+      : content::WebContentsObserver(page), done_(std::move(done)) {
     timer_.Start(FROM_HERE, wait,
                  base::BindOnce(&PageWait::Done, base::Unretained(this)));
   }
 
   // content::WebContentsObserver:
-  void DidFirstVisuallyNonEmptyPaint() override {
-    if (!until_loaded_) {
-      Done();
-    }
-  }
+  void DidFirstVisuallyNonEmptyPaint() override { Done(); }
   void DidStopLoading() override { Done(); }
   void WebContentsDestroyed() override { Done(); }
 
@@ -276,7 +261,6 @@ class PageWait : public content::WebContentsObserver {
     }
   }
 
-  const bool until_loaded_;
   base::OnceClosure done_;
   base::OneShotTimer timer_;
   base::WeakPtrFactory<PageWait> weak_factory_{this};
@@ -1117,7 +1101,7 @@ void WorkspaceSwipe::GetReady() {
   if (page && page->IsLoading() &&
       !page->CompletedFirstVisuallyNonEmptyPaint()) {
     ready_wait_ =
-        std::make_unique<PageWait>(page, /*until_loaded=*/false, kReadyPageWait,
+        std::make_unique<PageWait>(page, kReadyPageWait,
                                    base::BindOnce(
                                        [](base::WeakPtr<WorkspaceSwipe> self) {
                                          if (self) {
@@ -1178,39 +1162,13 @@ void WorkspaceSwipe::OnReadyPartner(int step,
   if (step != ready_step_ || !ready_give_up_.IsRunning()) {
     return;
   }
-  // Going under this window shows its page, which then loads.
-  WorkspaceWindow* partner =
-      CanGetReady() && window != window_.get() &&
-              !UnloadedByMemorySaver(
-                  window->GetTabStripModel()->GetActiveWebContents())
-          ? WorkspaceWindow::From(window_)->Prepare(id)
-          : nullptr;
-  WorkspaceSwipe* other = partner ? From(partner->window()) : nullptr;
+  WorkspaceSwipe* other =
+      CanGetReady() && window != window_.get() ? From(window) : nullptr;
   if (!other) {
     EndReadyStep(step);
     return;
   }
-  // The picture waits for the page to load, so its tab shows how it ends up.
-  base::OnceClosure picture = base::BindOnce(&WorkspaceSwipe::TakeReadyPicture,
-                                             weak_factory_.GetWeakPtr(), step,
-                                             other->weak_factory_.GetWeakPtr());
-  content::WebContents* page =
-      partner->window()->GetTabStripModel()->GetActiveWebContents();
-  if (page && page->IsLoading()) {
-    ready_wait_ = std::make_unique<PageWait>(
-        page, /*until_loaded=*/true, kReadyPageWait, std::move(picture));
-    return;
-  }
-  std::move(picture).Run();
-}
-
-void WorkspaceSwipe::TakeReadyPicture(int step,
-                                      base::WeakPtr<WorkspaceSwipe> other) {
-  if (step != ready_step_ || !ready_give_up_.IsRunning()) {
-    return;
-  }
-  ready_wait_.reset();
-  if (!other) {
+  if (!WorkspaceWindow::From(window_)->PrepareSidebar(id)) {
     EndReadyStep(step);
     return;
   }
@@ -1225,10 +1183,8 @@ void WorkspaceSwipe::EndReadyStep(int step) {
   ++ready_step_;
   ready_give_up_.Stop();
   ready_wait_.reset();
-  if (sliding()) {
-    return;
-  }
-  if (WorkspaceWindow* shown = WorkspaceWindow::From(window_)) {
+  if (WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+      shown && !sliding()) {
     shown->Unprepare();
   }
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -1244,14 +1200,7 @@ void WorkspaceSwipe::StopReady() {
 }
 
 bool WorkspaceSwipe::NeedsReady() const {
-  content::WebContents* page =
-      window_->GetTabStripModel()->GetActiveWebContents();
-  // Its picture stays as it was.
-  if (UnloadedByMemorySaver(page)) {
-    return false;
-  }
-  return picture_.isNull() || stale_ ||
-         (page && page->GetController().NeedsReload());
+  return picture_.isNull() || stale_;
 }
 
 void WorkspaceSwipe::OnSidebarChanged() {
