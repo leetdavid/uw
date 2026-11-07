@@ -195,6 +195,58 @@ index 09b450d58aa84054c428be019c8671f10fd889ab..24755b7037ac046eaa4aebb231b84fdc
    NOTREACHED() << "Unsupported child process flags!";
  }
  #endif  // BUILDFLAG(IS_MAC)
+diff --git a/chrome/browser/component_updater/translate_kit_component_installer.cc b/chrome/browser/component_updater/translate_kit_component_installer.cc
+index 1bc53ebb8a64a7c195bee6bf274732bbc76b4eae..38356decf8b35471a7d3f6712909b7e3f5dcff84 100644
+--- a/chrome/browser/component_updater/translate_kit_component_installer.cc
++++ b/chrome/browser/component_updater/translate_kit_component_installer.cc
+@@ -223,7 +223,10 @@ void RegisterTranslateKitComponent(ComponentUpdateService* cus,
+ 
+   pref_service->SetBoolean(prefs::kTranslateKitPreviouslyRegistered, true);
+   // Clear any previously set path in the preferences
+-  SetBinaryPathInPrefs(pref_service, base::FilePath());
++  // uw: clears it for real. SetBinaryPathInPrefs(base::FilePath()) left the
++  // library's relative path, which the installer's IsInit() took for an
++  // installed library, so a translator made before the download failed.
++  pref_service->ClearPref(prefs::kTranslateKitBinaryPath);
+ 
+   auto installer = base::MakeRefCounted<ComponentInstaller>(
+       std::make_unique<TranslateKitComponentInstallerPolicy>(
+diff --git a/chrome/browser/component_updater/translate_kit_component_installer_unittest.cc b/chrome/browser/component_updater/translate_kit_component_installer_unittest.cc
+index ab6af077443529b59ce1274c5171d692b316832e..358077e3551ccf02be3a43ad393d42b471624493 100644
+--- a/chrome/browser/component_updater/translate_kit_component_installer_unittest.cc
++++ b/chrome/browser/component_updater/translate_kit_component_installer_unittest.cc
+@@ -222,6 +222,31 @@ TEST_F(RegisterTranslateKitComponentTest, ComponentRegistrationForceInstall) {
+       pref_service()->GetBoolean(prefs::kTranslateKitPreviouslyRegistered));
+ }
+ 
++// uw: until the library is installed, the path stays empty, so nothing takes
++// the library for installed.
++TEST_F(RegisterTranslateKitComponentTest,
++       ComponentRegistrationClearsThePathUntilInstalled) {
++  auto service =
++      std::make_unique<TranslateKitComponentMockComponentUpdateService>();
++  pref_service()->SetFilePath(prefs::kTranslateKitBinaryPath,
++                              install_dir().AppendASCII("old"));
++  scoped_refptr<update_client::CrxInstaller> installer;
++  EXPECT_CALL(*service, RegisterComponent)
++      .WillOnce([&](const ComponentRegistration& registration) {
++        installer = registration.installer;
++        return true;
++      });
++  EXPECT_CALL(*service, GetComponentIDs());
++  base::RunLoop run_loop;
++  RegisterTranslateKitComponent(service.get(), pref_service(),
++                                /*force_install=*/true,
++                                /*registered_callback=*/run_loop.QuitClosure(),
++                                /*on_ready_callback=*/base::DoNothing());
++  run_loop.Run();
++  EXPECT_TRUE(
++      pref_service()->GetFilePath(prefs::kTranslateKitBinaryPath).empty());
++}
++
+ TEST_F(RegisterTranslateKitComponentTest,
+        ComponentRegistrationForceInstallAlreadyRegistered) {
+   auto service =
 diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
 index 93efa759d535182ba84a7b5cd0563ab2de56303a..8764f79a059e531791097de0759f06d95cacf303 100644
 --- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
