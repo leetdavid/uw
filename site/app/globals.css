@@ -427,7 +427,7 @@ em {
     height: 64px;
   }
 
-  .links a:not(.get) {
+  .links > a:not(.get) {
     display: none;
   }
 }

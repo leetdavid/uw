@@ -5,6 +5,7 @@ import { Dock } from "./dock";
 import { Film } from "./film";
 import { Filmstrip, type Stop } from "./filmstrip";
 import { Favicon } from "./icons";
+import { Menu } from "./menu";
 import { Sidebar, type SidebarState } from "./sidebar";
 import { bike, launch, moved, sorted, tab, trip } from "./tabs";
 import "./home.css";
@@ -12,6 +13,12 @@ import "./home.css";
 const DOWNLOAD =
   "https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg";
 const REPO = "https://github.com/leetdavid/uw";
+const PAGES: [string, string][] = [
+  ["How it works", "#how"],
+  ["Features", "#features"],
+  ["Help", "/help"],
+  ["GitHub", REPO],
+];
 
 const working: SidebarState = {
   tasks: [
@@ -211,10 +218,11 @@ export default function Home() {
             uw
           </a>
           <div className="links">
-            <a href="#how">How it works</a>
-            <a href="#features">Features</a>
-            <a href="/help">Help</a>
-            <a href={REPO}>GitHub</a>
+            {PAGES.map(([label, href]) => (
+              <a key={href} href={href}>
+                {label}
+              </a>
+            ))}
             <a
               className="get"
               href={DOWNLOAD}
@@ -223,6 +231,7 @@ export default function Home() {
             >
               Download
             </a>
+            <Menu links={PAGES} />
           </div>
         </nav>
         <div className="copy">
