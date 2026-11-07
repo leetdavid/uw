@@ -57,7 +57,6 @@ source_set("report_issue") {
   deps = [
     ":release_version",
     "//base",
-    "//base/version_info",
     "//url",
   ]
 }

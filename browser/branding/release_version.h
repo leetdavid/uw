@@ -9,9 +9,13 @@
 namespace uw {
 
 // uw's own version, such as "0.1.0", which `pnpm run release` writes into the
-// app bundle. A development build carries Chromium's version there and has
-// none.
+// Mac app bundle and a Windows build's arguments. A development build has none.
 std::optional<std::string> ReleaseVersion();
+
+// Chromium's own version, such as "153.0.8010.53". A Windows release's build
+// has a four-part version of its own made from it, such as 153.0.8010.5312.
+// See docs/adr/0027-windows-uw-numbers-its-releases-from-chromiums-version.md.
+std::string ChromiumVersion();
 
 }  // namespace uw
 

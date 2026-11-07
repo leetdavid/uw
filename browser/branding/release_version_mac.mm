@@ -25,4 +25,8 @@ std::optional<std::string> ReleaseVersion() {
   return release;
 }
 
+std::string ChromiumVersion() {
+  return std::string(version_info::GetVersionNumber());
+}
+
 }  // namespace uw

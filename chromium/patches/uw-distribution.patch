@@ -676,6 +676,53 @@ diff --git a/chrome/chrome_elf/BUILD.gn b/chrome/chrome_elf/BUILD.gn
      "//sandbox/policy:win_hook_util",
      "//third_party/crashpad/crashpad/client",  # DumpWithoutCrash
    ]
+diff --git a/chrome/installer/setup/BUILD.gn b/chrome/installer/setup/BUILD.gn
+index 9635a435d6fdc568240daae2ce69c62c54d44904..91e1937d21d10a82260906cabcd673c32c6118b8 100644
+--- a/chrome/installer/setup/BUILD.gn
++++ b/chrome/installer/setup/BUILD.gn
+@@ -121,6 +121,7 @@ if (is_win) {
+       "//third_party/crashpad/crashpad/client",
+       "//third_party/crashpad/crashpad/util",
+       "//ui/base:fullscreen_win",
++      "//uw/browser/branding:release_buildflags",
+     ]
+ 
+     if (webnn_install_runtime_in_chrome_installer) {
+diff --git a/chrome/installer/setup/install_worker.cc b/chrome/installer/setup/install_worker.cc
+index b197e7addd13c401624630e11cbf7ed6fc755f75..d38aa225b8be63e6616e8d3f2174bca98f753769 100644
+--- a/chrome/installer/setup/install_worker.cc
++++ b/chrome/installer/setup/install_worker.cc
+@@ -40,6 +40,7 @@
+ #include "base/win/win_util.h"
+ #include "base/win/windows_version.h"
+ #include "build/branding_buildflags.h"
++#include "build/buildflag.h"
+ #include "chrome/install_static/buildflags.h"
+ #include "chrome/install_static/install_details.h"
+ #include "chrome/install_static/install_modes.h"
+@@ -71,6 +72,7 @@
+ #include "chrome/installer/util/shell_util.h"
+ #include "chrome/installer/util/util_constants.h"
+ #include "chrome/installer/util/work_item_list.h"
++#include "uw/browser/branding/release_buildflags.h"
+ 
+ #if BUILDFLAG(USE_GOOGLE_UPDATE_INTEGRATION)
+ #include "chrome/installer/setup/channel_override_work_item.h"
+@@ -644,9 +646,13 @@ void AddUninstallShortcutWorkItems(const InstallParams& install_params,
+     install_list->AddSetRegValueWorkItem(
+         reg_root, uninstall_reg, KEY_WOW64_32KEY, L"Version",
+         ASCIIToWide(new_version.GetString()), true);
++    // uw: Installed apps shows uw's own version, such as 0.1.11. See
++    // docs/plans/windows.md.
++    const std::string release = BUILDFLAG(UW_RELEASE_VERSION);
+     install_list->AddSetRegValueWorkItem(
+         reg_root, uninstall_reg, KEY_WOW64_32KEY, L"DisplayVersion",
+-        ASCIIToWide(new_version.GetString()), true);
++        ASCIIToWide(release.empty() ? new_version.GetString() : release),
++        true);
+     // TODO(wfh): Ensure that this value is preserved in the 64-bit hive when
+     // 64-bit installs place the uninstall information into the 64-bit registry.
+     install_list->AddSetRegValueWorkItem(reg_root, uninstall_reg,
 diff --git a/chrome/installer/setup/setup_main.cc b/chrome/installer/setup/setup_main.cc
 --- a/chrome/installer/setup/setup_main.cc
 +++ b/chrome/installer/setup/setup_main.cc
@@ -695,6 +742,18 @@ diff --git a/chrome/installer/setup/setup_main.cc b/chrome/installer/setup/setup
        }
      }
    }
+diff --git a/components/crash/core/app/BUILD.gn b/components/crash/core/app/BUILD.gn
+index 4234878aa567cb18410217bc99a7b0c54831ecb0..40eface5e37bd0981b6aa5c4b0d6fcfa599ab070 100644
+--- a/components/crash/core/app/BUILD.gn
++++ b/components/crash/core/app/BUILD.gn
+@@ -138,6 +138,7 @@ static_library("app") {
+       "//third_party/crashpad/crashpad/handler",
+       "//third_party/crashpad/crashpad/minidump",
+       "//third_party/crashpad/crashpad/util",
++      "//uw/browser/branding:release_buildflags",
+     ]
+   }
+ 
 diff --git a/components/crash/core/app/crashpad_mac.mm b/components/crash/core/app/crashpad_mac.mm
 index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366ddedc9bcd33 100644
 --- a/components/crash/core/app/crashpad_mac.mm
@@ -715,6 +774,38 @@ index 3b131e1fc804a55c80b3b2704686270211fcf9fb..8dede8ec39b711df16a896f6e5366dde
        process_annotations["plat"] = std::string("OS X");
      }  // @autoreleasepool
      return process_annotations;
+diff --git a/components/crash/core/app/crashpad_win.cc b/components/crash/core/app/crashpad_win.cc
+index a7af39181e259b4c793fa9a39cb95e4f86ac47d1..a96c745ebbc0b156577257d055bb0f5413608515 100644
+--- a/components/crash/core/app/crashpad_win.cc
++++ b/components/crash/core/app/crashpad_win.cc
+@@ -19,6 +19,7 @@
+ #include "base/win/windows_version.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
++#include "build/buildflag.h"
+ #include "components/app_launch_prefetch/app_launch_prefetch.h"
+ #include "components/crash/core/app/crash_export_thunks.h"
+ #include "components/crash/core/app/crash_reporter_client.h"
+@@ -26,6 +27,7 @@
+ #include "third_party/crashpad/crashpad/client/crashpad_client.h"
+ #include "third_party/crashpad/crashpad/client/crashpad_info.h"
+ #include "third_party/crashpad/crashpad/client/simulate_crash_win.h"
++#include "uw/browser/branding/release_buildflags.h"
+ 
+ namespace crash_reporter {
+ namespace internal {
+@@ -40,6 +42,11 @@ void GetPlatformCrashpadAnnotations(
+       exe_file, &product_name, &version, &special_build, &channel_name);
+   (*annotations)["prod"] = base::WideToUTF8(product_name);
+   (*annotations)["ver"] = base::WideToUTF8(version);
++  // uw: Sentry files a crash under the release that sent it, such as
++  // uw@0.1.11.
++  if (std::string release = BUILDFLAG(UW_RELEASE_VERSION); !release.empty()) {
++    (*annotations)["sentry[release]"] = "uw@" + release;
++  }
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+   // Empty means stable.
+   const bool allow_empty_channel = true;
 diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_ids.spec
 index 1ce535f4e6cad30605a64671044b2c42c8f6c3ea..b1782d82803bf29d7c082edf17c6a3242859b856 100644
 --- a/tools/gritsettings/resource_ids.spec
