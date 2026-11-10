@@ -452,6 +452,22 @@ bool ScheduledChats::Retry(const std::string& chat_id) {
   return true;
 }
 
+std::vector<std::string> ScheduledChats::ChatsToRetry() const {
+  std::vector<std::string> ids;
+  for (const auto& [id, chat] : chats_) {
+    if (CanRetry(id) && (!chat.paused || !chat.pause_reason.empty())) {
+      ids.push_back(id);
+    }
+  }
+  return ids;
+}
+
+void ScheduledChats::RetryAll() {
+  for (const std::string& id : ChatsToRetry()) {
+    Retry(id);
+  }
+}
+
 void ScheduledChats::RunNow(const std::string& chat_id, bool retry) {
   const auto chat = chats_.find(chat_id);
   if (ending_ || chat == chats_.end() || runs_.contains(chat_id)) {

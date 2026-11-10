@@ -1,0 +1,26 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index ac1e543651d9db1f38c353e3b9f7d9891e1e91ad..ddd4344576fa8c020f063edfbd712e9e397fc702 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -439,6 +439,7 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_WATCHING_THINGS" desc="Tooltip of the filled eye in the address bar on a page that several scheduled chats check, each for something else.">{COUNT, plural, other {Watching this page for # things}}</message>
+       <message name="IDS_UW_INBOX" desc="Tooltip and name of the button at the top of the sidebar that opens the Inbox, a list of every notification the user's scheduled chats sent. Also the Inbox's name in the task manager.">Inbox</message>
+       <message name="IDS_UW_INBOX_UNSEEN" desc="Tooltip and name of the Inbox button at the top of the sidebar while some of the notifications in the Inbox are unread.">{COUNT, plural, other {Inbox, # unread}}</message>
++      <message name="IDS_UW_RETRY_FAILED_SCHEDULED_CHATS_MAC" desc="In Title Case: Item in the Window menu and command in the command bar. Runs again, at once, every scheduled chat whose last run failed, except those the user paused. A scheduled chat is a chat that the browser's agent runs on a schedule, out of sight.">Retry Failed Scheduled Chats</message>
+       <message name="IDS_UW_THEME_MODE_AUTO" desc="Theme picker choice that follows the system's light or dark appearance.">Auto</message>
+       <message name="IDS_UW_THEME_MODE_LIGHT" desc="Theme picker choice for light mode.">Light</message>
+       <message name="IDS_UW_THEME_MODE_DARK" desc="Theme picker choice for dark mode.">Dark</message>
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index c3df67da8323cf7e44024c60aae94e92f8d7e261..7bf11d9a085ea3fc7915aacc1b263a21bdbec2ef 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -526,6 +526,9 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+               Item(IDS_TASK_MANAGER_MAC)
+                   .command_id(IDC_TASK_MANAGER_MAIN_MENU)
+                   .remove_if(is_pwa),
++              Item(IDS_UW_RETRY_FAILED_SCHEDULED_CHATS_MAC)
++                  .command_id(uw::kRetryFailedScheduledChats)
++                  .remove_if(is_pwa),
+               Item().is_separator()
+                   .remove_if(is_pwa),
+               Item(IDS_ALL_WINDOWS_FRONT_MAC)

@@ -1,5 +1,6 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <memory>
@@ -17,6 +18,7 @@
 #include "chrome/browser/notifications/notification_display_service_tester.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -31,6 +33,7 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/events/base_event_utils.h"
@@ -45,10 +48,14 @@
 #include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/agent/scripted_model.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/views/command_bar/command_bar.h"
+#include "uw/browser/ui/views/tab_organization/command_bar_commands.h"
 #include "uw/browser/ui/views/tab_organization/inbox_button.h"
+#include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/browser/workspaces/workspace_theme.h"
 #include "uw/components/ai_providers/providers.h"
@@ -150,6 +157,29 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_TRUE(base::test::RunUntil([&] { return !chats()->Running(id); }));
     EXPECT_TRUE(base::test::RunUntil([&] { return alerts()->Unread() == 1; }));
     return id;
+  }
+
+  // Watches the desk for `watch_for` with a first run that ends without a
+  // report, and so fails, and waits for that run to end.
+  std::string FailedWatch(std::string_view watch_for, bool muted = false) {
+    model_.Script({ScriptedModel::Answer("I looked around.")});
+    ScheduledChat watch;
+    watch.request = base::StrCat({"Watch the desk for this: ", watch_for});
+    watch.page = Desk().spec();
+    watch.watch_for = std::string(watch_for);
+    watch.provider_id = provider_;
+    watch.model = "test-agent";
+    watch.muted = muted;
+    const std::string id = chats()->Watch(watch);
+    EXPECT_TRUE(base::test::RunUntil(
+        [&] { return !chats()->Running(id) && chats()->Find(id)->failing; }));
+    return id;
+  }
+
+  // The chat's newest alert.
+  const ChatAlerts::Alert& NewestAlertOf(const std::string& chat_id) {
+    return *std::ranges::find(alerts()->alerts(), chat_id,
+                              &ChatAlerts::Alert::chat_id);
   }
 
   // Presses the Inbox button and returns the Inbox's page once it shows.
@@ -293,9 +323,13 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
       [&] { return button()->GetTooltipText() == u"Inbox, 1 unread"; }));
   SaveWindowScreenshot(browser(), "inbox-button-unread");
 
-  // Opening the Inbox leaves the alert unread.
+  // Opening the Inbox leaves the alert unread. Nothing failed, so there is no
+  // Retry all.
   content::WebContents* page = OpenTheInbox();
   ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
+  EXPECT_FALSE(
+      content::EvalJs(page, "!!document.querySelector('#inbox-retry-all')")
+          .ExtractBool());
   EXPECT_EQ(alerts()->Unread(), 1u);
   EXPECT_EQ(button()->GetTooltipText(), u"Inbox, 1 unread");
   EXPECT_NE(Text(page, "[data-alert]").find("Change alert"), std::string::npos);
@@ -371,6 +405,96 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
   EXPECT_EQ(alerts()->alerts()[0].what, "No change");
   EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('[data-retry]')")
                    .ExtractBool());
+}
+
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
+                       RetryAllRunsEveryFailedChatTheUserDidNotPause) {
+  const std::string desk = FailedWatch("Price drops below $500");
+  const std::string stock = FailedWatch("Back in stock");
+  const std::string muted = FailedWatch("New colors", /*muted=*/true);
+  const std::string paused = FailedWatch("Free shipping");
+  chats()->SetPaused(paused, true);
+  // Two more failed runs, and failures pause the schedule.
+  for (int i = 0; i < 2; ++i) {
+    chats()->CheckNow(stock);
+    ASSERT_TRUE(base::test::RunUntil([&] { return !chats()->Running(stock); }));
+  }
+  ASSERT_TRUE(chats()->Find(stock)->paused);
+  EXPECT_THAT(chats()->ChatsToRetry(),
+              testing::UnorderedElementsAre(desk, stock, muted));
+
+  // The muted chat left no alert, and the chat the user paused keeps its own
+  // Retry.
+  content::WebContents* page = OpenTheInbox();
+  ASSERT_TRUE(Shows(page, "#inbox-retry-all"));
+  EXPECT_EQ(Text(page, "#inbox-retry-all"), "Retry all (3)");
+  EXPECT_EQ(
+      content::EvalJs(page, "document.querySelectorAll('[data-retry]').length")
+          .ExtractInt(),
+      3);
+  SaveWidgetScreenshot(
+      views::Widget::GetWidgetForNativeView(page->GetNativeView()),
+      "inbox-retry-all");
+
+  model_.Script({ScriptedModel::Hang()});
+  const size_t asked = model_.Requests().size();
+  Click(page, "#inbox-retry-all");
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return model_.Requests().size() == asked + 3; }));
+  EXPECT_TRUE(chats()->Running(desk));
+  EXPECT_TRUE(chats()->Running(stock));
+  EXPECT_TRUE(chats()->Running(muted));
+  EXPECT_FALSE(chats()->Running(paused));
+  // The alerts that offered Retry for the runs are read; the paused chat's
+  // and the older failure of the chat failures paused are not.
+  EXPECT_TRUE(NewestAlertOf(desk).read);
+  EXPECT_EQ(NewestAlertOf(stock).what, "Paused");
+  EXPECT_TRUE(NewestAlertOf(stock).read);
+  EXPECT_FALSE(NewestAlertOf(paused).read);
+  EXPECT_EQ(alerts()->Unread(), 2u);
+  // Nothing is left to retry while the runs go, and the Inbox stays open.
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return !content::EvalJs(page,
+                            "!!document.querySelector('#inbox-retry-all')")
+                .ExtractBool();
+  }));
+  EXPECT_TRUE(button()->IsShowing());
+  SaveWidgetScreenshot(
+      views::Widget::GetWidgetForNativeView(page->GetNativeView()),
+      "inbox-retry-all-running");
+
+  // Stopped runs leave the chats failing, so Retry all comes back.
+  for (const std::string& id : {desk, stock, muted}) {
+    chats()->Stop(id);
+  }
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return Text(page, "#inbox-retry-all") == "Retry all (3)"; }));
+}
+
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
+                       RetryFailedScheduledChatsIsACommandWhileOneFailed) {
+  const auto listed = [&] {
+    return std::ranges::any_of(
+        ListCommandBarCommands(browser()), [](const CommandBar::Command& row) {
+          return row.id == kRetryFailedScheduledChats &&
+                 row.name == u"Retry Failed Scheduled Chats";
+        });
+  };
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kRetryFailedScheduledChats));
+  EXPECT_FALSE(listed());
+
+  const std::string id = FailedWatch("Price drops below $500");
+  EXPECT_TRUE(CanRunWindowCommand(browser(), kRetryFailedScheduledChats));
+  EXPECT_TRUE(listed());
+  EXPECT_FALSE(CanRunWindowCommand(CreateIncognitoBrowser(),
+                                   kRetryFailedScheduledChats));
+
+  model_.Script({ScriptedModel::Hang()});
+  chrome::ExecuteCommand(browser(), kRetryFailedScheduledChats);
+  EXPECT_TRUE(chats()->Running(id));
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kRetryFailedScheduledChats));
+  EXPECT_FALSE(listed());
+  chats()->Stop(id);
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AnAlertOpensItsPageOrItsChat) {

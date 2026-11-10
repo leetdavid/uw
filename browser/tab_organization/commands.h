@@ -45,7 +45,9 @@ enum WindowCommand {
   kMaximizePane,
   // Lists the tasks the selected tabs can move to, in the command bar.
   kMoveToTask,
-  kLastWindowCommand = kMoveToTask,
+  // Runs Retry on every failed scheduled chat the user hasn't paused.
+  kRetryFailedScheduledChats,
+  kLastWindowCommand = kRetryFailedScheduledChats,
 };
 
 bool IsWindowCommand(int command);

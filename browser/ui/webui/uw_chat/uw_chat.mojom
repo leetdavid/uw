@@ -759,6 +759,9 @@ interface InboxHandler {
   // Runs the chat of the alert `id` again at once, out of sight, and marks
   // the alert read. The Inbox stays open.
   Retry(string id);
+  // Runs every scheduled chat Retry all names again at once, and marks read
+  // each alert that offered Retry for one of them. The Inbox stays open.
+  RetryAll();
   MarkAllRead();
   ClearAll();
   // Opens uw://scheduled and closes the Inbox.
@@ -768,9 +771,13 @@ interface InboxHandler {
 
 // The Inbox's page.
 interface InboxPage {
-  // The alerts, newest first, and how many chats are scheduled: once the page
-  // connects, and again whenever either changes.
-  OnAlerts(array<InboxAlert> alerts, int32 scheduled, bool frosted);
+  // The alerts, newest first, how many chats are scheduled, and how many
+  // Retry all would run: once the page connects, and again whenever any of
+  // them changes.
+  OnAlerts(array<InboxAlert> alerts,
+           int32 scheduled,
+           int32 retry_all,
+           bool frosted);
 };
 
 // What uw's new tab page shows around its box. See

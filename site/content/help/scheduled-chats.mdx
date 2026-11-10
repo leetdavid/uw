@@ -84,7 +84,7 @@ Go to `uw://scheduled`, click **Scheduled** under **New chat** on a chat page, o
 
 The Inbox button sits at the top right of the sidebar. It keeps every notification your scheduled chats send, and its badge counts the unread ones. An unread alert has a dot after its time.
 
-<Figure caption="The Inbox, under its button at the top of the sidebar. A dot marks each unread alert, and a run that failed offers Retry.">
+<Figure caption="The Inbox, under its button at the top of the sidebar. A dot marks each unread alert, a run that failed offers Retry, and Retry all runs every failed chat again.">
   <Window height={340} cut>
     <Sidebar unread={2}>
       <Task name="Set up the home office" color="green">
@@ -97,6 +97,7 @@ The Inbox button sits at the top right of the sidebar. It keeps every notificati
     <Page address="mail.google.com" />
     <Popup top={44} left={40} width={340}>
       <Row title="Inbox">
+        <Accent>Retry all (1)</Accent>
         <Muted>Mark all read</Muted>
         <Muted>Clear all</Muted>
       </Row>
@@ -122,6 +123,7 @@ The Inbox button sits at the top right of the sidebar. It keeps every notificati
 - What you open from the Inbox, or from a notification, opens at the top of the Scratchpad.
 - Opening an alert marks it read. **Mark all read** marks every alert read.
 - An alert that says a run failed, such as **Couldn't check**, has **Retry** while the chat's last run failed. It runs the chat again now, and you hear how it went, even when nothing changed. On a schedule that three failures paused, a Retry that works resumes it. The failure's notification has **Retry** too.
+- **Retry all** in the Inbox's header runs every scheduled chat whose last run failed again at once, except the ones you paused. Its count includes muted chats, which leave no alerts. It's also **Retry Failed Scheduled Chats** in the command bar and, on the Mac, in the Window menu.
 - **Clear all** empties the Inbox. Deleting a chat removes its alerts.
 
 Private windows have no Inbox.

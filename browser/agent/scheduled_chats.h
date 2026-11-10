@@ -141,6 +141,11 @@ class ScheduledChats
   // can, and says whether it did. The run always tells how it went, and one
   // that works resumes a schedule that failures paused.
   bool Retry(const std::string& chat_id);
+  // The chats Retry all runs: each that CanRetry(), unless the user paused
+  // it. A schedule that failures paused is one of them.
+  std::vector<std::string> ChatsToRetry() const;
+  // Retries every chat ChatsToRetry() names, all at once.
+  void RetryAll();
   // Brings the tab a waiting run of `chat_id` waits in next to `chat_tab`,
   // in the user's window.
   void BringWaitingTab(const std::string& chat_id,

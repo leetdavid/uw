@@ -25,6 +25,7 @@
 #include "components/tabs/public/tab_interface.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
+#include "uw/browser/agent/scheduled_chats.h"
 #include "uw/browser/branding/report_issue.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
@@ -148,6 +149,10 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
     case kWatchThisPage:
       return window->GetActiveTabInterface() &&
              WatchCard::CanWatch(*window->GetActiveTabInterface());
+    case kRetryFailedScheduledChats: {
+      const ScheduledChats* chats = ScheduledChats::For(window->GetProfile());
+      return chats && !chats->ChatsToRetry().empty();
+    }
     default:
       return true;
   }
@@ -251,6 +256,9 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
       break;
     case kWatchThisPage:
       WatchCard::Open(window);
+      break;
+    case kRetryFailedScheduledChats:
+      ScheduledChats::For(window->GetProfile())->RetryAll();
       break;
     case kReportIssue:
       ShowSingletonTab(window, NewIssueUrl());

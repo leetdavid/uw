@@ -148,13 +148,20 @@ function Alert({ alert }: { alert: InboxAlert }) {
 function Inbox() {
   const [alerts, setAlerts] = useState<InboxAlert[] | null>(null);
   const [scheduled, setScheduled] = useState(0);
+  const [retryAll, setRetryAll] = useState(0);
   const [frosted, setFrosted] = useState(false);
   const shown = useRef(false);
   useEffect(() => {
     const id = inboxPage.onAlerts.addListener(
-      (next: InboxAlert[], count: number, glass: boolean) => {
+      (
+        next: InboxAlert[],
+        count: number,
+        retrying: number,
+        glass: boolean,
+      ) => {
         setAlerts(next);
         setScheduled(count);
+        setRetryAll(retrying);
         setFrosted(glass);
       },
     );
@@ -184,12 +191,29 @@ function Inbox() {
         className="flex max-h-[520px] w-[372px] flex-col p-1.5"
       >
         <header className="flex items-center justify-between py-1.5 pr-1 pl-2.5">
-          <h1 className="text-[15px] font-semibold">Inbox</h1>
+          <h1 className="mr-auto text-[15px] font-semibold">Inbox</h1>
+          {retryAll > 0 && (
+            <Button
+              id="inbox-retry-all"
+              variant="ghost"
+              size="compact"
+              leadingIcon={RefreshCw}
+              title={
+                retryAll === 1
+                  ? "Run the failed scheduled chat again"
+                  : `Run the ${retryAll} failed scheduled chats again`
+              }
+              className="text-[12.5px] text-primary hover:bg-primary/[0.08] hover:text-primary"
+              onClick={() => inboxHandler.retryAll()}
+            >
+              Retry all ({retryAll})
+            </Button>
+          )}
           <Button
             id="inbox-mark-read"
             variant="ghost"
             size="compact"
-            className="ml-auto text-[12.5px]"
+            className="text-[12.5px]"
             disabled={alerts.every((alert) => alert.read)}
             onClick={() => inboxHandler.markAllRead()}
           >

@@ -46,6 +46,7 @@ class UwInboxHandler : public mojom::InboxHandler,
   void OpenAlert(const std::string& id) override;
   void OpenChat(const std::string& id) override;
   void Retry(const std::string& id) override;
+  void RetryAll() override;
   void MarkAllRead() override;
   void ClearAll() override;
   void ShowScheduled() override;

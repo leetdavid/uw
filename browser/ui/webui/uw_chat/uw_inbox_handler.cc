@@ -98,6 +98,29 @@ void UwInboxHandler::Retry(const std::string& id) {
   }
 }
 
+void UwInboxHandler::RetryAll() {
+  ChatAlerts* alerts = alerts_.GetSource();
+  ScheduledChats* chats = schedules_.GetSource();
+  if (!alerts || !chats) {
+    return;
+  }
+  const std::vector<std::string> ids = chats->ChatsToRetry();
+  const std::set<std::string> retried(ids.begin(), ids.end());
+  // A chat's newest alert of a failed run is the one that offered Retry.
+  std::set<std::string> seen;
+  std::vector<std::string> offered;
+  for (const ChatAlerts::Alert& alert : alerts->alerts()) {
+    if (OffersRetry(alert.what) && seen.insert(alert.chat_id).second &&
+        retried.contains(alert.chat_id)) {
+      offered.push_back(alert.id);
+    }
+  }
+  for (const std::string& id : offered) {
+    alerts->MarkRead(id);
+  }
+  chats->RetryAll();
+}
+
 void UwInboxHandler::MarkAllRead() {
   if (ChatAlerts* alerts = alerts_.GetSource()) {
     alerts->MarkAllRead();
@@ -179,7 +202,7 @@ void UwInboxHandler::SendAlerts() {
   std::vector<mojom::InboxAlertPtr> sent;
   int scheduled = 0;
   if (!alerts || !index || !chats) {
-    page_->OnAlerts(std::move(sent), scheduled, false);
+    page_->OnAlerts(std::move(sent), scheduled, 0, false);
     return;
   }
   std::map<std::string, std::string> titles;
@@ -226,7 +249,9 @@ void UwInboxHandler::SendAlerts() {
     sent.push_back(std::move(shown));
   }
   BrowserWindowInterface* window = Window();
-  page_->OnAlerts(std::move(sent), scheduled, window && FrostsOver(window));
+  page_->OnAlerts(std::move(sent), scheduled,
+                  static_cast<int>(chats->ChatsToRetry().size()),
+                  window && FrostsOver(window));
 }
 
 }  // namespace uw
