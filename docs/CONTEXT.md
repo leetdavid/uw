@@ -275,8 +275,8 @@ The button that starts a run of a scheduled chat at once, outside its schedule. 
 _Avoid_: Run now, refresh.
 
 **Retry**:
-Check now, offered on the Inbox's newest error alert of a scheduled chat whose last run failed. Its run always sends an alert saying how it went.
-_Avoid_: Try again, rerun.
+Check now, offered on the Inbox's newest error alert of a scheduled chat whose last run failed. Its run always sends an alert saying how it went. Retry all does it at once for every such chat the user hasn't paused.
+_Avoid_: Try again, rerun, rerun all.
 
 **Trigger**:
 A command left running out of sight that wakes its chat once when it ends, or once for each line it prints. In a scheduled chat each wake starts a run.

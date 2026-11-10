@@ -299,6 +299,13 @@ Agreed on 2026-11-03: [Retry](CONTEXT.md#language) is Check now on a failed sche
 - The new tab page's rows have no Retry.
 - The frames "Retry: the Inbox (Fluid)" and "Retry: every state (Fluid)" have its states. The user signed them off on 2026-11-03.
 
+Agreed on 2026-11-10: Retry all runs Retry at once on every scheduled chat whose last run failed, unless the user paused it or a run of it is under way.
+
+- It includes muted chats, which stay silent, and chats with no alert left in the Inbox. A schedule that failures paused counts; one the user paused does not.
+- The Inbox's header has it before Mark all read, with how many chats it runs, such as "Retry all (3)". It shows only while at least one chat can retry.
+- A click marks read each alert that offered Retry, and the Inbox stays open. Each run sends its alert, as Retry's does.
+- The command bar has Retry Failed Scheduled Chats while a chat can retry. On the Mac it is also in the Window menu, after Task Manager, dimmed when no chat can retry. Neither has a key, and running it shows nothing more than the runs' alerts.
+
 Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
 
 - It lists each scheduled chat once, in two sections: "Watched pages" first, then "Scheduled chats", which also holds chats with a running trigger, as the filter did. An empty section is left out. The header has Pause all.

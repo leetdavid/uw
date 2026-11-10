@@ -383,6 +383,7 @@ Tickets are concrete pieces of work. Status values: `backlog`, `todo`, `in progr
 | T372 | The installer refuses Windows 10 | backlog | 8/10 | Windows uw installs only on Windows 11, per the [Windows plan](windows.md#distribution). |
 | T373 | Help follows the reader's system | backlog | 5/10 | Keys and steps show for Mac or Windows, with a switch at the top of Help, per the [Windows plan](windows.md#distribution). |
 | T374 | winget | backlog | 7/10 | `winget install uwbrowser.uw`, with `pnpm run release` opening the pull request to `winget-pkgs` for each release, per the [Windows plan](windows.md#distribution). |
+| T375 | Retry all | in progress | 8/10 | Asked by the owner on 2026-11-10 and agreed the same day in a grilling session: Retry all (3) in the Inbox's header, Retry Failed Scheduled Chats in the command bar and the Mac's Window menu, each running Retry on every failing chat the user hasn't paused, per [Scheduled chats](../product.md#scheduled-chats). The states go on the canvas page with the Inbox frames first, and building waits for the user's sign-off. Done when browser tests cover the button's count and hiding, a click running every failing chat but those the user paused and marking their alerts read, and the command left out when no chat can retry, and the [Help](../../site/content/help/scheduled-chats.mdx) page and its Inbox figure show Retry all. |
 
 ## 1. Choose the browser foundation
 
@@ -590,6 +591,7 @@ Feature scope and agreed behavior are recorded in [Product](../product.md).
 | [A chat sets up a watch, and several watches per page](../product.md#scheduled-chats) | 6/10 | The tool and the chat's card pass one more field through code that exists. Several watches change the eye's bubble, which is Chromium views code with its own sizing. |
 | [Scheduled page and Inbox](../product.md#scheduled-chats) | 6/10 | The page and the alerts reuse the watch card's and the chat page's parts. The Inbox button goes into Chromium's vertical tab strip top and the floating sidebar, which costs patch upkeep. |
 | [Network retries, catch-up after a lost connection, and Retry](../product.md#scheduled-chats) | 6/10 | Chromium's loader already retries on a network change, and Chromium reports when the connection returns. Retry reuses Check now but adds a button to chat notifications, a run that always reports, and a resume. |
+| [Retry all](../product.md#scheduled-chats) | 8/10 | Each chat's Retry exists. New are one Inbox call, one window command, and a Window menu item, which costs patch upkeep. |
 | [Triggers](../product.md#scheduled-chats) | 5/10 | Commands left running out of sight, restarted at launch, with output that wakes a chat without flooding it. |
 | [Page prompts and element selection](../product.md#prompt-built-extensions) | 8/10 | Selecting and describing the intended page content. |
 | [Prompt-built extensions and site customization](../product.md#prompt-built-extensions) | 5/10 | Generating working changes across different sites and coding tools. |
