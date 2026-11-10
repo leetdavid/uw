@@ -305,6 +305,7 @@ Agreed on 2026-11-10: Retry all runs Retry at once on every scheduled chat whose
 - The Inbox's header has it before Mark all read, with how many chats it runs, such as "Retry all (3)". It shows only while at least one chat can retry.
 - A click marks read each alert that offered Retry, and the Inbox stays open. Each run sends its alert, as Retry's does.
 - The command bar has Retry Failed Scheduled Chats while a chat can retry. On the Mac it is also in the Window menu, after Task Manager, dimmed when no chat can retry. Neither has a key, and running it shows nothing more than the runs' alerts.
+- The frame "Retry all: the Inbox (Fluid)" has its states.
 
 Agreed on 2026-10-28: the Scheduled page, `uw://scheduled`, replaces the Scheduled filter of the chat page's chat list.
 
