@@ -21,6 +21,8 @@
 #include "uw/components/agent/trigger.h"
 #include "uw/components/terminal/shell_host.h"
 
+class GURL;
+
 namespace actor {
 class ActorKeyedService;
 class ToolRequest;
@@ -238,6 +240,10 @@ class AgentTools {
   // The terminal tab a run uses: the one `args` names, else the agent's
   // first one. 0 when the run opens a new one, and -1 with `error` set.
   int TerminalFor(const base::DictValue& args, std::string& error);
+  // Opens `url` in a background tab as a link from the chat's tab, so the
+  // new tab nests under it. Nothing when the chat's tab is closed or no tab
+  // opened.
+  tabs::TabInterface* OpenFromChat(const GURL& url);
   // Opens a terminal tab under the chat and answers with its number, or 0.
   int OpenTerminal();
   // The folder of terminal tab `number` as the user reads it, such as

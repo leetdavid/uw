@@ -9,6 +9,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 
@@ -17,10 +18,6 @@ namespace {
 // Longer messages are cut, so a run's line and notification stay short.
 constexpr size_t kMaxMessageLength = 300;
 constexpr size_t kMaxValues = 10;
-
-base::DictValue Parameter(std::string_view type, std::string_view description) {
-  return base::DictValue().Set("type", type).Set("description", description);
-}
 
 std::string When(base::Time time) {
   return base::UnlocalizedTimeFormatWithPattern(time, "EEEE d MMMM y, HH:mm");
@@ -61,29 +58,35 @@ base::expected<TrackedValue, std::string> ParseValue(const base::Value& value) {
 base::DictValue ReportToolSchema() {
   base::DictValue value_properties =
       base::DictValue()
-          .Set("name", Parameter("string",
-                                 "A short name, such as price or in_stock. Use "
-                                 "the names earlier runs used."))
-          .Set("unit", Parameter("string", "Such as USD. Leave out when none."))
-          .Set("number", Parameter("number", "The value, when it is a number."))
-          .Set("yes", Parameter("boolean", "The value, when it is yes or no."))
-          .Set("text", Parameter("string", "The value, when it is text."));
+          .Set("name",
+               ToolParameter("string",
+                             "A short name, such as price or in_stock. Use "
+                             "the names earlier runs used."))
+          .Set("unit",
+               ToolParameter("string", "Such as USD. Leave out when none."))
+          .Set("number",
+               ToolParameter("number", "The value, when it is a number."))
+          .Set("yes",
+               ToolParameter("boolean", "The value, when it is yes or no."))
+          .Set("text", ToolParameter("string", "The value, when it is text."));
   base::DictValue properties =
       base::DictValue()
-          .Set("found",
-               Parameter("boolean",
-                         "True only when this run found what the user asked "
-                         "to hear about, such as a lower price or a new "
-                         "story."))
+          .Set("found", ToolParameter(
+                            "boolean",
+                            "True only when this run found what the user asked "
+                            "to hear about, such as a lower price or a new "
+                            "story."))
           .Set("message",
-               Parameter("string",
-                         "One or two short sentences for the user about what "
-                         "this run found."))
+               ToolParameter(
+                   "string",
+                   "One or two short sentences for the user about what "
+                   "this run found."))
           .Set("sign_in",
-               Parameter("string",
-                         "The site, such as fully.com, when it wants the user "
-                         "to sign in before you can do the request. Leave out "
-                         "otherwise."))
+               ToolParameter(
+                   "string",
+                   "The site, such as fully.com, when it wants the user "
+                   "to sign in before you can do the request. Leave out "
+                   "otherwise."))
           .Set(
               "values",
               base::DictValue()
@@ -96,21 +99,11 @@ base::DictValue ReportToolSchema() {
                            .Set("type", "object")
                            .Set("properties", std::move(value_properties))
                            .Set("required", base::ListValue().Append("name"))));
-  return base::DictValue()
-      .Set("type", "function")
-      .Set("function",
-           base::DictValue()
-               .Set("name", kReportTool)
-               .Set("description",
+  return ToolSchema(kReportTool,
                     "Reports what this scheduled run found. Call it once, "
-                    "when you are done, before your last reply.")
-               .Set("parameters",
-                    base::DictValue()
-                        .Set("type", "object")
-                        .Set("properties", std::move(properties))
-                        .Set("required",
-                             base::ListValue().Append("found").Append(
-                                 "message"))));
+                    "when you are done, before your last reply.",
+                    std::move(properties),
+                    base::ListValue().Append("found").Append("message"));
 }
 
 base::expected<RunReport, std::string> ParseReport(

@@ -35,6 +35,16 @@ struct ModelTurn {
 // tabs run a shell on the Mac only so far; see docs/plans/windows.md.
 inline constexpr bool kAgentHasTerminal = BUILDFLAG(IS_MAC);
 
+// A tool as a model is told about it: its name, what it does, its
+// parameters, and the names of those a call must give.
+base::DictValue ToolSchema(std::string_view name,
+                           std::string_view description,
+                           base::DictValue properties,
+                           base::ListValue required);
+// One parameter of a tool.
+base::DictValue ToolParameter(std::string_view type,
+                              std::string_view description);
+
 // The tools of browser/agent/agent_tools.h, and recall, as a model is told
 // about them.
 base::ListValue AgentToolSchemas();
@@ -43,6 +53,8 @@ base::DictValue AgentInstructions();
 base::DictValue UserMessage(std::string_view text);
 // The model's turn as it goes back into the conversation.
 base::DictValue AssistantMessage(const ModelTurn& turn);
+// What a tool answers when it could not do what was asked.
+base::DictValue ToolError(std::string_view message);
 // A tool's answer to `call_id`.
 base::DictValue ToolMessage(std::string_view call_id,
                             const base::DictValue& result);

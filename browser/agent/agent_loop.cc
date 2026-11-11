@@ -51,10 +51,6 @@ constexpr int64_t kCharsPerToken = 3;
 // A file of a skill larger than this is not read.
 constexpr size_t kMaxSkillFile = 256 * 1024;
 
-base::DictValue Error(std::string_view message) {
-  return base::DictValue().Set("error", message);
-}
-
 // What the skill tool answers: a skill's instructions, or with `file`, that
 // file of the skill's folder. Blocks.
 base::DictValue ReadSkill(base::FilePath path,
@@ -63,7 +59,7 @@ base::DictValue ReadSkill(base::FilePath path,
   std::string text;
   if (!base::ReadFileToStringWithMaxSize(path, &text, kMaxSkillFile) ||
       !base::IsStringUTF8(text)) {
-    return Error("That file of the skill cannot be read as text.");
+    return ToolError("That file of the skill cannot be read as text.");
   }
   if (file) {
     return base::DictValue()
@@ -435,7 +431,7 @@ void AgentLoop::RunCall(ModelTurn turn, size_t index) {
   if (call.name == "save_skill") {
     if (!save_skill_) {
       OnTool(std::move(turn), index, std::move(*args),
-             Error("Skills cannot be saved here."));
+             ToolError("Skills cannot be saved here."));
       return;
     }
     base::DictValue asked = args->Clone();
@@ -476,7 +472,7 @@ void AgentLoop::CheckTabStep(ModelTurn turn,
   // A run has nobody to show a tab to.
   if (turn.calls[index].name == kSelectTool && report_) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("There is no tool called select."));
+           ToolError("There is no tool called select."));
     return;
   }
   const std::string name = turn.calls[index].name;
@@ -657,7 +653,7 @@ void AgentLoop::OnToolCalled(ModelTurn turn,
     return;
   }
   if (refused) {
-    result = Error(
+    result = ToolError(
         "The user did not approve acting on this site, so the step did not "
         "happen.");
     if (!refused->note.empty()) {
@@ -699,8 +695,8 @@ void AgentLoop::OnApproval(ModelTurn turn,
       }
       return;
     case ApprovalAnswer::Choice::kDecline: {
-      base::DictValue result =
-          Error("The user did not approve this step, so it did not happen.");
+      base::DictValue result = ToolError(
+          "The user did not approve this step, so it did not happen.");
       if (!answer.note.empty()) {
         result.Set("user_said", answer.note);
       }
@@ -770,8 +766,8 @@ void AgentLoop::LoadConnector(ModelTurn turn,
            : connectors_.end();
   if (connector == connectors_.end()) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("There is no connector by that name. Use a name from the "
-                 "list."));
+           ToolError("There is no connector by that name. Use a name from the "
+                     "list."));
     return;
   }
   context_->LoadConnector(*name);
@@ -817,7 +813,7 @@ void AgentLoop::OnConnectorAnswer(
     base::DictValue args,
     base::expected<mcp::Content, std::string> answer) {
   if (!answer.has_value()) {
-    OnTool(std::move(turn), index, std::move(args), Error(answer.error()));
+    OnTool(std::move(turn), index, std::move(args), ToolError(answer.error()));
     return;
   }
   base::DictValue result;
@@ -849,7 +845,7 @@ void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {
   const auto skill = name ? skills_.find(*name) : skills_.end();
   if (skill == skills_.end()) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("There is no such skill. Use a name from the list."));
+           ToolError("There is no such skill. Use a name from the list."));
     return;
   }
   base::FilePath path = skill->second;
@@ -859,7 +855,7 @@ void AgentLoop::LoadSkill(ModelTurn turn, size_t index, base::DictValue args) {
     if (relative.empty() || relative.IsAbsolute() ||
         relative.ReferencesParent()) {
       OnTool(std::move(turn), index, std::move(args),
-             Error("file must be a path inside the skill's folder."));
+             ToolError("file must be a path inside the skill's folder."));
       return;
     }
     path = path.DirName().Append(relative);
@@ -882,7 +878,7 @@ void AgentLoop::RunMemoryTool(ModelTurn turn,
   MemoryStore* store = MemoryStore::For(profile_);
   if (use == MemoryUse::kOff || !store) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("Memory is off for this chat."));
+           ToolError("Memory is off for this chat."));
     return;
   }
   if (name == kSearchMemoryTool) {
@@ -891,7 +887,7 @@ void AgentLoop::RunMemoryTool(ModelTurn turn,
         text ? MemorySearchWords(*text) : std::vector<std::string>();
     if (words.empty()) {
       OnTool(std::move(turn), index, std::move(args),
-             Error("Pass several words to look for."));
+             ToolError("Pass several words to look for."));
       return;
     }
     base::DictValue asked = args.Clone();
@@ -903,14 +899,14 @@ void AgentLoop::RunMemoryTool(ModelTurn turn,
   }
   if (use != MemoryUse::kRecallAndKeep) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("This run cannot keep or forget memories."));
+           ToolError("This run cannot keep or forget memories."));
     return;
   }
   if (name == kForgetTool) {
     const std::optional<double> id = args.FindDouble("id");
     if (!id) {
       OnTool(std::move(turn), index, std::move(args),
-             Error("Pass the memory's id."));
+             ToolError("Pass the memory's id."));
       return;
     }
     base::DictValue asked = args.Clone();
@@ -925,8 +921,8 @@ void AgentLoop::RunMemoryTool(ModelTurn turn,
       text ? OneLine(*text, kMaxMemoryLength + 1) : std::string();
   if (memory.empty() || memory.size() > kMaxMemoryLength) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("Pass the memory as one plain sentence of at most 300 "
-                 "characters."));
+           ToolError("Pass the memory as one plain sentence of at most 300 "
+                     "characters."));
     return;
   }
   MemoryCheckInput input;
@@ -963,9 +959,9 @@ void AgentLoop::OnMemoryCheck(std::optional<QuickCheck::Answer> answer) {
              : std::nullopt);
   MemoryStore* store = MemoryStore::For(profile_);
   if (!verdict.keep || !store) {
-    OnTool(
-        std::move(check->turn), check->index, std::move(check->args),
-        Error(verdict.keep ? "Memory is off for this chat." : verdict.reason));
+    OnTool(std::move(check->turn), check->index, std::move(check->args),
+           ToolError(verdict.keep ? "Memory is off for this chat."
+                                  : verdict.reason));
     return;
   }
   const std::string text =
@@ -985,7 +981,7 @@ void AgentLoop::OnKept(
     base::DictValue args,
     base::expected<MemoryStore::KeepResult, std::string> kept) {
   if (!kept.has_value()) {
-    OnTool(std::move(turn), index, std::move(args), Error(kept.error()));
+    OnTool(std::move(turn), index, std::move(args), ToolError(kept.error()));
     return;
   }
   base::DictValue result;
@@ -1002,7 +998,7 @@ void AgentLoop::OnForgot(ModelTurn turn,
                          std::optional<Memory> forgot) {
   if (!forgot) {
     OnTool(std::move(turn), index, std::move(args),
-           Error("There is no memory by that id."));
+           ToolError("There is no memory by that id."));
     return;
   }
   OnTool(std::move(turn), index, std::move(args),

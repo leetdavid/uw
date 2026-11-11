@@ -6,9 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/strings/strcat.h"
@@ -118,22 +116,35 @@ base::ListValue ValuesValue(const std::vector<TrackedValue>& values) {
   return list;
 }
 
-std::optional<base::DictValue> ReadSchedules(const base::FilePath& path) {
-  std::string json;
-  if (!base::ReadFileToString(path, &json)) {
-    return std::nullopt;
-  }
-  return base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+// A run's line in its chat.
+base::DictValue RunLine(base::Time when,
+                        RunEnd end,
+                        const ChatRun::Outcome& outcome,
+                        bool found,
+                        std::string_view what,
+                        bool counted,
+                        bool paused,
+                        std::string_view trigger) {
+  return base::DictValue()
+      .Set("kind", "run")
+      .Set("time", base::TimeToValue(when))
+      .Set("end", NameOf(end))
+      .Set("found", found)
+      .Set("text",
+           end == RunEnd::kReported ? outcome.report.message : outcome.error)
+      .Set("values", ValuesValue(outcome.report.values))
+      .Set("sign_in", outcome.report.sign_in)
+      .Set("what", what)
+      .Set("counted", counted)
+      .Set("paused", paused)
+      .Set("steps", StepsValue(outcome.steps))
+      .Set("trigger", trigger)
+      .Set("usage", RunUsageValue(outcome.usage));
 }
 
 // Adds `lines` to the end of the saved chat in `file`, when there is one.
 void AppendToChat(const base::FilePath& file, base::ListValue lines) {
-  std::string json;
-  if (!base::ReadFileToString(file, &json)) {
-    return;
-  }
-  std::optional<base::DictValue> chat =
-      base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+  std::optional<base::DictValue> chat = ChatFile::Read(file);
   if (!chat) {
     return;
   }
@@ -190,7 +201,7 @@ ScheduledChats::ScheduledChats(Profile* profile)
       monitor.BindNewPipeAndPassReceiver());
   monitor->AddClient(time_zone_receiver_.BindNewPipeAndPassRemote());
   ChatFile::Sequence()->PostTaskAndReplyWithResult(
-      FROM_HERE, base::BindOnce(&ReadSchedules, writer_.path()),
+      FROM_HERE, base::BindOnce(&ChatFile::Read, writer_.path()),
       base::BindOnce(&ScheduledChats::OnLoaded, weak_factory_.GetWeakPtr()));
 }
 
@@ -789,22 +800,8 @@ void ScheduledChats::OnTriggerRunDone(const std::string& chat_id,
   const RunEnd end = EndOf(outcome.kind);
   const bool found = end == RunEnd::kReported && outcome.report.found;
   base::ListValue lines;
-  lines.Append(base::DictValue()
-                   .Set("kind", "run")
-                   .Set("time", base::TimeToValue(when))
-                   .Set("end", NameOf(end))
-                   .Set("found", found)
-                   .Set("text", end == RunEnd::kReported
-                                    ? outcome.report.message
-                                    : outcome.error)
-                   .Set("values", ValuesValue(outcome.report.values))
-                   .Set("sign_in", outcome.report.sign_in)
-                   .Set("what", found ? "Trigger" : "")
-                   .Set("counted", false)
-                   .Set("paused", false)
-                   .Set("steps", StepsValue(outcome.steps))
-                   .Set("trigger", command)
-                   .Set("usage", RunUsageValue(outcome.usage)));
+  lines.Append(RunLine(when, end, outcome, found, found ? "Trigger" : "",
+                       /*counted=*/false, /*paused=*/false, command));
   AddLines(chat_id, std::move(lines));
   // Only what is worth telling wakes the chat's model and the user.
   if (found) {
@@ -843,11 +840,9 @@ void ScheduledChats::AddLines(const std::string& chat_id,
     return;
   }
   ChatFile::Sequence()->PostTask(
-      FROM_HERE,
-      base::BindOnce(&AppendToChat,
-                     ChatFile::FolderFor(profile_->GetPath())
-                         .AppendASCII(base::StrCat({chat_id, ".json"})),
-                     std::move(lines)));
+      FROM_HERE, base::BindOnce(&AppendToChat,
+                                ChatFile::PathFor(profile_->GetPath(), chat_id),
+                                std::move(lines)));
 }
 
 bool ScheduledChats::OnWake(const std::string& chat_id,
@@ -958,22 +953,8 @@ void ScheduledChats::OnRunDone(const std::string& chat_id,
     lines.Append(
         base::DictValue().Set("kind", "run_skipped").Set("count", skipped));
   }
-  lines.Append(base::DictValue()
-                   .Set("kind", "run")
-                   .Set("time", base::TimeToValue(when))
-                   .Set("end", NameOf(end))
-                   .Set("found", outcome.report.found)
-                   .Set("text", end == RunEnd::kReported
-                                    ? outcome.report.message
-                                    : outcome.error)
-                   .Set("values", ValuesValue(outcome.report.values))
-                   .Set("sign_in", outcome.report.sign_in)
-                   .Set("what", effect.what)
-                   .Set("counted", effect.counted)
-                   .Set("paused", effect.paused)
-                   .Set("steps", StepsValue(outcome.steps))
-                   .Set("trigger", trigger)
-                   .Set("usage", RunUsageValue(outcome.usage)));
+  lines.Append(RunLine(when, end, outcome, outcome.report.found, effect.what,
+                       effect.counted, effect.paused, trigger));
   AddLines(chat_id, std::move(lines));
   if (!effect.what.empty()) {
     Notify(chat_id, effect.what, effect.text);
@@ -1009,10 +990,8 @@ void ScheduledChats::Notify(const std::string& chat_id,
   }
   std::string title;
   if (const ChatIndex* index = index_observation_.GetSource()) {
-    for (const ChatIndex::Entry& entry : index->Entries()) {
-      if (entry.id == chat_id) {
-        title = entry.title;
-      }
+    if (const ChatIndex::Entry* entry = index->Find(chat_id)) {
+      title = entry->title;
     }
   }
   NotifyAboutChat(profile_, chat_id, title, what, text, OffersRetry(what));

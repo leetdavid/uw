@@ -28,6 +28,9 @@ class ChatFile {
   static std::string NewChatId();
   // Where a profile keeps its chats.
   static base::FilePath FolderFor(const base::FilePath& profile_path);
+  // The file of the chat `id`.
+  static base::FilePath PathFor(const base::FilePath& profile_path,
+                                std::string_view id);
   // Where uw keeps copies of the files attached to the chat `id`: beside the
   // profiles, not in one, so a path the agent gets leads away from the
   // profile's cookies and passwords. See ADR 0020.
@@ -36,6 +39,9 @@ class ChatFile {
   // The one sequence that reads and writes chats, so a page that loads a
   // chat again reads it after the writes before.
   static const scoped_refptr<base::SequencedTaskRunner>& Sequence();
+  // Reads the JSON file at `path`. Nothing when it cannot be read or is not
+  // a dictionary. Blocks.
+  static std::optional<base::DictValue> Read(const base::FilePath& path);
 
   ChatFile(const base::FilePath& profile_path, std::string_view id);
   ChatFile(const ChatFile&) = delete;

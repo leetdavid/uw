@@ -60,6 +60,8 @@ struct TrackedName {
 struct PastRun {
   base::Time time;
   RunReport report;
+
+  bool operator==(const PastRun&) const = default;
 };
 
 // The report tool, as a model is told about it.

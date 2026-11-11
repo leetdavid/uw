@@ -3,6 +3,7 @@
 #ifndef UW_BROWSER_AGENT_CHAT_INDEX_H_
 #define UW_BROWSER_AGENT_CHAT_INDEX_H_
 
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -59,6 +60,8 @@ class ChatIndex : public base::SupportsUserData::Data {
   bool loaded() const { return loaded_; }
   // Newest first.
   std::vector<Entry> Entries() const;
+  // The chat `id`, when the index has it.
+  const Entry* Find(std::string_view id) const;
   void Update(Entry entry);
   // The user saw how the unread chat `id` ended, away from its page.
   void MarkRead(std::string_view id);
@@ -77,7 +80,7 @@ class ChatIndex : public base::SupportsUserData::Data {
   const base::FilePath folder_;
   base::ImportantFileWriter writer_;
   bool loaded_ = false;
-  std::map<std::string, Entry> entries_;
+  std::map<std::string, Entry, std::less<>> entries_;
   std::set<std::string, std::less<>> deleted_;
   base::ObserverList<Observer> observers_;
   base::WeakPtrFactory<ChatIndex> weak_factory_{this};

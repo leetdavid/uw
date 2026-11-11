@@ -16,23 +16,6 @@
 #include "base/uuid.h"
 
 namespace uw {
-namespace {
-
-base::FilePath PathFor(const base::FilePath& profile_path,
-                       std::string_view id) {
-  return ChatFile::FolderFor(profile_path)
-      .AppendASCII(base::StrCat({id, ".json"}));
-}
-
-std::optional<base::DictValue> Read(const base::FilePath& path) {
-  std::string json;
-  if (!base::ReadFileToString(path, &json)) {
-    return std::nullopt;
-  }
-  return base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
-}
-
-}  // namespace
 
 // static
 bool ChatFile::IsChatId(std::string_view id) {
@@ -50,6 +33,12 @@ base::FilePath ChatFile::FolderFor(const base::FilePath& profile_path) {
 }
 
 // static
+base::FilePath ChatFile::PathFor(const base::FilePath& profile_path,
+                                 std::string_view id) {
+  return FolderFor(profile_path).AppendASCII(base::StrCat({id, ".json"}));
+}
+
+// static
 base::FilePath ChatFile::FilesFolderFor(const base::FilePath& profile_path,
                                         std::string_view id) {
   return profile_path.DirName().AppendASCII("Chat files").AppendASCII(id);
@@ -64,6 +53,15 @@ const scoped_refptr<base::SequencedTaskRunner>& ChatFile::Sequence() {
   return *sequence;
 }
 
+// static
+std::optional<base::DictValue> ChatFile::Read(const base::FilePath& path) {
+  std::string json;
+  if (!base::ReadFileToString(path, &json)) {
+    return std::nullopt;
+  }
+  return base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+}
+
 ChatFile::ChatFile(const base::FilePath& profile_path, std::string_view id)
     : writer_(PathFor(profile_path, id), Sequence()) {
   Sequence()->PostTask(
@@ -75,7 +73,8 @@ ChatFile::~ChatFile() = default;
 
 void ChatFile::Load(Loaded done) {
   Sequence()->PostTaskAndReplyWithResult(
-      FROM_HERE, base::BindOnce(&Read, writer_.path()), std::move(done));
+      FROM_HERE, base::BindOnce(&ChatFile::Read, writer_.path()),
+      std::move(done));
 }
 
 void ChatFile::Save(const base::DictValue& chat) {

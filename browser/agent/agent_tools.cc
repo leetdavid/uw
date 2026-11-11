@@ -39,6 +39,7 @@
 #include "url/origin.h"
 #include "url/url_constants.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/tab_tools.h"
 
 namespace uw {
@@ -47,10 +48,6 @@ namespace {
 // About 5,000 words: most of a long article, and still a modest part of a
 // model's context.
 constexpr size_t kMaxPageText = 30000;
-
-base::DictValue Error(std::string_view message) {
-  return base::DictValue().Set("error", message);
-}
 
 std::string Refusal(const actor::mojom::ActionResult& result) {
   if (result.code ==
@@ -201,7 +198,7 @@ void AgentTools::Call(std::string_view tool,
   if (IsTabTool(tool)) {
     tabs::TabInterface* chat = chat_.Get();
     if (!chat) {
-      std::move(done).Run(Error("The chat's tab is closed."));
+      std::move(done).Run(ToolError("The chat's tab is closed."));
       return;
     }
     RunTabTool(chat->GetBrowserWindowInterface()->GetProfile(), tool, args,
@@ -209,7 +206,7 @@ void AgentTools::Call(std::string_view tool,
     return;
   }
   if (!engine_ || !engine_->GetTask(task_)) {
-    std::move(done).Run(Error("Chromium's agent engine is not running."));
+    std::move(done).Run(ToolError("Chromium's agent engine is not running."));
     return;
   }
   acting_tab_ = tool == "open" ? next_tab_ : args.FindInt("tab").value_or(0);
@@ -225,7 +222,7 @@ void AgentTools::Call(std::string_view tool,
     Type(args, std::move(done));
   } else {
     std::move(done).Run(
-        Error(base::StrCat({"There is no tool called ", tool, "."})));
+        ToolError(base::StrCat({"There is no tool called ", tool, "."})));
   }
 }
 
@@ -285,7 +282,7 @@ void AgentTools::CheckTabStep(std::string_view tool,
   tabs::TabInterface* chat = chat_.Get();
   if (!chat) {
     TabCheck check;
-    check.refused = Error("The chat's tab is closed.");
+    check.refused = ToolError("The chat's tab is closed.");
     std::move(done).Run(std::move(check));
     return;
   }
@@ -367,31 +364,37 @@ void AgentTools::Adopt(int number, tabs::TabInterface& tab) {
                                   base::DoNothing());
 }
 
+tabs::TabInterface* AgentTools::OpenFromChat(const GURL& url) {
+  tabs::TabInterface* chat = chat_.Get();
+  if (!chat) {
+    return nullptr;
+  }
+  NavigateParams params(chat->GetBrowserWindowInterface(), url,
+                        ui::PAGE_TRANSITION_LINK);
+  params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
+  params.source_contents = chat->GetContents();
+  ::Navigate(&params);
+  return params.navigated_or_inserted_contents
+             ? tabs::TabInterface::MaybeGetFromContents(
+                   params.navigated_or_inserted_contents)
+             : nullptr;
+}
+
 void AgentTools::Open(const base::DictValue& args, Done done) {
   const std::string* spec = args.FindString("url");
   const GURL url(spec ? *spec : std::string());
   if (!url.SchemeIsHTTPOrHTTPS()) {
-    std::move(done).Run(Error("open needs an http or https address."));
+    std::move(done).Run(ToolError("open needs an http or https address."));
     return;
   }
-  tabs::TabInterface* chat = chat_.Get();
-  if (!chat) {
-    std::move(done).Run(Error("The chat's tab is closed."));
+  if (!chat_.Get()) {
+    std::move(done).Run(ToolError("The chat's tab is closed."));
     return;
   }
-  // Opened as a link from the chat's tab, the new tab nests under it. It
-  // starts blank so that the engine, and its site checks, load the page.
-  NavigateParams params(chat->GetBrowserWindowInterface(),
-                        GURL(url::kAboutBlankURL), ui::PAGE_TRANSITION_LINK);
-  params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
-  params.source_contents = chat->GetContents();
-  ::Navigate(&params);
-  tabs::TabInterface* tab = params.navigated_or_inserted_contents
-                                ? tabs::TabInterface::MaybeGetFromContents(
-                                      params.navigated_or_inserted_contents)
-                                : nullptr;
+  // It starts blank so that the engine, and its site checks, load the page.
+  tabs::TabInterface* tab = OpenFromChat(GURL(url::kAboutBlankURL));
   if (!tab) {
-    std::move(done).Run(Error("The tab could not be opened."));
+    std::move(done).Run(ToolError("The tab could not be opened."));
     return;
   }
   const int id = next_tab_++;
@@ -405,7 +408,7 @@ void AgentTools::Open(const base::DictValue& args, Done done) {
               return;
             }
             if (added->code != actor::mojom::ActionResultCode::kOk) {
-              std::move(done).Run(Error(Refusal(*added)));
+              std::move(done).Run(ToolError(Refusal(*added)));
               return;
             }
             self->Act(std::make_unique<actor::NavigateToolRequest>(
@@ -424,7 +427,7 @@ void AgentTools::Navigate(const base::DictValue& args, Done done) {
     error = "navigate needs an http or https address.";
   }
   if (!error.empty()) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   Act(std::make_unique<actor::NavigateToolRequest>(tab->handle, url),
@@ -435,7 +438,7 @@ void AgentTools::Read(const base::DictValue& args, Done done) {
   std::string error;
   Tab* tab = WebTabFrom(args, error);
   if (!tab) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   const int id = *args.FindInt("tab");
@@ -448,12 +451,12 @@ void AgentTools::Read(const base::DictValue& args, Done done) {
               return;
             }
             if (!seen.has_value()) {
-              std::move(done).Run(Error(seen.error().message));
+              std::move(done).Run(ToolError(seen.error().message));
               return;
             }
             const auto& content = seen.value()->annotated_page_content_result;
             if (!content.has_value()) {
-              std::move(done).Run(Error(content.error()));
+              std::move(done).Run(ToolError(content.error()));
               return;
             }
             const auto tab = self->tabs_.find(id);
@@ -462,7 +465,7 @@ void AgentTools::Read(const base::DictValue& args, Done done) {
                     ? nullptr
                     : tab->second.handle.Get()->GetContents();
             if (!contents) {
-              std::move(done).Run(Error("That tab is closed."));
+              std::move(done).Run(ToolError("That tab is closed."));
               return;
             }
             tab->second.page = DescribePage(content->proto, kMaxPageText);
@@ -480,7 +483,7 @@ void AgentTools::Click(const base::DictValue& args, Done done) {
   Tab* tab = WebTabFrom(args, error);
   const PageElement* element = tab ? ElementFrom(*tab, args, error) : nullptr;
   if (!element) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   Act(std::make_unique<actor::ClickToolRequest>(
@@ -498,7 +501,7 @@ void AgentTools::Type(const base::DictValue& args, Done done) {
     error = "type needs the text to type.";
   }
   if (!error.empty()) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   Act(std::make_unique<actor::TypeToolRequest>(
@@ -560,12 +563,12 @@ void AgentTools::Act(std::unique_ptr<actor::ToolRequest> action,
              std::vector<actor::ActionResultWithLatencyInfo> results,
              actor::TabObservationStrategy) {
             if (results.empty()) {
-              std::move(done).Run(Error("The agent engine did nothing."));
+              std::move(done).Run(ToolError("The agent engine did nothing."));
               return;
             }
             for (const actor::ActionResultWithLatencyInfo& ended : results) {
               if (ended.result->code != actor::mojom::ActionResultCode::kOk) {
-                std::move(done).Run(Error(Refusal(*ended.result)));
+                std::move(done).Run(ToolError(Refusal(*ended.result)));
                 return;
               }
             }

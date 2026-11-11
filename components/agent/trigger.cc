@@ -8,30 +8,11 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 
 namespace {
-
-base::DictValue Parameter(std::string_view type, std::string_view description) {
-  return base::DictValue().Set("type", type).Set("description", description);
-}
-
-base::DictValue Function(std::string_view name,
-                         std::string_view description,
-                         base::DictValue properties,
-                         base::ListValue required) {
-  return base::DictValue()
-      .Set("type", "function")
-      .Set("function",
-           base::DictValue()
-               .Set("name", name)
-               .Set("description", description)
-               .Set("parameters", base::DictValue()
-                                      .Set("type", "object")
-                                      .Set("properties", std::move(properties))
-                                      .Set("required", std::move(required))));
-}
 
 std::string Trimmed(const std::string* text) {
   return text ? std::string(base::TrimWhitespaceASCII(*text, base::TRIM_ALL))
@@ -41,7 +22,7 @@ std::string Trimmed(const std::string* text) {
 }  // namespace
 
 base::DictValue TriggerToolSchema() {
-  return Function(
+  return ToolSchema(
       kTriggerTool,
       "Leaves a command running out of sight as a trigger that wakes you "
       "when it ends, or each time it prints lines, such as gh run watch 123 "
@@ -51,24 +32,25 @@ base::DictValue TriggerToolSchema() {
       "when it finds something worth telling. It stops after 24 hours. A "
       "chat has one trigger at a time.",
       base::DictValue()
-          .Set("command", Parameter("string", "The command, as typed."))
-          .Set("wake", Parameter("string",
-                                 "end to wake once when it ends, or lines to "
-                                 "wake each time it prints lines."))
+          .Set("command", ToolParameter("string", "The command, as typed."))
+          .Set("wake",
+               ToolParameter("string",
+                             "end to wake once when it ends, or lines to "
+                             "wake each time it prints lines."))
           .Set("request",
-               Parameter("string",
-                         "What to do when it wakes you, such as Tell the "
-                         "user whether the deploy passed."))
-          .Set("tab", Parameter("integer",
-                                "The terminal tab whose folder it runs in. "
-                                "Your first one when left out.")),
+               ToolParameter("string",
+                             "What to do when it wakes you, such as Tell the "
+                             "user whether the deploy passed."))
+          .Set("tab", ToolParameter("integer",
+                                    "The terminal tab whose folder it runs in. "
+                                    "Your first one when left out.")),
       base::ListValue().Append("command").Append("wake").Append("request"));
 }
 
 base::DictValue StopTriggerToolSchema() {
-  return Function(kStopTriggerTool,
-                  "Stops this chat's trigger and the command it runs.",
-                  base::DictValue(), base::ListValue());
+  return ToolSchema(kStopTriggerTool,
+                    "Stops this chat's trigger and the command it runs.",
+                    base::DictValue(), base::ListValue());
 }
 
 base::expected<TriggerAsk, std::string> ParseTrigger(

@@ -114,10 +114,9 @@ void ChatMark::Refresh() {
   const std::string id = tab ? ChatIdOf(tab->GetContents()) : std::string();
   ChatIndex* index = observation_.GetSource();
   if (index && !id.empty()) {
-    for (const ChatIndex::Entry& entry : index->Entries()) {
-      if (entry.id == id && entry.state != ChatIndex::State::kDone) {
-        state = entry.state;
-      }
+    const ChatIndex::Entry* entry = index->Find(id);
+    if (entry && entry->state != ChatIndex::State::kDone) {
+      state = entry->state;
     }
   }
   if (state == state_) {

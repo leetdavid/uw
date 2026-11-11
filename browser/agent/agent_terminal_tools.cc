@@ -20,15 +20,11 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
-#include "chrome/browser/ui/navigator/browser_navigator.h"
-#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "content/public/browser/web_contents.h"
-#include "ui/base/page_transition_types.h"
-#include "ui/base/window_open_disposition.h"
 #include "uw/browser/agent/agent_tools.h"
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/terminal/terminal_tab.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 namespace {
@@ -58,10 +54,6 @@ constexpr size_t kMaxOutput = 30000;
 constexpr int kScreenLines = 100;
 // What an approval shows of a program that waits for keys.
 constexpr size_t kApprovalScreenLines = 8;
-
-base::DictValue Error(std::string_view message) {
-  return base::DictValue().Set("error", message);
-}
 
 std::string TabName(int number) {
   return base::StrCat({"Tab ", base::NumberToString(number)});
@@ -282,20 +274,7 @@ int AgentTools::TerminalFor(const base::DictValue& args, std::string& error) {
 }
 
 int AgentTools::OpenTerminal() {
-  tabs::TabInterface* chat = chat_.Get();
-  if (!chat) {
-    return 0;
-  }
-  // Opened as a link from the chat's tab, the terminal nests under it.
-  NavigateParams params(chat->GetBrowserWindowInterface(), TerminalUrl(),
-                        ui::PAGE_TRANSITION_LINK);
-  params.disposition = WindowOpenDisposition::NEW_BACKGROUND_TAB;
-  params.source_contents = chat->GetContents();
-  ::Navigate(&params);
-  tabs::TabInterface* tab = params.navigated_or_inserted_contents
-                                ? tabs::TabInterface::MaybeGetFromContents(
-                                      params.navigated_or_inserted_contents)
-                                : nullptr;
+  tabs::TabInterface* tab = OpenFromChat(TerminalUrl());
   if (!tab) {
     return 0;
   }
@@ -333,13 +312,13 @@ TerminalShell* AgentTools::ShellOf(int number) const {
 void AgentTools::Run(const base::DictValue& args, Done done) {
   const std::string* command = args.FindString("command");
   if (!command || base::TrimWhitespaceASCII(*command, base::TRIM_ALL).empty()) {
-    std::move(done).Run(Error("run needs a command."));
+    std::move(done).Run(ToolError("run needs a command."));
     return;
   }
   std::string error;
   const int number = TerminalFor(args, error);
   if (number < 0) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   wait_ = std::make_unique<TerminalWait>();
@@ -357,7 +336,7 @@ void AgentTools::Run(const base::DictValue& args, Done done) {
     wait_->opened = true;
     wait_->tab = OpenTerminal();
     if (!wait_->tab) {
-      FinishWait(Error("The terminal tab could not be opened."));
+      FinishWait(ToolError("The terminal tab could not be opened."));
       return;
     }
   }
@@ -369,7 +348,7 @@ void AgentTools::Trigger(const base::DictValue& args, Done done) {
   std::string error;
   const int number = ask.has_value() ? TerminalFor(args, error) : 0;
   if (!ask.has_value() || number < 0) {
-    std::move(done).Run(Error(ask.has_value() ? error : ask.error()));
+    std::move(done).Run(ToolError(ask.has_value() ? error : ask.error()));
     return;
   }
   const auto tab = tabs_.find(number);
@@ -384,7 +363,7 @@ void AgentTools::Trigger(const base::DictValue& args, Done done) {
 void AgentTools::Keys(const base::DictValue& args, Done done) {
   std::string error;
   if (!TerminalTabFrom(args, error)) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   const std::string* text = args.FindString("text");
@@ -394,7 +373,7 @@ void AgentTools::Keys(const base::DictValue& args, Done done) {
       const std::optional<std::string> sent =
           key.is_string() ? KeyBytes(key.GetString()) : std::nullopt;
       if (!sent) {
-        std::move(done).Run(Error(base::StrCat(
+        std::move(done).Run(ToolError(base::StrCat(
             {"Unknown key ", key.is_string() ? key.GetString() : "",
              ". Use Enter, Tab, Escape, Backspace, Delete, Space, Up, Down, "
              "Left, Right, Home, End, PageUp, PageDown, or Ctrl- and a "
@@ -405,7 +384,7 @@ void AgentTools::Keys(const base::DictValue& args, Done done) {
     }
   }
   if (bytes.empty()) {
-    std::move(done).Run(Error("keys needs text or keys to send."));
+    std::move(done).Run(ToolError("keys needs text or keys to send."));
     return;
   }
   wait_ = std::make_unique<TerminalWait>();
@@ -421,14 +400,14 @@ void AgentTools::Keys(const base::DictValue& args, Done done) {
 void AgentTools::Screen(const base::DictValue& args, Done done) {
   std::string error;
   if (!TerminalTabFrom(args, error)) {
-    std::move(done).Run(Error(error));
+    std::move(done).Run(ToolError(error));
     return;
   }
   const int number = *args.FindInt("tab");
   TerminalShell* shell = ShellOf(number);
   if (!shell) {
-    std::move(done).Run(
-        Error(base::StrCat({TabName(number), "'s shell has not started."})));
+    std::move(done).Run(ToolError(
+        base::StrCat({TabName(number), "'s shell has not started."})));
     return;
   }
   shell->GetActivity(base::BindOnce(
@@ -437,7 +416,7 @@ void AgentTools::Screen(const base::DictValue& args, Done done) {
         TerminalShell* shell = self ? self->ShellOf(number) : nullptr;
         if (!shell) {
           std::move(done).Run(
-              Error(base::StrCat({TabName(number), " is closed."})));
+              ToolError(base::StrCat({TabName(number), " is closed."})));
           return;
         }
         shell->Read(-kScreenLines,
@@ -491,7 +470,7 @@ void AgentTools::CheckShell() {
                 self->CheckShell();
                 return;
               }
-              self->FinishWait(Error(
+              self->FinishWait(ToolError(
                   base::StrCat({TabName(self->wait_->tab), " is closed."})));
               return;
             }
@@ -507,7 +486,7 @@ void AgentTools::OnActivity(ShellHost::Activity activity) {
   TerminalWait& wait = *wait_;
   TerminalShell* shell = ShellOf(wait.tab);
   if (!shell) {
-    FinishWait(Error(base::StrCat({TabName(wait.tab), " is closed."})));
+    FinishWait(ToolError(base::StrCat({TabName(wait.tab), " is closed."})));
     return;
   }
   const base::TimeTicks now = base::TimeTicks::Now();
@@ -515,13 +494,13 @@ void AgentTools::OnActivity(ShellHost::Activity activity) {
   if (wait.starting) {
     if (wait.end_now) {
       FinishWait(
-          Error("Not sent: the user wrote in or stopped the chat "
-                "first."));
+          ToolError("Not sent: the user wrote in or stopped the chat "
+                    "first."));
       return;
     }
     // Ctrl-C alone cancels a password prompt; nothing else reaches one.
     if (activity.password && !(wait.keys && wait.bytes == kCtrlC)) {
-      FinishWait(Error(PasswordError(wait.tab)));
+      FinishWait(ToolError(PasswordError(wait.tab)));
       return;
     }
     // A new shell has started once it has printed its prompt; one in use
@@ -534,8 +513,8 @@ void AgentTools::OnActivity(ShellHost::Activity activity) {
       CheckShell();
       return;
     }
-    FinishWait(Error(wait.opened ? "The terminal's shell did not start."
-                                 : BusyError(wait.tab, activity)));
+    FinishWait(ToolError(wait.opened ? "The terminal's shell did not start."
+                                     : BusyError(wait.tab, activity)));
     return;
   }
   // A password prompt hands the tab to the user, and the wait pauses until
@@ -597,7 +576,7 @@ void AgentTools::Send() {
             }
             TerminalShell* shell = self->ShellOf(self->wait_->tab);
             if (!shell) {
-              self->FinishWait(Error(
+              self->FinishWait(ToolError(
                   base::StrCat({TabName(self->wait_->tab), " is closed."})));
               return;
             }

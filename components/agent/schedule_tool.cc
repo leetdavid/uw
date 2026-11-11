@@ -13,6 +13,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "url/gurl.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 
@@ -39,10 +40,6 @@ constexpr std::string_view kWeekdays[] = {"sunday",    "monday",   "tuesday",
                                           "wednesday", "thursday", "friday",
                                           "saturday"};
 
-base::DictValue Parameter(std::string_view type, std::string_view description) {
-  return base::DictValue().Set("type", type).Set("description", description);
-}
-
 // The numbers of `text` split at `separator`, such as 9 and 30 for "09:30".
 std::vector<int> NumbersIn(std::string_view text, char separator) {
   std::vector<int> numbers;
@@ -63,63 +60,58 @@ std::vector<int> NumbersIn(std::string_view text, char separator) {
 base::DictValue ScheduleToolSchema() {
   base::DictValue properties =
       base::DictValue()
-          .Set("request",
-               Parameter("string",
-                         "What each run is asked, in the user's words, with "
-                         "the page's address when it is about a page."))
+          .Set(
+              "request",
+              ToolParameter("string",
+                            "What each run is asked, in the user's words, with "
+                            "the page's address when it is about a page."))
           .Set("repeat",
-               Parameter("string",
-                         "One of every_hours, daily, weekdays (Monday to "
-                         "Friday), weekly, or once."))
+               ToolParameter("string",
+                             "One of every_hours, daily, weekdays (Monday to "
+                             "Friday), weekly, or once."))
           .Set("hours",
-               Parameter("integer",
-                         "For every_hours: 1, 2, 3, 4, 6, or 12. Hourly is the "
-                         "shortest."))
-          .Set("time", Parameter("string",
-                                 "For daily, weekdays, weekly, and once: the "
-                                 "time of day, 24-hour, such as 09:00."))
-          .Set("weekday", Parameter("string", "For weekly: monday to sunday."))
-          .Set("date", Parameter("string",
-                                 "For once: the day, such as "
-                                 "2026-10-24."))
-          .Set("regular_updates",
-               Parameter("boolean",
-                         "True to tell the user what every run found. Leave "
-                         "out to tell them only when a run finds what they "
-                         "asked to hear about."))
+               ToolParameter(
+                   "integer",
+                   "For every_hours: 1, 2, 3, 4, 6, or 12. Hourly is the "
+                   "shortest."))
+          .Set("time",
+               ToolParameter("string",
+                             "For daily, weekdays, weekly, and once: the "
+                             "time of day, 24-hour, such as 09:00."))
+          .Set("weekday",
+               ToolParameter("string", "For weekly: monday to sunday."))
+          .Set("date", ToolParameter("string",
+                                     "For once: the day, such as "
+                                     "2026-10-24."))
+          .Set(
+              "regular_updates",
+              ToolParameter("boolean",
+                            "True to tell the user what every run found. Leave "
+                            "out to tell them only when a run finds what they "
+                            "asked to hear about."))
           .Set("page",
-               Parameter("string",
-                         "To watch a page: its http or https address. This "
-                         "chat then watches it, once the user saves the "
-                         "card."))
+               ToolParameter("string",
+                             "To watch a page: its http or https address. This "
+                             "chat then watches it, once the user saves the "
+                             "card."))
           .Set("watch_for",
-               Parameter("string",
-                         "With a page, when the user's ask matches one: "
-                         "price_drops, back_in_stock, new_items, or "
-                         "anything. Leave out otherwise; the request says "
-                         "it."))
+               ToolParameter("string",
+                             "With a page, when the user's ask matches one: "
+                             "price_drops, back_in_stock, new_items, or "
+                             "anything. Leave out otherwise; the request says "
+                             "it."))
           .Set("below",
-               Parameter("string",
-                         "With price_drops, the price the user named, as "
-                         "they wrote it, such as $500."));
-  return base::DictValue()
-      .Set("type", "function")
-      .Set("function",
-           base::DictValue()
-               .Set("name", kScheduleTool)
-               .Set("description",
+               ToolParameter("string",
+                             "With price_drops, the price the user named, as "
+                             "they wrote it, such as $500."));
+  return ToolSchema(kScheduleTool,
                     "Fills in the schedule card for this chat when the user "
                     "asks for something to happen on a schedule, such as "
                     "checking a page every morning. To watch a page, give "
                     "its address as page. The user saves it; nothing is "
-                    "scheduled until they do.")
-               .Set("parameters",
-                    base::DictValue()
-                        .Set("type", "object")
-                        .Set("properties", std::move(properties))
-                        .Set("required",
-                             base::ListValue().Append("request").Append(
-                                 "repeat"))));
+                    "scheduled until they do.",
+                    std::move(properties),
+                    base::ListValue().Append("request").Append("repeat"));
 }
 
 base::expected<ScheduledChat, std::string> FillScheduleCard(

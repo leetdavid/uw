@@ -7,9 +7,7 @@
 #include <optional>
 #include <utility>
 
-#include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/task/sequenced_task_runner.h"
@@ -27,12 +25,7 @@ constexpr char kAlertsFile[] = "alerts.json";
 // quit can no longer be answered, so its alert is left out.
 std::vector<ChatAlerts::Alert> Load(const base::FilePath& path) {
   std::vector<ChatAlerts::Alert> alerts;
-  std::string json;
-  if (!base::ReadFileToString(path, &json)) {
-    return alerts;
-  }
-  std::optional<base::DictValue> saved =
-      base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+  std::optional<base::DictValue> saved = ChatFile::Read(path);
   const base::ListValue* list = saved ? saved->FindList("alerts") : nullptr;
   if (!list) {
     return alerts;

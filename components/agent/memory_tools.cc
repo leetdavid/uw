@@ -9,6 +9,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 namespace {
@@ -40,66 +41,47 @@ constexpr char kOnlyRecalls[] =
     "search_memory with several words to find the others. In this run you "
     "cannot keep or forget memories.";
 
-base::DictValue Tool(std::string_view name,
-                     std::string_view description,
-                     base::DictValue properties,
-                     std::string_view required) {
-  return base::DictValue()
-      .Set("type", "function")
-      .Set("function",
-           base::DictValue()
-               .Set("name", name)
-               .Set("description", description)
-               .Set("parameters",
-                    base::DictValue()
-                        .Set("type", "object")
-                        .Set("properties", std::move(properties))
-                        .Set("required", base::ListValue().Append(required))));
-}
-
-base::DictValue Parameter(std::string_view type, std::string_view description) {
-  return base::DictValue().Set("type", type).Set("description", description);
-}
-
 }  // namespace
 
 base::ListValue MemoryToolSchemas(bool keeps) {
   base::ListValue tools;
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       kSearchMemoryTool,
       "Finds your memories about the user that contain any of the words, the "
       "most matches first, then the newest. Answers with at most 20.",
       base::DictValue().Set(
-          "words", Parameter("string",
-                             "Several words to look for, such as \"bank card "
-                             "payment\". Try other words when nothing comes "
-                             "up.")),
-      "words"));
+          "words",
+          ToolParameter("string",
+                        "Several words to look for, such as \"bank card "
+                        "payment\". Try other words when nothing comes "
+                        "up.")),
+      base::ListValue().Append("words")));
   if (!keeps) {
     return tools;
   }
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       kRememberTool,
       "Keeps one plain sentence about the user for later chats, such as "
       "\"Banks with Chase.\" uw checks it first. Answers with its id, or why "
       "it was not kept.",
       base::DictValue()
           .Set("memory",
-               Parameter("string",
-                         "One plain sentence about the user, at most 300 "
-                         "characters."))
-          .Set("core", Parameter("boolean",
-                                 "True when almost every request can use it, "
-                                 "such as their name, city, or language."))
+               ToolParameter("string",
+                             "One plain sentence about the user, at most 300 "
+                             "characters."))
+          .Set("core",
+               ToolParameter("boolean",
+                             "True when almost every request can use it, "
+                             "such as their name, city, or language."))
           .Set("replaces",
-               Parameter("integer",
-                         "The id of a memory this one replaces, such as an "
-                         "old address.")),
-      "memory"));
-  tools.Append(Tool(
+               ToolParameter("integer",
+                             "The id of a memory this one replaces, such as an "
+                             "old address.")),
+      base::ListValue().Append("memory")));
+  tools.Append(ToolSchema(
       kForgetTool, "Forgets one of your memories about the user.",
-      base::DictValue().Set("id", Parameter("integer", "The memory's id.")),
-      "id"));
+      base::DictValue().Set("id", ToolParameter("integer", "The memory's id.")),
+      base::ListValue().Append("id")));
   return tools;
 }
 

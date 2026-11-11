@@ -12,7 +12,6 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
-#include "base/strings/strcat.h"
 #include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/profiles/profile.h"
 #include "uw/browser/agent/chat_file.h"
@@ -49,13 +48,11 @@ ChatIndex::State StateFrom(std::string_view name) {
 
 // What the list needs from one chat file, for a profile with no index yet.
 std::optional<ChatIndex::Entry> EntryFromChat(const base::FilePath& path) {
-  std::string json;
   const std::string id = path.BaseName().RemoveExtension().MaybeAsASCII();
-  if (!ChatFile::IsChatId(id) || !base::ReadFileToString(path, &json)) {
+  if (!ChatFile::IsChatId(id)) {
     return std::nullopt;
   }
-  std::optional<base::DictValue> chat =
-      base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+  std::optional<base::DictValue> chat = ChatFile::Read(path);
   base::File::Info info;
   if (!chat || !base::GetFileInfo(path, &info)) {
     return std::nullopt;
@@ -138,6 +135,11 @@ ChatIndex::ChatIndex(const base::FilePath& profile_path)
 
 ChatIndex::~ChatIndex() = default;
 
+const ChatIndex::Entry* ChatIndex::Find(std::string_view id) const {
+  const auto entry = entries_.find(id);
+  return entry == entries_.end() ? nullptr : &entry->second;
+}
+
 std::vector<ChatIndex::Entry> ChatIndex::Entries() const {
   std::vector<Entry> entries;
   for (const auto& [id, entry] : entries_) {
@@ -173,9 +175,8 @@ void ChatIndex::Delete(std::string_view id) {
   deleted_.insert(std::string(id));
   entries_.erase(std::string(id));
   ChatFile::Sequence()->PostTask(
-      FROM_HERE,
-      base::BindOnce(base::IgnoreResult(&base::DeleteFile),
-                     folder_.AppendASCII(base::StrCat({id, ".json"}))));
+      FROM_HERE, base::BindOnce(base::IgnoreResult(&base::DeleteFile),
+                                ChatFile::PathFor(folder_.DirName(), id)));
   ChatFile::Sequence()->PostTask(
       FROM_HERE,
       base::BindOnce(base::IgnoreResult(&base::DeletePathRecursively),
@@ -210,7 +211,7 @@ void ChatIndex::OnLoaded(std::vector<Entry> entries) {
 void ChatIndex::Save() {
   if (loaded_) {
     base::ListValue chats;
-    for (const Entry& entry : Entries()) {
+    for (const auto& [id, entry] : entries_) {
       base::DictValue chat = base::DictValue()
                                  .Set("id", entry.id)
                                  .Set("title", entry.title)

@@ -7,7 +7,6 @@
 
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
-#include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/strings/strcat.h"
@@ -76,12 +75,7 @@ void ChatSuggestions::Get(Callback callback) {
 // static
 ChatSuggestions::Saved ChatSuggestions::Load(const base::FilePath& file) {
   Saved saved;
-  std::string json;
-  if (!base::ReadFileToString(file, &json)) {
-    return saved;
-  }
-  std::optional<base::DictValue> dict =
-      base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC);
+  std::optional<base::DictValue> dict = ChatFile::Read(file);
   if (!dict) {
     return saved;
   }

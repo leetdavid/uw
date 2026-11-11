@@ -3,7 +3,6 @@
 #include "uw/components/agent/tab_tools.h"
 
 #include <algorithm>
-#include <initializer_list>
 #include <map>
 #include <set>
 #include <utility>
@@ -14,33 +13,10 @@
 #include "base/strings/string_util.h"
 #include "base/types/expected_macros.h"
 #include "url/gurl.h"
+#include "uw/components/agent/agent_protocol.h"
 
 namespace uw {
 namespace {
-
-base::DictValue Tool(std::string_view name,
-                     std::string_view description,
-                     base::DictValue properties,
-                     std::initializer_list<std::string_view> required) {
-  base::ListValue names;
-  for (std::string_view each : required) {
-    names.Append(each);
-  }
-  return base::DictValue()
-      .Set("type", "function")
-      .Set("function",
-           base::DictValue()
-               .Set("name", name)
-               .Set("description", description)
-               .Set("parameters", base::DictValue()
-                                      .Set("type", "object")
-                                      .Set("properties", std::move(properties))
-                                      .Set("required", std::move(names))));
-}
-
-base::DictValue Parameter(std::string_view type, std::string_view description) {
-  return base::DictValue().Set("type", type).Set("description", description);
-}
 
 base::DictValue Ids(std::string_view description) {
   return base::DictValue()
@@ -153,30 +129,31 @@ bool IsTabTool(std::string_view tool) {
 
 base::ListValue TabToolSchemas(bool select) {
   const auto task = [] {
-    return Parameter("string", "A task's id from tabs.");
+    return ToolParameter("string", "A task's id from tabs.");
   };
   base::ListValue tools;
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       kTabsTool,
       "Lists the user's open tabs in every workspace, by task, each with its "
       "id. You see titles and addresses, never the pages. Every filter is "
       "optional.",
       base::DictValue()
-          .Set("query", Parameter("string",
-                                  "Words that must all be in a tab's title "
-                                  "or address."))
-          .Set("workspace", Parameter("string", "A workspace's name."))
-          .Set("task", Parameter("string", "A task's id or name.")),
-      {}));
+          .Set("query", ToolParameter("string",
+                                      "Words that must all be in a tab's title "
+                                      "or address."))
+          .Set("workspace", ToolParameter("string", "A workspace's name."))
+          .Set("task", ToolParameter("string", "A task's id or name.")),
+      base::ListValue()));
   if (select) {
-    tools.Append(Tool(kSelectTool,
-                      "Shows one of the user's tabs in their window, switching "
-                      "to its workspace if needed.",
-                      base::DictValue().Set(
-                          "tab", Parameter("string", "A tab's id from tabs.")),
-                      {"tab"}));
+    tools.Append(
+        ToolSchema(kSelectTool,
+                   "Shows one of the user's tabs in their window, switching "
+                   "to its workspace if needed.",
+                   base::DictValue().Set(
+                       "tab", ToolParameter("string", "A tab's id from tabs.")),
+                   base::ListValue().Append("tab")));
   }
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       kMoveTool,
       "Moves the user's tabs, each with the tabs under it, to a task, to a "
       "new task, or to the Scratchpad, where tabs outside every task are. "
@@ -185,22 +162,26 @@ base::ListValue TabToolSchemas(bool select) {
       base::DictValue()
           .Set("tabs", Ids("Tab ids from tabs."))
           .Set("task", task())
-          .Set("new_task", Parameter("string", "The name of a new task."))
-          .Set("scratchpad", Parameter("boolean", "True for the Scratchpad.")),
-      {"tabs"}));
-  tools.Append(Tool(kRenameTaskTool, "Renames one of the user's tasks.",
-                    base::DictValue()
-                        .Set("task", task())
-                        .Set("name", Parameter("string", "The new name.")),
-                    {"task", "name"}));
-  tools.Append(Tool(kCloseTool,
-                    "Closes the user's tabs, each with the tabs under it. A "
-                    "terminal running a command is never closed.",
-                    base::DictValue().Set("tabs", Ids("Tab ids from tabs.")),
-                    {"tabs"}));
-  tools.Append(Tool(kCloseTaskTool,
-                    "Closes one of the user's tasks and its tabs.",
-                    base::DictValue().Set("task", task()), {"task"}));
+          .Set("new_task", ToolParameter("string", "The name of a new task."))
+          .Set("scratchpad",
+               ToolParameter("boolean", "True for the Scratchpad.")),
+      base::ListValue().Append("tabs")));
+  tools.Append(
+      ToolSchema(kRenameTaskTool, "Renames one of the user's tasks.",
+                 base::DictValue()
+                     .Set("task", task())
+                     .Set("name", ToolParameter("string", "The new name.")),
+                 base::ListValue().Append("task").Append("name")));
+  tools.Append(
+      ToolSchema(kCloseTool,
+                 "Closes the user's tabs, each with the tabs under it. A "
+                 "terminal running a command is never closed.",
+                 base::DictValue().Set("tabs", Ids("Tab ids from tabs.")),
+                 base::ListValue().Append("tabs")));
+  tools.Append(ToolSchema(kCloseTaskTool,
+                          "Closes one of the user's tasks and its tabs.",
+                          base::DictValue().Set("task", task()),
+                          base::ListValue().Append("task")));
   return tools;
 }
 

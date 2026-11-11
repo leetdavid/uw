@@ -66,7 +66,7 @@ struct ScheduledChat {
   // The values its runs track, in the order runs first reported them.
   std::vector<TrackedName> tracked;
 
-  bool operator==(const ScheduledChat&) const;
+  bool operator==(const ScheduledChat&) const = default;
 };
 
 // The address that `url` matches a watched page by: `url` without the part

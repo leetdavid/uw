@@ -66,10 +66,20 @@ constexpr char kInstructions[] =
     "When the job is done, or you have the answer, reply to the user in a "
     "few plain sentences and call no tool.";
 
-base::DictValue Tool(std::string_view name,
-                     std::string_view description,
-                     base::DictValue properties,
-                     base::ListValue required) {
+base::ListValue Names(std::initializer_list<std::string_view> names) {
+  base::ListValue list;
+  for (std::string_view name : names) {
+    list.Append(name);
+  }
+  return list;
+}
+
+}  // namespace
+
+base::DictValue ToolSchema(std::string_view name,
+                           std::string_view description,
+                           base::DictValue properties,
+                           base::ListValue required) {
   return base::DictValue()
       .Set("type", "function")
       .Set("function",
@@ -82,105 +92,96 @@ base::DictValue Tool(std::string_view name,
                                       .Set("required", std::move(required))));
 }
 
-base::DictValue Parameter(std::string_view type, std::string_view description) {
+base::DictValue ToolParameter(std::string_view type,
+                              std::string_view description) {
   return base::DictValue().Set("type", type).Set("description", description);
 }
 
-base::ListValue Names(std::initializer_list<std::string_view> names) {
-  base::ListValue list;
-  for (std::string_view name : names) {
-    list.Append(name);
-  }
-  return list;
-}
-
-}  // namespace
-
 base::ListValue AgentToolSchemas() {
   const auto tab = [] {
-    return Parameter("integer", "The number of one of your tabs.");
+    return ToolParameter("integer", "The number of one of your tabs.");
   };
   const auto element = [] {
-    return Parameter("integer",
-                     "The element's number in your latest reading of the tab.");
+    return ToolParameter(
+        "integer", "The element's number in your latest reading of the tab.");
   };
   const auto changes = [] {
-    return Parameter("boolean",
-                     "True when this step submits, buys, sends, deletes, "
-                     "cancels, changes account settings, or signs in.");
+    return ToolParameter("boolean",
+                         "True when this step submits, buys, sends, deletes, "
+                         "cancels, changes account settings, or signs in.");
   };
   base::ListValue tools;
-  tools.Append(
-      Tool("open",
-           "Opens a web page in a new tab under this chat, in the background. "
-           "Answers with the tab's number.",
-           base::DictValue().Set(
-               "url", Parameter("string", "An http or https address.")),
-           Names({"url"})));
-  tools.Append(
-      Tool("navigate", "Loads another address in one of your tabs.",
-           base::DictValue()
-               .Set("tab", tab())
-               .Set("url", Parameter("string", "An http or https address.")),
-           Names({"tab", "url"})));
-  tools.Append(
-      Tool("read",
-           "Reads one of your tabs: its title, address, and text. Each link, "
-           "field, and button is numbered, like [3].",
-           base::DictValue().Set("tab", tab()), Names({"tab"})));
-  tools.Append(Tool("click", "Clicks an element of one of your tabs.",
-                    base::DictValue()
-                        .Set("tab", tab())
-                        .Set("element", element())
-                        .Set("changes", changes()),
-                    Names({"tab", "element"})));
-  tools.Append(
-      Tool("type",
-           "Types into a field of one of your tabs, replacing what is in it.",
-           base::DictValue()
-               .Set("tab", tab())
-               .Set("element", element())
-               .Set("text", Parameter("string", "What to type."))
-               .Set("enter",
-                    Parameter("boolean", "Whether to press Enter afterwards."))
-               .Set("changes", changes()),
-           Names({"tab", "element", "text"})));
+  tools.Append(ToolSchema(
+      "open",
+      "Opens a web page in a new tab under this chat, in the background. "
+      "Answers with the tab's number.",
+      base::DictValue().Set(
+          "url", ToolParameter("string", "An http or https address.")),
+      Names({"url"})));
+  tools.Append(ToolSchema(
+      "navigate", "Loads another address in one of your tabs.",
+      base::DictValue()
+          .Set("tab", tab())
+          .Set("url", ToolParameter("string", "An http or https address.")),
+      Names({"tab", "url"})));
+  tools.Append(ToolSchema(
+      "read",
+      "Reads one of your tabs: its title, address, and text. Each link, "
+      "field, and button is numbered, like [3].",
+      base::DictValue().Set("tab", tab()), Names({"tab"})));
+  tools.Append(ToolSchema("click", "Clicks an element of one of your tabs.",
+                          base::DictValue()
+                              .Set("tab", tab())
+                              .Set("element", element())
+                              .Set("changes", changes()),
+                          Names({"tab", "element"})));
+  tools.Append(ToolSchema(
+      "type",
+      "Types into a field of one of your tabs, replacing what is in it.",
+      base::DictValue()
+          .Set("tab", tab())
+          .Set("element", element())
+          .Set("text", ToolParameter("string", "What to type."))
+          .Set("enter",
+               ToolParameter("boolean", "Whether to press Enter afterwards."))
+          .Set("changes", changes()),
+      Names({"tab", "element", "text"})));
 #if BUILDFLAG(IS_MAC)  // As kAgentHasTerminal.
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "run",
       "Runs a shell command on the user's Mac in your terminal tab under this "
       "chat, opening one in their home folder when there is none, and waits "
       "for it to finish. Answers with what it printed. A command still "
       "running when the wait ends keeps running in its tab.",
       base::DictValue()
-          .Set("command", Parameter("string", "The command, as typed."))
-          .Set("tab", Parameter("integer",
-                                "One of your terminal tabs. Your first one "
-                                "when left out."))
+          .Set("command", ToolParameter("string", "The command, as typed."))
+          .Set("tab", ToolParameter("integer",
+                                    "One of your terminal tabs. Your first one "
+                                    "when left out."))
           .Set("new_tab",
-               Parameter("boolean",
-                         "Open another terminal tab, to keep something "
-                         "running in the first, such as a dev server."))
+               ToolParameter("boolean",
+                             "Open another terminal tab, to keep something "
+                             "running in the first, such as a dev server."))
           .Set("wait",
-               Parameter("number",
-                         "Seconds to wait for it to finish: 120 when left "
-                         "out, at most 600. 0 does not wait.")),
+               ToolParameter("number",
+                             "Seconds to wait for it to finish: 120 when left "
+                             "out, at most 600. 0 does not wait.")),
       Names({"command"})));
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "screen",
       "Reads one of your terminal tabs: its screen and the lines above it, "
       "and the program that runs there, if any.",
-      base::DictValue().Set("tab",
-                            Parameter("integer", "One of your terminal tabs.")),
+      base::DictValue().Set(
+          "tab", ToolParameter("integer", "One of your terminal tabs.")),
       Names({"tab"})));
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "keys",
       "Sends text, then keys, to the program that runs in one of your "
       "terminal tabs, such as an answer to a question it asks, or Ctrl-C to "
       "stop it. Answers with its screen after.",
       base::DictValue()
-          .Set("tab", Parameter("integer", "One of your terminal tabs."))
-          .Set("text", Parameter("string", "Text to type first."))
+          .Set("tab", ToolParameter("integer", "One of your terminal tabs."))
+          .Set("text", ToolParameter("string", "Text to type first."))
           .Set("keys",
                base::DictValue()
                    .Set("type", "array")
@@ -192,37 +193,40 @@ base::ListValue AgentToolSchemas() {
                         "such as Ctrl-C.")),
       Names({"tab"})));
 #endif
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "skill",
       "Loads a skill's instructions, or with file, another file from the "
       "skill's folder.",
       base::DictValue()
-          .Set("name", Parameter("string", "The skill's name, from the list."))
-          .Set("file", Parameter("string",
-                                 "A path inside the skill's folder, such as "
-                                 "references/sites.md.")),
+          .Set("name",
+               ToolParameter("string", "The skill's name, from the list."))
+          .Set("file",
+               ToolParameter("string",
+                             "A path inside the skill's folder, such as "
+                             "references/sites.md.")),
       Names({"name"})));
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "save_skill",
       "Asks the user to save a new skill: instructions for a kind of request, "
       "to use next time.",
       base::DictValue()
-          .Set("name",
-               Parameter("string", "Lowercase letters, digits, and hyphens."))
+          .Set("name", ToolParameter("string",
+                                     "Lowercase letters, digits, and hyphens."))
           .Set("description",
-               Parameter("string",
-                         "One line: what the skill does and when to "
-                         "use it."))
-          .Set("instructions", Parameter("string", "The steps, in Markdown.")),
+               ToolParameter("string",
+                             "One line: what the skill does and when to "
+                             "use it."))
+          .Set("instructions",
+               ToolParameter("string", "The steps, in Markdown.")),
       Names({"name", "description", "instructions"})));
-  tools.Append(Tool(
+  tools.Append(ToolSchema(
       "recall",
       "Shows the full result of an earlier step again, or an image or file "
       "the user sent.",
       base::DictValue()
-          .Set("step", Parameter("integer", "The step's number."))
-          .Set("image", Parameter("integer", "An image's number, instead."))
-          .Set("file", Parameter("integer", "A file's number, instead.")),
+          .Set("step", ToolParameter("integer", "The step's number."))
+          .Set("image", ToolParameter("integer", "An image's number, instead."))
+          .Set("file", ToolParameter("integer", "A file's number, instead.")),
       base::ListValue()));
   return tools;
 }
@@ -256,6 +260,10 @@ base::DictValue AssistantMessage(const ModelTurn& turn) {
     message.Set(kKeptPartsKey, std::move(*kept));
   }
   return message;
+}
+
+base::DictValue ToolError(std::string_view message) {
+  return base::DictValue().Set("error", message);
 }
 
 base::DictValue ToolMessage(std::string_view call_id,

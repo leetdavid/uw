@@ -58,28 +58,6 @@ std::string StringOr(const base::DictValue& dict, std::string_view key) {
 
 }  // namespace
 
-bool ScheduledChat::operator==(const ScheduledChat& other) const {
-  const auto same_runs = [](const std::vector<PastRun>& a,
-                            const std::vector<PastRun>& b) {
-    return std::ranges::equal(a, b, [](const PastRun& x, const PastRun& y) {
-      return x.time == y.time && x.report == y.report;
-    });
-  };
-  return schedule == other.schedule && request == other.request &&
-         page == other.page && watch_for == other.watch_for &&
-         regular_updates == other.regular_updates &&
-         even_when_nothing_changes == other.even_when_nothing_changes &&
-         provider_id == other.provider_id && model == other.model &&
-         effort == other.effort && approval_mode == other.approval_mode &&
-         paused == other.paused && muted == other.muted && last == other.last &&
-         failures == other.failures && failing == other.failing &&
-         last_failure == other.last_failure &&
-         pause_reason == other.pause_reason &&
-         same_runs(recent, other.recent) && tracked == other.tracked &&
-         trigger == other.trigger && trigger_wake == other.trigger_wake &&
-         trigger_folder == other.trigger_folder;
-}
-
 GURL WatchedAddress(const GURL& url) {
   std::vector<std::string_view> kept;
   for (std::string_view pair :

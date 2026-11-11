@@ -33,6 +33,7 @@
 #include "uw/browser/terminal/terminal_shell.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/agent/agent_protocol.h"
 #include "uw/components/tab_organization/page_tree.h"
 
 namespace uw {
@@ -53,10 +54,6 @@ struct UserTab {
   std::string color;
   tabs::TabHandle tab;
 };
-
-base::DictValue Error(std::string_view message) {
-  return base::DictValue().Set("error", message);
-}
 
 bool Reaches(Profile* profile, BrowserWindowInterface* window) {
   return window->GetProfile() == profile &&
@@ -591,11 +588,11 @@ base::DictValue Select(Profile* profile,
         return result;
       }
     }
-    return Error("No window shows the pins.");
+    return ToolError("No window shows the pins.");
   }
   TabOrganizationController* tree = TreeOf(tab);
   if (!tree) {
-    return Error("That tab has closed.");
+    return ToolError("That tab has closed.");
   }
   // The front window that shows its workspace, or else a hidden window's
   // partner, which switches to it.
@@ -630,7 +627,7 @@ base::DictValue Select(Profile* profile,
   if (!partner ||
       !partner->Switch(workspace->workspace(),
                        base::BindOnce(&ShowIn, tab.page, forward))) {
-    return Error("uw can't switch to that workspace now.");
+    return ToolError("uw can't switch to that workspace now.");
   }
   return result;
 }
@@ -648,7 +645,7 @@ base::DictValue Act(Profile* profile,
                                                   : plan.tabs.front()];
   TabOrganizationController* tree = TreeOf(first);
   if (!tree) {
-    return Error("Those tabs have closed.");
+    return ToolError("Those tabs have closed.");
   }
   if (tool == kRenameTaskTool || tool == kCloseTaskTool) {
     const std::optional<tab_groups::TabGroupId> group =
@@ -656,7 +653,7 @@ base::DictValue Act(Profile* profile,
     const tab_groups::TabGroupVisualData* visuals =
         VisualsOf(*tree, first.listed.task_id);
     if (!group || !visuals) {
-      return Error("That task has closed.");
+      return ToolError("That task has closed.");
     }
     if (tool == kCloseTaskTool) {
       tree->CloseTask(*group);
@@ -704,20 +701,20 @@ base::DictValue Act(Profile* profile,
     const std::optional<tab_groups::TabGroupId> group =
         tree->GroupFor(task.listed.task_id);
     if (!group || !tree->MoveToTask(roots, *group)) {
-      return Error("Those tabs could not move to that task.");
+      return ToolError("Those tabs could not move to that task.");
     }
     return std::move(result).Set("task", TaskValue(task));
   }
   if (plan.new_task.empty()) {
     if (!tree->MoveToScratchpad(roots)) {
-      return Error("Those tabs could not move to the Scratchpad.");
+      return ToolError("Those tabs could not move to the Scratchpad.");
     }
     return std::move(result).Set("scratchpad", true);
   }
   const std::optional<tab_groups::TabGroupId> group =
       tree->MoveToNewTask(roots, base::UTF8ToUTF16(plan.new_task));
   if (!group) {
-    return Error("A new task could not start.");
+    return ToolError("A new task could not start.");
   }
   UserTab started = first;
   started.listed.task_id = tree->KeyOf(*group);
