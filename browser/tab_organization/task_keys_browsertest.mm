@@ -291,9 +291,15 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   ASSERT_TRUE(base::test::RunUntil([&] { return !parent->GetGroup(); }));
   EXPECT_FALSE(child->GetGroup());
 
+  EXPECT_EQ(
+      GetWindowCommandTitle(browser(), TabOrganizationController::kKeepHere),
+      u"Keep Here");
   Press(ui::VKEY_K, kOptionCmd);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return controller()->IsKept(Id(parent)); }));
+  EXPECT_EQ(
+      GetWindowCommandTitle(browser(), TabOrganizationController::kKeepHere),
+      u"Stop Keeping Here");
 
   const int before = tabs()->count();
   Press(ui::VKEY_W, kOptionCmd);

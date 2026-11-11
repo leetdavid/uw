@@ -453,10 +453,6 @@ class KeyCardView : public views::View {
   }
 
   std::u16string NameOf(const RowSpec& spec) {
-    if (spec.command == Controller::kKeepHere && controller() &&
-        !controller()->KeepsTabs(controller()->SelectionFor())) {
-      return l10n_util::GetStringUTF16(IDS_UW_STOP_KEEPING_HERE_MAC);
-    }
     return GetWindowCommandTitle(window_, spec.command)
         .value_or(l10n_util::GetStringUTF16(spec.name));
   }

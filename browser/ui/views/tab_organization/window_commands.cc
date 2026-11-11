@@ -304,13 +304,23 @@ std::optional<std::u16string> GetWindowCommandTitle(
   }
   const TabOrganizationController* controller =
       TabOrganizationController::From(window);
-  if (!controller || command != TabOrganizationController::kToggleBranch) {
+  if (!controller) {
     return std::nullopt;
   }
-  return l10n_util::GetStringUTF16(
-      controller->CollapsesBranches(controller->SelectionFor())
-          ? IDS_UW_COLLAPSE_BRANCH_MAC
-          : IDS_UW_EXPAND_BRANCH_MAC);
+  switch (command) {
+    case TabOrganizationController::kToggleBranch:
+      return l10n_util::GetStringUTF16(
+          controller->CollapsesBranches(controller->SelectionFor())
+              ? IDS_UW_COLLAPSE_BRANCH_MAC
+              : IDS_UW_EXPAND_BRANCH_MAC);
+    case TabOrganizationController::kKeepHere:
+      return l10n_util::GetStringUTF16(
+          controller->KeepsTabs(controller->SelectionFor())
+              ? IDS_UW_KEEP_HERE_MAC
+              : IDS_UW_STOP_KEEPING_HERE_MAC);
+    default:
+      return std::nullopt;
+  }
 }
 
 }  // namespace uw
