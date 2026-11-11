@@ -562,6 +562,7 @@ function showRows(on: boolean) {
 function query(preventInlineAutocomplete: boolean) {
   const completed = typed + completion;
   const grew = field.value.length > typed.length;
+  const started = !typed;
   typed = field.value;
   calculate();
   // Typing the completion's next letters keeps the rest of it until the rows
@@ -581,8 +582,11 @@ function query(preventInlineAutocomplete: boolean) {
     return;
   }
   showRows(true);
-  // What can run changes with the selected tab, so each query asks again.
-  refreshLists();
+  // What can run changes with the selected tab, which stays while text is
+  // typed, so the start of each query asks again.
+  if (started) {
+    refreshLists();
+  }
   handler.queryAutocomplete(
       ++queryId, typed, preventInlineAutocomplete,
       field.selectionStart ?? typed.length, SuggestInventory.kDefault,
