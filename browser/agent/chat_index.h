@@ -38,6 +38,8 @@ class ChatIndex : public base::SupportsUserData::Data {
     State state = State::kDone;
     // The uw command started it.
     bool from_terminal = false;
+
+    bool operator==(const Entry&) const = default;
   };
 
   class Observer : public base::CheckedObserver {

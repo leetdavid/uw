@@ -151,8 +151,13 @@ void ChatIndex::Update(Entry entry) {
   if (WasDeleted(entry.id)) {
     return;
   }
-  const std::string id = entry.id;
-  entries_[id] = std::move(entry);
+  const auto [saved, added] = entries_.try_emplace(entry.id, entry);
+  if (!added) {
+    if (saved->second == entry) {
+      return;
+    }
+    saved->second = std::move(entry);
+  }
   Save();
 }
 
