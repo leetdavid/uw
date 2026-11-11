@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/browser_process.h"
@@ -17,6 +18,7 @@
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
+#include "uw/components/uw_command/command_messages.h"
 
 namespace uw {
 
@@ -80,6 +82,35 @@ void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded) {
             std::move(loaded).Run(profile, id);
           },
           std::move(workspace.id), std::move(loaded)));
+}
+
+void RunInWorkspace(CommandRequest request,
+                    CommandReply reply,
+                    WorkspaceCommand run) {
+  base::expected<CommandWorkspace, std::string> chosen =
+      ChooseWorkspace(request.params);
+  if (!chosen.has_value()) {
+    std::move(reply).Run(
+        CommandError(request.id, kCommandUsage, chosen.error()));
+    return;
+  }
+  LoadWorkspace(
+      std::move(*chosen),
+      base::BindOnce(
+          [](CommandRequest request, CommandReply reply, WorkspaceCommand run,
+             Profile* profile, const std::string& id) {
+            if (!profile) {
+              std::move(reply).Run(
+                  CommandError(request.id, kCommandFailed,
+                               "uw couldn't open that workspace."));
+              return;
+            }
+            const WorkspaceList::Workspace* workspace =
+                WorkspaceList::Get().Find(id);
+            std::move(run).Run(std::move(request), std::move(reply), profile,
+                               id, workspace ? workspace->name : std::string());
+          },
+          std::move(request), std::move(reply), std::move(run)));
 }
 
 BrowserWindowInterface* FrontWindow(Profile* profile) {

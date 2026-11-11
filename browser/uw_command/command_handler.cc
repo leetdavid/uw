@@ -5,7 +5,6 @@
 #include <utility>
 
 #include "base/functional/callback.h"
-#include "base/strings/strcat.h"
 #include "base/values.h"
 #include "components/version_info/version_info.h"
 #include "uw/components/uw_command/command_messages.h"
@@ -47,10 +46,7 @@ void HandleCommand(CommandRequest request,
                     std::move(connection));
     return;
   }
-  std::move(reply).Run(CommandError(
-      request.id, kMethodNotFound,
-      base::StrCat({"This uw can't answer ", request.method,
-                    ". Update uw, then try again."})));
+  std::move(reply).Run(UnknownMethod(request.id, request.method));
 }
 
 }  // namespace uw

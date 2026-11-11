@@ -18,7 +18,6 @@
 #include "uw/browser/agent/user_tabs.h"
 #include "uw/browser/uw_command/command_handler.h"
 #include "uw/browser/uw_command/command_workspace.h"
-#include "uw/browser/workspaces/workspace_list.h"
 #include "uw/components/agent/tab_tools.h"
 #include "uw/components/uw_command/command_messages.h"
 
@@ -173,43 +172,23 @@ void RunTabsCommand(CommandRequest request, CommandReply reply) {
     }
   }
   if (!tool && request.method != "tabs.list") {
-    std::move(reply).Run(
-        CommandError(request.id, kMethodNotFound,
-                     base::StrCat({"This uw can't answer ", request.method,
-                                   ". Update uw, then try again."})));
+    std::move(reply).Run(UnknownMethod(request.id, request.method));
     return;
   }
-  base::expected<CommandWorkspace, std::string> chosen =
-      ChooseWorkspace(request.params);
-  if (!chosen.has_value()) {
-    std::move(reply).Run(
-        CommandError(request.id, kCommandUsage, chosen.error()));
-    return;
-  }
-  LoadWorkspace(
-      std::move(*chosen),
+  RunInWorkspace(
+      std::move(request), std::move(reply),
       base::BindOnce(
-          [](CommandRequest request, CommandReply reply,
-             std::optional<size_t> tool, Profile* profile,
-             const std::string& id) {
-            if (!profile) {
-              std::move(reply).Run(
-                  CommandError(request.id, kCommandFailed,
-                               "uw couldn't open that workspace."));
-              return;
-            }
+          [](std::optional<size_t> tool, CommandRequest request,
+             CommandReply reply, Profile* profile, const std::string&,
+             const std::string& name) {
             if (tool) {
               Run(std::move(request), std::move(reply), *tool, profile);
               return;
             }
-            const WorkspaceList::Workspace* workspace =
-                WorkspaceList::Get().Find(id);
-            ListUserTabs(
-                profile,
-                base::BindOnce(&List, std::move(request), std::move(reply),
-                               workspace ? workspace->name : std::string()));
+            ListUserTabs(profile, base::BindOnce(&List, std::move(request),
+                                                 std::move(reply), name));
           },
-          std::move(request), std::move(reply), tool));
+          tool));
 }
 
 }  // namespace uw

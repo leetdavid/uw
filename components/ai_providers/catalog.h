@@ -62,6 +62,12 @@ class ModelCatalog {
   // switches thinking on or off, or takes a token budget, has no levels.
   // A Custom provider reads the catalog provider at its address.
   ModelAbilities For(const Provider& provider, std::string_view model) const;
+  // The same for many models of one provider: KeyOf(provider) once, then each
+  // model with that key.
+  std::optional<std::string> KeyOf(const Provider& provider) const;
+  ModelAbilities For(const Provider& provider,
+                     const std::optional<std::string>& provider_key,
+                     std::string_view model) const;
 
   // The format of `model`'s maker: Anthropic's models go over Anthropic
   // Messages, OpenAI's over OpenAI Responses, and any other over chat

@@ -323,10 +323,7 @@ void RunConnectorsCommand(CommandRequest request, CommandReply reply) {
         } else if (request.method == "connectors.signIn") {
           SignIn(std::move(request), std::move(reply));
         } else {
-          std::move(reply).Run(CommandError(
-              request.id, kMethodNotFound,
-              base::StrCat({"This uw can't answer ", request.method,
-                            ". Update uw, then try again."})));
+          std::move(reply).Run(UnknownMethod(request.id, request.method));
         }
       },
       std::move(request), std::move(reply)));

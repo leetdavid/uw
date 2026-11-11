@@ -3,6 +3,8 @@
 #ifndef UW_COMPONENTS_AI_PROVIDERS_PROVIDERS_H_
 #define UW_COMPONENTS_AI_PROVIDERS_PROVIDERS_H_
 
+#include <array>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -45,6 +47,41 @@ enum class ProviderPreset {
   kOllama = 5,
   kJev = 6,
 };
+
+// What uw knows of a preset.
+struct PresetFacts {
+  // The start of the preset's ids, as in uw://ai/providers/openai, and its
+  // models.dev provider when `in_catalog`.
+  std::string_view slug;
+  // What the Add provider menu fills in.
+  std::string_view name;
+  std::string_view address;
+  ProviderFormat format = ProviderFormat::kChatCompletions;
+  // The format of its decision models, when the preset alone decides it.
+  std::optional<ProviderFormat> decision_format;
+  bool in_catalog = false;
+};
+
+// One row for each ProviderPreset, in its order.
+inline constexpr auto kPresetFacts = std::to_array<PresetFacts>({
+    {"custom", "", ""},
+    {"openai", "OpenAI", "https://api.openai.com/v1",
+     ProviderFormat::kOpenAiResponses, ProviderFormat::kOpenAiDecisions, true},
+    {"anthropic", "Anthropic", "https://api.anthropic.com/v1",
+     ProviderFormat::kAnthropicMessages, std::nullopt, true},
+    {"openrouter", "OpenRouter", "https://openrouter.ai/api/v1",
+     ProviderFormat::kChatCompletions, ProviderFormat::kSystemOne, true},
+    {"vercel", "Vercel AI Gateway", "https://ai-gateway.vercel.sh/v1",
+     ProviderFormat::kChatCompletions, ProviderFormat::kOpenAiDecisions, true},
+    {"ollama", "Ollama", "http://localhost:11434/v1"},
+    {"jev", "Jev", "https://api.typesafe.ai/v1", ProviderFormat::kSystemOne},
+});
+static_assert(kPresetFacts.size() ==
+              static_cast<size_t>(ProviderPreset::kJev) + 1);
+
+constexpr const PresetFacts& FactsOf(ProviderPreset preset) {
+  return kPresetFacts[static_cast<size_t>(preset)];
+}
 
 struct Provider {
   std::string id;

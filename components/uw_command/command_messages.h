@@ -39,6 +39,8 @@ std::string CommandResult(const base::Value& id, base::Value result);
 std::string CommandError(const base::Value& id,
                          int code,
                          std::string_view message);
+// The error for a method this uw doesn't know.
+std::string UnknownMethod(const base::Value& id, std::string_view method);
 
 // A notification uw sends without being asked, such as a chat's next step.
 std::string CommandNotification(std::string_view method, base::Value params);

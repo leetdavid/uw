@@ -6,6 +6,7 @@
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/strcat.h"
 
 namespace uw {
 
@@ -57,6 +58,12 @@ std::string CommandError(const base::Value& id,
   error.Set("code", code);
   error.Set("message", message);
   return Line(id, "error", base::Value(std::move(error)));
+}
+
+std::string UnknownMethod(const base::Value& id, std::string_view method) {
+  return CommandError(id, kMethodNotFound,
+                      base::StrCat({"This uw can't answer ", method,
+                                    ". Update uw, then try again."}));
 }
 
 std::string CommandNotification(std::string_view method, base::Value params) {

@@ -145,9 +145,7 @@ std::string Answer(const CommandRequest& request,
     return CommandResult(request.id, Describe(*setting, profile, workspace));
   }
   if (request.method != "settings.set") {
-    return CommandError(request.id, kMethodNotFound,
-                        base::StrCat({"This uw can't answer ", request.method,
-                                      ". Update uw, then try again."}));
+    return UnknownMethod(request.id, request.method);
   }
   const std::string* text = request.params.FindString("value");
   if (!text) {
@@ -172,24 +170,13 @@ std::string Answer(const CommandRequest& request,
 }  // namespace
 
 void RunSettingsCommand(CommandRequest request, CommandReply reply) {
-  base::expected<CommandWorkspace, std::string> chosen =
-      ChooseWorkspace(request.params);
-  if (!chosen.has_value()) {
-    std::move(reply).Run(
-        CommandError(request.id, kCommandUsage, chosen.error()));
-    return;
-  }
-  LoadWorkspace(
-      std::move(*chosen),
-      base::BindOnce(
-          [](CommandRequest request, CommandReply reply, Profile* profile,
-             const std::string& workspace) {
-            std::move(reply).Run(
-                profile ? Answer(request, profile, workspace)
-                        : CommandError(request.id, kCommandFailed,
-                                       "uw couldn't open that workspace."));
-          },
-          std::move(request), std::move(reply)));
+  RunInWorkspace(std::move(request), std::move(reply),
+                 base::BindOnce([](CommandRequest request, CommandReply reply,
+                                   Profile* profile,
+                                   const std::string& workspace,
+                                   const std::string&) {
+                   std::move(reply).Run(Answer(request, profile, workspace));
+                 }));
 }
 
 }  // namespace uw

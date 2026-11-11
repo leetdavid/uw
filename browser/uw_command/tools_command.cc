@@ -31,10 +31,10 @@
 #include "uw/browser/agent/run_window_mark.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
+#include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/uw_command/command_handler.h"
 #include "uw/browser/uw_command/command_workspace.h"
-#include "uw/browser/workspaces/workspace_list.h"
 #include "uw/components/agent/agent_protocol.h"
 #include "uw/components/agent/tab_tools.h"
 #include "uw/components/uw_command/command_messages.h"
@@ -84,41 +84,20 @@ base::DictValue Error(std::string_view text) {
 }
 
 // A page or tab step's approval as the command reads a chat's.
-base::DictValue Described(const AgentTools::Approval& approval) {
-  base::ListValue tabs;
+base::Value Described(const AgentTools::Approval& approval) {
+  mojom::Approval shown;
+  shown.tab = approval.tab;
+  shown.site = approval.site;
+  shown.action = approval.action;
+  shown.reason = approval.reason;
+  shown.workspace = approval.workspace;
+  shown.workspace_icon = approval.workspace_icon;
   for (const AgentTools::Approval::Tab& tab : approval.tabs) {
-    tabs.Append(base::DictValue().Set("title", tab.title).Set("url", tab.url));
+    shown.tabs.push_back(mojom::ApprovalTab::New(tab.title, tab.url));
   }
-  return base::DictValue()
-      .Set("tab", approval.tab)
-      .Set("site", approval.site)
-      .Set("action", approval.action)
-      .Set("reason", approval.reason)
-      .Set("folder", "")
-      .Set("command", "")
-      .Set("text", "")
-      .Set("keys", base::ListValue())
-      .Set("connector", "")
-      .Set("tool", "")
-      .Set("arguments", base::DictValue())
-      .Set("canAlwaysAllow", false)
-      .Set("sensitive", false)
-      .Set("file", "")
-      .Set("workspace", approval.workspace)
-      .Set("workspaceIcon", approval.workspace_icon)
-      .Set("tabs", std::move(tabs))
-      .Set("task", approval.task)
-      .Set("newName", approval.new_name);
-}
-
-ApprovalMode ModeFrom(const std::string* name, const PrefService& prefs) {
-  if (!name) {
-    return ModeNamed(prefs.GetString(kAgentApprovalModePref));
-  }
-  if (*name == "ask-first") {
-    return ApprovalMode::kAskFirst;
-  }
-  return *name == "full-auto" ? ApprovalMode::kFullAuto : ApprovalMode::kAuto;
+  shown.task = approval.task;
+  shown.new_name = approval.new_name;
+  return DescribedApproval(shown);
 }
 
 class ToolSession;
@@ -422,20 +401,13 @@ ToolSession* SessionOf(const CommandConnection* connection) {
 void StartSession(CommandRequest request,
                   CommandReply reply,
                   base::WeakPtr<CommandConnection> connection) {
-  base::expected<CommandWorkspace, std::string> chosen =
-      ChooseWorkspace(request.params);
-  if (!chosen.has_value()) {
-    std::move(reply).Run(
-        CommandError(request.id, kCommandUsage, chosen.error()));
-    return;
-  }
-  LoadWorkspace(
-      std::move(*chosen),
+  RunInWorkspace(
+      std::move(request), std::move(reply),
       base::BindOnce(
-          [](CommandRequest request, CommandReply reply,
-             base::WeakPtr<CommandConnection> connection, Profile* profile,
-             const std::string& id) {
-            if (!profile || !connection) {
+          [](base::WeakPtr<CommandConnection> connection,
+             CommandRequest request, CommandReply reply, Profile* profile,
+             const std::string&, const std::string& name) {
+            if (!connection) {
               std::move(reply).Run(
                   CommandError(request.id, kCommandFailed,
                                "uw couldn't open that workspace."));
@@ -447,17 +419,15 @@ void StartSession(CommandRequest request,
             const std::string* client = request.params.FindString("client");
             Sessions().push_back(std::make_unique<ToolSession>(
                 profile, client ? *client : std::string("An outside agent"),
-                ModeFrom(request.params.FindString("mode"),
-                         *profile->GetPrefs()),
+                CommandModeFrom(request.params.FindString("mode"))
+                    .value_or(ModeNamed(profile->GetPrefs()->GetString(
+                        kAgentApprovalModePref))),
                 connection));
-            const WorkspaceList::Workspace* workspace =
-                WorkspaceList::Get().Find(id);
             std::move(reply).Run(CommandResult(
                 request.id,
-                base::Value(base::DictValue().Set(
-                    "workspace", workspace ? workspace->name : ""))));
+                base::Value(base::DictValue().Set("workspace", name))));
           },
-          std::move(request), std::move(reply), std::move(connection)));
+          std::move(connection)));
 }
 
 }  // namespace
@@ -504,10 +474,7 @@ void RunToolsCommand(CommandRequest request,
                     std::move(reply));
     return;
   }
-  std::move(reply).Run(
-      CommandError(request.id, kMethodNotFound,
-                   base::StrCat({"This uw can't answer ", request.method,
-                                 ". Update uw, then try again."})));
+  std::move(reply).Run(UnknownMethod(request.id, request.method));
 }
 
 }  // namespace uw

@@ -41,26 +41,6 @@ const char* ChoicePref(ModelSlot slot) {
   }
 }
 
-// The start of a preset's ids, as in uw://ai/providers/openai.
-const char* Slug(ProviderPreset preset) {
-  switch (preset) {
-    case ProviderPreset::kCustom:
-      return "custom";
-    case ProviderPreset::kOpenAi:
-      return "openai";
-    case ProviderPreset::kAnthropic:
-      return "anthropic";
-    case ProviderPreset::kOpenRouter:
-      return "openrouter";
-    case ProviderPreset::kVercelAiGateway:
-      return "vercel";
-    case ProviderPreset::kOllama:
-      return "ollama";
-    case ProviderPreset::kJev:
-      return "jev";
-  }
-}
-
 std::optional<ProviderPreset> PresetFrom(std::optional<int> value) {
   if (!value || *value < static_cast<int>(ProviderPreset::kCustom) ||
       *value > static_cast<int>(ProviderPreset::kJev)) {
@@ -119,39 +99,12 @@ void RegisterProviderPrefs(PrefRegistrySimple* registry) {
 }
 
 Provider PresetProvider(ProviderPreset preset) {
+  const PresetFacts& facts = FactsOf(preset);
   Provider provider;
   provider.preset = preset;
-  switch (preset) {
-    case ProviderPreset::kCustom:
-      break;
-    case ProviderPreset::kOpenAi:
-      provider.name = "OpenAI";
-      provider.address = "https://api.openai.com/v1";
-      provider.format = ProviderFormat::kOpenAiResponses;
-      break;
-    case ProviderPreset::kAnthropic:
-      provider.name = "Anthropic";
-      provider.address = "https://api.anthropic.com/v1";
-      provider.format = ProviderFormat::kAnthropicMessages;
-      break;
-    case ProviderPreset::kOpenRouter:
-      provider.name = "OpenRouter";
-      provider.address = "https://openrouter.ai/api/v1";
-      break;
-    case ProviderPreset::kVercelAiGateway:
-      provider.name = "Vercel AI Gateway";
-      provider.address = "https://ai-gateway.vercel.sh/v1";
-      break;
-    case ProviderPreset::kOllama:
-      provider.name = "Ollama";
-      provider.address = "http://localhost:11434/v1";
-      break;
-    case ProviderPreset::kJev:
-      provider.name = "Jev";
-      provider.address = "https://api.typesafe.ai/v1";
-      provider.format = ProviderFormat::kSystemOne;
-      break;
-  }
+  provider.name = facts.name;
+  provider.address = facts.address;
+  provider.format = facts.format;
   return provider;
 }
 
@@ -180,7 +133,7 @@ std::string AddProvider(PrefService& prefs, Provider provider) {
   for (const Provider& saved : ReadProviders(prefs)) {
     taken.push_back(saved.id);
   }
-  const std::string slug = Slug(provider.preset);
+  const std::string slug(FactsOf(provider.preset).slug);
   provider.id = slug;
   for (int n = 2; std::ranges::contains(taken, provider.id); ++n) {
     provider.id = base::StrCat({slug, "-", base::NumberToString(n)});
@@ -271,17 +224,9 @@ std::optional<ProviderFormat> LanguageFormatOf(const Provider& provider) {
 }
 
 std::optional<ProviderFormat> DecisionFormatOf(const Provider& provider) {
-  switch (provider.preset) {
-    case ProviderPreset::kOpenAi:
-    case ProviderPreset::kVercelAiGateway:
-      return ProviderFormat::kOpenAiDecisions;
-    case ProviderPreset::kOpenRouter:
-      return ProviderFormat::kSystemOne;
-    case ProviderPreset::kCustom:
-    case ProviderPreset::kAnthropic:
-    case ProviderPreset::kOllama:
-    case ProviderPreset::kJev:
-      break;
+  if (const std::optional<ProviderFormat> preset_format =
+          FactsOf(provider.preset).decision_format) {
+    return preset_format;
   }
   switch (provider.format) {
     case ProviderFormat::kOpenAiDecisions:

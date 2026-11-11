@@ -10,6 +10,7 @@
 #include "base/functional/callback_forward.h"
 #include "base/types/expected.h"
 #include "base/values.h"
+#include "uw/browser/uw_command/command_handler.h"
 
 class BrowserWindowInterface;
 class Profile;
@@ -34,6 +35,18 @@ base::expected<CommandWorkspace, std::string> ChooseWorkspace(
 using WorkspaceLoaded =
     base::OnceCallback<void(Profile* profile, const std::string& id)>;
 void LoadWorkspace(CommandWorkspace workspace, WorkspaceLoaded loaded);
+
+// Chooses and loads the workspace `request` names, then gives `run` the
+// request, the profile, and the workspace's id and name. Replies itself when
+// no workspace has that name or its profile can't load.
+using WorkspaceCommand = base::OnceCallback<void(CommandRequest request,
+                                                 CommandReply reply,
+                                                 Profile* profile,
+                                                 const std::string& id,
+                                                 const std::string& name)>;
+void RunInWorkspace(CommandRequest request,
+                    CommandReply reply,
+                    WorkspaceCommand run);
 
 // The names of the workspaces on `profile`, or of every workspace when it is
 // null.

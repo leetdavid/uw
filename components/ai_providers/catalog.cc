@@ -18,35 +18,16 @@ constexpr int kSavedVersion = 4;
 // gives no input limit of its own.
 constexpr int64_t kAnswerRoom = 16000;
 
-constexpr ProviderPreset kCatalogPresets[] = {
-    ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
-    ProviderPreset::kOpenRouter, ProviderPreset::kVercelAiGateway};
-
 // The models.dev provider behind each preset that has one.
 std::optional<std::string_view> CatalogKey(ProviderPreset preset) {
-  switch (preset) {
-    case ProviderPreset::kOpenAi:
-      return "openai";
-    case ProviderPreset::kAnthropic:
-      return "anthropic";
-    case ProviderPreset::kOpenRouter:
-      return "openrouter";
-    case ProviderPreset::kVercelAiGateway:
-      return "vercel";
-    case ProviderPreset::kCustom:
-    case ProviderPreset::kOllama:
-    case ProviderPreset::kJev:
-      return std::nullopt;
-  }
+  const PresetFacts& facts = FactsOf(preset);
+  return facts.in_catalog ? std::optional(facts.slug) : std::nullopt;
 }
 
 bool IsPresetKey(std::string_view key) {
-  for (ProviderPreset preset : kCatalogPresets) {
-    if (*CatalogKey(preset) == key) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(kPresetFacts, [&](const PresetFacts& facts) {
+    return facts.in_catalog && facts.slug == key;
+  });
 }
 
 // An address as uw compares them: without a trailing slash.
@@ -196,6 +177,7 @@ std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
   if (!wanted.is_valid()) {
     return std::nullopt;
   }
+  const std::string wanted_spec = Trimmed(wanted);
   std::optional<std::string> on_host;
   int hosts = 0;
   for (const auto [key, value] : addresses_) {
@@ -203,7 +185,7 @@ std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
     if (!known.is_valid()) {
       continue;
     }
-    if (Trimmed(known) == Trimmed(wanted)) {
+    if (Trimmed(known) == wanted_spec) {
       return key;
     }
     if (known.host() == wanted.host()) {
@@ -214,17 +196,31 @@ std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
   return hosts == 1 ? on_host : std::nullopt;
 }
 
+std::optional<std::string> ModelCatalog::KeyOf(const Provider& provider) const {
+  if (provider.format == ProviderFormat::kEachModel) {
+    return std::nullopt;
+  }
+  if (provider.preset == ProviderPreset::kCustom) {
+    return KeyAt(provider.address);
+  }
+  if (const std::optional<std::string_view> preset_key =
+          CatalogKey(provider.preset)) {
+    return std::string(*preset_key);
+  }
+  return std::nullopt;
+}
+
 ModelAbilities ModelCatalog::For(const Provider& provider,
                                  std::string_view model) const {
-  std::optional<std::string> key;
-  if (provider.format == ProviderFormat::kEachModel) {
-    key = MakerKeyOf(model);
-  } else if (provider.preset == ProviderPreset::kCustom) {
-    key = KeyAt(provider.address);
-  } else if (const std::optional<std::string_view> preset_key =
-                 CatalogKey(provider.preset)) {
-    key = std::string(*preset_key);
-  }
+  return For(provider, KeyOf(provider), model);
+}
+
+ModelAbilities ModelCatalog::For(const Provider& provider,
+                                 const std::optional<std::string>& provider_key,
+                                 std::string_view model) const {
+  const std::optional<std::string> key =
+      provider.format == ProviderFormat::kEachModel ? MakerKeyOf(model)
+                                                    : provider_key;
   const base::DictValue* models = key ? models_.FindDict(*key) : nullptr;
   const base::DictValue* known = models ? models->FindDict(model) : nullptr;
   if (!known) {

@@ -250,8 +250,9 @@ void ModelLister::OnCatalog(Listing* listing, const ModelCatalog* catalog) {
     return;
   }
   if (catalog) {
+    const std::optional<std::string> key = catalog->KeyOf(listing->provider);
     for (ListedModel& model : listing->result.models) {
-      model.abilities = catalog->For(listing->provider, model.name);
+      model.abilities = catalog->For(listing->provider, key, model.name);
       model.format = FormatOfModel(listing->provider, model.name, catalog);
     }
   }

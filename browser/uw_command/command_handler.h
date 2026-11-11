@@ -3,13 +3,20 @@
 #ifndef UW_BROWSER_UW_COMMAND_COMMAND_HANDLER_H_
 #define UW_BROWSER_UW_COMMAND_COMMAND_HANDLER_H_
 
+#include <optional>
 #include <string>
 
 #include "base/functional/callback_forward.h"
 #include "base/memory/weak_ptr.h"
+#include "base/values.h"
 
 namespace uw {
 
+namespace mojom {
+class Approval;
+}
+
+enum class ApprovalMode;
 class CommandConnection;
 struct CommandRequest;
 
@@ -34,6 +41,13 @@ void RunConnectorsCommand(CommandRequest request, CommandReply reply);
 void RunChatCommand(CommandRequest request,
                     CommandReply reply,
                     base::WeakPtr<CommandConnection> connection);
+
+// An approval as the command reads it.
+base::Value DescribedApproval(const mojom::Approval& approval);
+
+// The approval mode the command calls `name`, such as "ask-first": nothing
+// without a name, and auto for a name it doesn't know.
+std::optional<ApprovalMode> CommandModeFrom(const std::string* name);
 
 // uw memory: list and forget agent memory. See
 // docs/plans/agent-memory.md#the-uw-command.

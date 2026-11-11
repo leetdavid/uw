@@ -36,7 +36,6 @@
 #include "uw/browser/uw_command/command_channel.h"
 #include "uw/browser/uw_command/command_handler.h"
 #include "uw/browser/uw_command/command_workspace.h"
-#include "uw/browser/workspaces/workspace_list.h"
 #include "uw/components/agent/skills.h"
 #include "uw/components/connectors/mcp.h"
 #include "uw/components/uw_command/command_messages.h"
@@ -92,39 +91,6 @@ base::Value Parsed(const std::string& json) {
   std::optional<base::Value> parsed =
       base::JSONReader::Read(json, base::JSON_PARSE_RFC);
   return parsed ? std::move(*parsed) : base::Value(base::DictValue());
-}
-
-base::Value Described(const mojom::Approval& approval) {
-  base::DictValue described;
-  described.Set("tab", approval.tab);
-  described.Set("site", approval.site);
-  described.Set("action", approval.action);
-  described.Set("reason", approval.reason);
-  described.Set("folder", approval.folder);
-  described.Set("command", approval.command);
-  described.Set("text", approval.text);
-  base::ListValue keys;
-  for (const std::string& key : approval.keys) {
-    keys.Append(key);
-  }
-  described.Set("keys", std::move(keys));
-  described.Set("connector", approval.connector);
-  described.Set("tool", approval.tool);
-  described.Set("arguments", Parsed(approval.arguments));
-  described.Set("canAlwaysAllow", approval.can_always_allow);
-  described.Set("sensitive", approval.sensitive);
-  described.Set("file", approval.file);
-  described.Set("workspace", approval.workspace);
-  described.Set("workspaceIcon", approval.workspace_icon);
-  base::ListValue tabs;
-  for (const mojom::ApprovalTabPtr& tab : approval.tabs) {
-    tabs.Append(
-        base::DictValue().Set("title", tab->title).Set("url", tab->url));
-  }
-  described.Set("tabs", std::move(tabs));
-  described.Set("task", approval.task);
-  described.Set("newName", approval.new_name);
-  return base::Value(std::move(described));
 }
 
 class ChatSession;
@@ -223,7 +189,8 @@ class ChatSession : public UwChatHandler::Watcher {
 
   void OnApproval(const mojom::Approval* approval) override {
     base::DictValue sent;
-    sent.Set("approval", approval ? Described(*approval) : base::Value());
+    sent.Set("approval",
+             approval ? DescribedApproval(*approval) : base::Value());
     Notify("chat.approval", base::Value(std::move(sent)));
   }
 
@@ -376,19 +343,6 @@ bool OpenOutOfSight(Profile* profile, const std::string& id, bool started) {
   return true;
 }
 
-std::optional<ApprovalMode> ModeFrom(const std::string* name) {
-  if (!name) {
-    return std::nullopt;
-  }
-  if (*name == "ask-first") {
-    return ApprovalMode::kAskFirst;
-  }
-  if (*name == "full-auto") {
-    return ApprovalMode::kFullAuto;
-  }
-  return ApprovalMode::kAuto;
-}
-
 UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
   UwChatHandler::CommandAsk ask;
   if (const std::string* text = params.FindString("text")) {
@@ -407,7 +361,7 @@ UwChatHandler::CommandAsk AskFrom(const base::DictValue& params) {
       }
     }
   }
-  ask.mode = ModeFrom(params.FindString("mode"));
+  ask.mode = CommandModeFrom(params.FindString("mode"));
   if (const std::string* model = params.FindString("model")) {
     ask.model = *model;
   }
@@ -636,8 +590,9 @@ void AboutOpenChat(CommandRequest request, CommandReply reply) {
   base::DictValue result;
   result.Set("chat", handler->id());
   if (method == "chats.waiting") {
-    result.Set("waiting", handler->waiting() ? Described(*handler->waiting())
-                                             : base::Value());
+    result.Set("waiting", handler->waiting()
+                              ? DescribedApproval(*handler->waiting())
+                              : base::Value());
   } else if (method == "chats.approve") {
     if (!handler->waiting()) {
       std::move(reply).Run(
@@ -702,10 +657,7 @@ void AboutOpenChat(CommandRequest request, CommandReply reply) {
       }
     }
   } else {
-    std::move(reply).Run(
-        CommandError(request.id, kMethodNotFound,
-                     base::StrCat({"This uw can't answer ", method,
-                                   ". Update uw, then try again."})));
+    std::move(reply).Run(UnknownMethod(request.id, method));
     return;
   }
   std::move(reply).Run(
@@ -713,6 +665,52 @@ void AboutOpenChat(CommandRequest request, CommandReply reply) {
 }
 
 }  // namespace
+
+base::Value DescribedApproval(const mojom::Approval& approval) {
+  base::DictValue described;
+  described.Set("tab", approval.tab);
+  described.Set("site", approval.site);
+  described.Set("action", approval.action);
+  described.Set("reason", approval.reason);
+  described.Set("folder", approval.folder);
+  described.Set("command", approval.command);
+  described.Set("text", approval.text);
+  base::ListValue keys;
+  for (const std::string& key : approval.keys) {
+    keys.Append(key);
+  }
+  described.Set("keys", std::move(keys));
+  described.Set("connector", approval.connector);
+  described.Set("tool", approval.tool);
+  described.Set("arguments", Parsed(approval.arguments));
+  described.Set("canAlwaysAllow", approval.can_always_allow);
+  described.Set("sensitive", approval.sensitive);
+  described.Set("file", approval.file);
+  described.Set("workspace", approval.workspace);
+  described.Set("workspaceIcon", approval.workspace_icon);
+  base::ListValue tabs;
+  for (const mojom::ApprovalTabPtr& tab : approval.tabs) {
+    tabs.Append(
+        base::DictValue().Set("title", tab->title).Set("url", tab->url));
+  }
+  described.Set("tabs", std::move(tabs));
+  described.Set("task", approval.task);
+  described.Set("newName", approval.new_name);
+  return base::Value(std::move(described));
+}
+
+std::optional<ApprovalMode> CommandModeFrom(const std::string* name) {
+  if (!name) {
+    return std::nullopt;
+  }
+  if (*name == "ask-first") {
+    return ApprovalMode::kAskFirst;
+  }
+  if (*name == "full-auto") {
+    return ApprovalMode::kFullAuto;
+  }
+  return ApprovalMode::kAuto;
+}
 
 void RunChatCommand(CommandRequest request,
                     CommandReply reply,
@@ -723,40 +721,26 @@ void RunChatCommand(CommandRequest request,
     AboutOpenChat(std::move(request), std::move(reply));
     return;
   }
-  base::expected<CommandWorkspace, std::string> chosen =
-      ChooseWorkspace(request.params);
-  if (!chosen.has_value()) {
-    std::move(reply).Run(
-        CommandError(request.id, kCommandUsage, chosen.error()));
-    return;
-  }
-  LoadWorkspace(
-      std::move(*chosen),
+  RunInWorkspace(
+      std::move(request), std::move(reply),
       base::BindOnce(
-          [](CommandRequest request, CommandReply reply,
-             base::WeakPtr<CommandConnection> connection, Profile* profile,
-             const std::string& id) {
-            const WorkspaceList::Workspace* workspace =
-                WorkspaceList::Get().Find(id);
-            std::string name = workspace ? workspace->name : std::string();
-            if (!profile) {
-              std::move(reply).Run(
-                  CommandError(request.id, kCommandFailed,
-                               "uw couldn't open that workspace."));
-            } else if (request.method == "chats.list") {
+          [](base::WeakPtr<CommandConnection> connection,
+             CommandRequest request, CommandReply reply, Profile* profile,
+             const std::string&, const std::string& name) {
+            if (request.method == "chats.list") {
               List(std::move(request), std::move(reply), profile);
             } else if (!connection) {
               std::move(reply).Run(CommandError(request.id, kCommandFailed,
                                                 "The command went away."));
             } else if (request.method == "chats.start") {
               Start(std::move(request), std::move(reply), std::move(connection),
-                    profile, std::move(name));
+                    profile, name);
             } else {
               Resume(std::move(request), std::move(reply),
-                     std::move(connection), profile, std::move(name));
+                     std::move(connection), profile, name);
             }
           },
-          std::move(request), std::move(reply), std::move(connection)));
+          std::move(connection)));
 }
 
 }  // namespace uw
