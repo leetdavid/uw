@@ -182,7 +182,8 @@ void KeyHint::AddedToWidget() {
           // it moves, and its branch stays faded until the drop.
           TabOrganizationController* controller =
               ControllerOf(hint->tab_.Get());
-          if (Hovered().tab == hint->tab_ && controller->dragging_alone()) {
+          if (Hovered().tab == hint->tab_ && controller &&
+              controller->dragging_alone()) {
             DraggedAlone() = hint->tab_;
           }
           if (Hovered().tab == hint->tab_ || DraggedAlone() == hint->tab_) {

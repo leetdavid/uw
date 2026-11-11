@@ -22,6 +22,7 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -49,6 +50,7 @@
 #include "ui/gfx/scoped_animation_duration_scale_mode.h"
 #include "ui/views/test/button_test_api.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_tracker.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
@@ -733,6 +735,23 @@ IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
   Settle();
   EXPECT_EQ(ShownOn(tree.b), KeyHint::Shown::kNone);
   EXPECT_EQ(OpacitiesOn(tree.b), std::set<float>{1.0f});
+}
+
+// Sentry UW-7. A row that closes under the pointer stays the hovered one
+// while it slides away, with no tab behind it. A press on the row that moved
+// up under the pointer begins a drag then.
+IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
+                       ADragBeginsWhileTheRowUnderThePointerCloses) {
+  const Tree tree = OpenTree();
+  PointAtRow(tree.d);
+  views::ViewTracker row(TabRowOf(tree.d));
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(tree.d),
+                             TabCloseTypes::CLOSE_NONE);
+  ASSERT_TRUE(row.view() && row.view()->GetWidget());
+
+  controller()->BeginTabDrag(/*alone=*/false);
+  controller()->EndTabDrag();
+  EXPECT_FALSE(controller()->dragging());
 }
 
 IN_PROC_BROWSER_TEST_F(MouseActionsBrowserTest,
