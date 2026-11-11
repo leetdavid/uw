@@ -18,6 +18,7 @@
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
+#include "uw/browser/ai_providers/api_key_store.h"
 #include "url/gurl.h"
 
 namespace uw {
@@ -159,7 +160,7 @@ void GoogleCloudTranslator::CheckKey(
 
 GoogleCloudTranslator::GoogleCloudTranslator(
     scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
-    std::string key)
+    std::optional<std::string> key)
     : loader_factory_(std::move(loader_factory)), key_(std::move(key)) {}
 
 GoogleCloudTranslator::~GoogleCloudTranslator() = default;
@@ -174,7 +175,9 @@ void GoogleCloudTranslator::Translate(std::vector<std::string> segments,
   }
   const size_t count = segments.size();
   loaders_.push_front(
-      Request(key_, segments, source_language, target_language));
+      Request(key_ ? *key_
+                   : ApiKeyStore().GetKey(kKeyAccount).value_or(std::string()),
+              segments, source_language, target_language));
   Loaders::iterator loader = loaders_.begin();
   (*loader)->DownloadToString(
       loader_factory_.get(),

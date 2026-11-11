@@ -14,7 +14,6 @@
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
-#include "uw/browser/ai_providers/api_key_store.h"
 #include "uw/browser/translation/ai_translator.h"
 #include "uw/browser/translation/device_translator.h"
 #include "uw/browser/translation/google_cloud_translator.h"
@@ -176,10 +175,7 @@ SegmentTranslator* PageTranslator::TranslatorFor(TranslationEngine engine,
       if (!google_cloud_) {
         google_cloud_ = std::make_unique<GoogleCloudTranslator>(
             profile->GetDefaultStoragePartition()
-                ->GetURLLoaderFactoryForBrowserProcess(),
-            ApiKeyStore()
-                .GetKey(GoogleCloudTranslator::kKeyAccount)
-                .value_or(std::string()));
+                ->GetURLLoaderFactoryForBrowserProcess());
       }
       return google_cloud_.get();
     case TranslationEngine::kAi:

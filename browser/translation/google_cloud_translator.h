@@ -36,9 +36,11 @@ class GoogleCloudTranslator : public SegmentTranslator {
       const std::string& key,
       base::OnceCallback<void(std::optional<std::string>)> callback);
 
-  GoogleCloudTranslator(
+  // Without a `key`, each request uses the saved one, so a key replaced in
+  // Settings reaches the tabs that are open.
+  explicit GoogleCloudTranslator(
       scoped_refptr<network::SharedURLLoaderFactory> loader_factory,
-      std::string key);
+      std::optional<std::string> key = std::nullopt);
   ~GoogleCloudTranslator() override;
 
   // SegmentTranslator:
@@ -57,7 +59,7 @@ class GoogleCloudTranslator : public SegmentTranslator {
 
   scoped_refptr<network::SharedURLLoaderFactory> loader_factory_;
   // Never logged.
-  const std::string key_;
+  const std::optional<std::string> key_;
   Loaders loaders_;
   base::WeakPtrFactory<GoogleCloudTranslator> weak_factory_{this};
 };
