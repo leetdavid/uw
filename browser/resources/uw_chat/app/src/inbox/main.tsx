@@ -5,9 +5,8 @@
 // uw-scheduled-page-and-inbox, and docs/product.md, "Scheduled chats".
 import "@/trusted-types";
 import "@/theme-colors";
-import { StrictMode, useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
-import { MotionConfig, motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import {
   ArrowRight,
   Clock,
@@ -21,26 +20,20 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { KIND_COLORS } from "../alert-kinds";
 import { FadeOver, FitToContent, SLIDE } from "../fit-to-content";
+import { mount, usePopUp } from "../mount";
+import { clockText, dateText, daysFromToday } from "../time-text";
 import { connect, inboxHandler, inboxPage, type InboxAlert } from "./inbox-api";
-
-function clockText(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 // "Today", "Yesterday", or the date, such as "Oct 24".
 function dayText(ms: number): string {
-  const day = new Date(ms).setHours(0, 0, 0, 0);
-  const days = Math.round((new Date().setHours(0, 0, 0, 0) - day) / 86_400_000);
+  const days = daysFromToday(ms);
   if (days === 0) {
     return "Today";
   }
-  if (days === 1) {
+  if (days === -1) {
     return "Yesterday";
   }
-  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
+  return dateText(ms);
 }
 
 function groupsOf(alerts: InboxAlert[]): { day: string; alerts: InboxAlert[] }[] {
@@ -132,10 +125,11 @@ function Alert({ alert }: { alert: InboxAlert }) {
       {alert.retry && (
         <Button
           variant="ghost"
+          tone="primary"
           size="compact"
           leadingIcon={RefreshCw}
           data-retry={alert.id}
-          className="absolute bottom-2 left-7 h-6 text-primary hover:bg-primary/[0.08] hover:text-primary"
+          className="absolute bottom-2 left-7 h-6"
           onClick={() => inboxHandler.retry(alert.id)}
         >
           Retry
@@ -150,7 +144,6 @@ function Inbox() {
   const [scheduled, setScheduled] = useState(0);
   const [retryAll, setRetryAll] = useState(0);
   const [frosted, setFrosted] = useState(false);
-  const shown = useRef(false);
   useEffect(() => {
     const id = inboxPage.onAlerts.addListener(
       (
@@ -170,15 +163,7 @@ function Inbox() {
       inboxPage.removeListener(id);
     };
   }, []);
-  useEffect(() => {
-    document.documentElement.classList.toggle("frosted", frosted);
-  }, [frosted]);
-  useEffect(() => {
-    if (alerts && !shown.current) {
-      shown.current = true;
-      inboxHandler.showUI();
-    }
-  }, [alerts]);
+  usePopUp(alerts !== null, frosted, () => inboxHandler.showUI());
   if (!alerts) {
     return null;
   }
@@ -196,6 +181,7 @@ function Inbox() {
             <Button
               id="inbox-retry-all"
               variant="ghost"
+              tone="primary"
               size="compact"
               leadingIcon={RefreshCw}
               title={
@@ -203,7 +189,7 @@ function Inbox() {
                   ? "Run the failed scheduled chat again"
                   : `Run the ${retryAll} failed scheduled chats again`
               }
-              className="text-[12.5px] text-primary hover:bg-primary/[0.08] hover:text-primary"
+              className="text-[12.5px]"
               onClick={() => inboxHandler.retryAll()}
             >
               Retry all ({retryAll})
@@ -283,17 +269,4 @@ function Inbox() {
   );
 }
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <Inbox />
-    </MotionConfig>
-  </StrictMode>,
-);
+mount(<Inbox />);

@@ -8,6 +8,7 @@ import { Tooltip as Hint } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ChatUsage, MessageCost } from "./chat-api";
 import { Tooltip, nearest, useHovered, useWidth } from "./chart";
+import { dateText } from "./time-text";
 
 // The parts of the context, in order, in the dataviz palette's light and dark
 // steps.
@@ -40,10 +41,6 @@ export function costText(cost: number): string {
 // A price per million tokens: $3, $0.07, or $1.10.
 function priceText(price: number): string {
   return `$${Number.isInteger(price) ? price : price.toFixed(2)}`;
-}
-
-function dayText(ms: number): string {
-  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 // Whether the chat shows a cost: some request had a price.
@@ -229,7 +226,7 @@ function CostSection({ usage }: { usage: ChatUsage }) {
           priced ? (
             <>
               <b className="font-semibold text-foreground">{costText(usage.total)}</b>{" "}
-              {usage.partial && usage.countedSince ? `since ${dayText(usage.countedSince)}` : "this chat"}
+              {usage.partial && usage.countedSince ? `since ${dateText(usage.countedSince)}` : "this chat"}
             </>
           ) : null
         }
@@ -260,7 +257,7 @@ function CostSection({ usage }: { usage: ChatUsage }) {
       )}
       {usage.partial && usage.countedSince > 0 && (
         <p className="mt-2 text-[12px] text-muted-foreground">
-          uw counts from {dayText(usage.countedSince)}. Earlier requests aren't in these numbers.
+          uw counts from {dateText(usage.countedSince)}. Earlier requests aren't in these numbers.
         </p>
       )}
       {priced && usage.messages.length > 1 && (

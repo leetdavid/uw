@@ -1,10 +1,10 @@
 // A chat's trigger on the chat page: the strip while it runs, its wakes, and
 // why it stopped. See docs/product.md, "Scheduled chats".
-import { useEffect, useState } from "react";
 import { Square, Terminal as TerminalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chatHandler, type Step, type TriggerState } from "./chat-api";
 import { whenText } from "./schedule";
+import { useNow } from "./use-now";
 
 function Command({ command }: { command: string }) {
   return (
@@ -24,11 +24,7 @@ function age(since: number): string {
 
 export function TriggerStrip({ state }: { state: TriggerState }) {
   // The age moves on without a change from the browser.
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => tick((count) => count + 1), 30_000);
-    return () => clearInterval(timer);
-  }, []);
+  useNow(true, 30_000);
   const wakes =
     state.wakes === 0
       ? "no wakes yet"

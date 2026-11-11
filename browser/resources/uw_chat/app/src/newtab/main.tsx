@@ -4,15 +4,12 @@
 import "@/trusted-types";
 import "@/theme-colors";
 import {
-  StrictMode,
   useEffect,
   useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
 import {
   Activity,
   ArrowUp,
@@ -43,11 +40,15 @@ import { MenuItem } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
 import { KIND_COLORS } from "../alert-kinds";
 import type { ChatSchedule, ScheduleState } from "../chat-api";
+import { favicon } from "../favicon";
+import { mount } from "../mount";
 import { CHIP, ModelChip } from "../providers/model-chip";
 import { ProviderIcon } from "../providers/provider-parts";
 import { type ProviderPreset, providersHandler } from "../providers/providers-api";
+import { useModels } from "../providers/use-models";
 import { repeatText, ScheduleRows } from "../schedule";
-import { useModels } from "../watch-card/watch-parts";
+import { clockText, dateText, daysFromToday } from "../time-text";
+import { useNow } from "../use-now";
 import {
   connect,
   newTabHandler,
@@ -182,7 +183,7 @@ function Suggestions({
               <img
                 alt=""
                 className="size-4"
-                src={`chrome://favicon2/?size=16&scaleFactor=2x&pageUrl=${encodeURIComponent(match.destinationUrl)}`}
+                src={favicon(match.destinationUrl)}
               />
             )}
             <span className="truncate font-medium">{title}</span>
@@ -461,12 +462,8 @@ function Box({ box }: { box: NewTabBox }) {
 // "9:02" today, else with its day: "Tomorrow 7:30", "Yesterday 19:00", or
 // "Oct 24 10:00".
 function rowTime(ms: number): string {
-  const clock = new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  const day = new Date(ms).setHours(0, 0, 0, 0);
-  const days = Math.round((day - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
+  const clock = clockText(ms);
+  const days = daysFromToday(ms);
   if (days === 0) {
     return clock;
   }
@@ -475,7 +472,7 @@ function rowTime(ms: number): string {
       ? "Tomorrow"
       : days === -1
         ? "Yesterday"
-        : new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
+        : dateText(ms);
   return `${name} ${clock}`;
 }
 
@@ -759,19 +756,6 @@ function mediaTime(seconds: number): string {
   return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
-// The time, every `every` milliseconds while `on`.
-function useNow(on: boolean, every = 1000): number {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!on) {
-      return;
-    }
-    const id = setInterval(() => setNow(Date.now()), every);
-    return () => clearInterval(id);
-  }, [on, every]);
-  return now;
-}
-
 // "Playing · 12:41 of 58:20". A playing video moves on from where the browser
 // last said it was.
 function videoText(row: NewTabRunningRow, now: number): string {
@@ -868,10 +852,7 @@ function pausedText(tabs: NewTabTabs): string {
     case OrganizationPause.kOff:
       return "Automatic organization is on";
     case OrganizationPause.kTimed:
-      return `Paused until ${new Date(tabs.pausedUntil).toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      })}`;
+      return `Paused until ${clockText(tabs.pausedUntil)}`;
     case OrganizationPause.kUntilLaunch:
       return "Paused until next launch";
     default:
@@ -1125,17 +1106,4 @@ function NewTabPage() {
   );
 }
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <NewTabPage />
-    </MotionConfig>
-  </StrictMode>,
-);
+mount(<NewTabPage />);

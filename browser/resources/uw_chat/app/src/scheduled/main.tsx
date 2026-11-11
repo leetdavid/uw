@@ -5,9 +5,7 @@
 // uw-scheduled-page-and-inbox, and docs/product.md, "Scheduled chats".
 import "@/trusted-types";
 import "@/theme-colors";
-import { StrictMode, useEffect, useState, type ReactNode } from "react";
-import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   CircleX,
@@ -36,9 +34,10 @@ import {
   type ScheduleState,
   type Step,
 } from "../chat-api";
+import { mount } from "../mount";
+import { useModels } from "../providers/use-models";
 import { repeatText, ScheduleRows, WATCH_CHIPS } from "../schedule";
 import {
-  useModels,
   WatchForm,
   WatchList,
   Watched,
@@ -51,16 +50,10 @@ import {
   type ScheduledRow,
   type WatchAddress,
 } from "./scheduled-api";
-import { Change, dateText, daysFromToday, latestOf, Trend } from "./trend";
+import { clockText, dateText, daysFromToday } from "../time-text";
+import { Change, latestOf, Trend } from "./trend";
 
 const AMBER = "text-[#B4580A] dark:text-warning";
-
-function clockText(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
 
 // "Today 9:02", "Tomorrow 9:00", "Yesterday 19:00", "Mon 9:00" within the
 // week, or "Oct 24 10:00".
@@ -1004,17 +997,4 @@ function ScheduledPage() {
   );
 }
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <ScheduledPage />
-    </MotionConfig>
-  </StrictMode>,
-);
+mount(<ScheduledPage />);

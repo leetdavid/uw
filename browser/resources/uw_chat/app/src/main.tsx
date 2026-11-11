@@ -5,14 +5,11 @@ import "@/trusted-types";
 import "@/theme-colors";
 import {
   Fragment,
-  StrictMode,
   useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import {
   Brain,
@@ -60,7 +57,7 @@ import {
   DropdownSubTrigger,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
-import { MenuItem } from "@/components/ui/menu-item";
+import { MenuItem, menuItemNoteClass } from "@/components/ui/menu-item";
 import {
   InputMessage,
   type QueuedMessage,
@@ -115,6 +112,9 @@ import {
 import { FileCard } from "./file-card";
 import { MAX_FILES, attach, isImage, limit, prepareCopies } from "./files";
 import { BrainOff } from "./brain-off";
+import { mount } from "./mount";
+import { clockText, dateText } from "./time-text";
+import { useNow } from "./use-now";
 import {
   ChatMemory,
   MemoryCounts,
@@ -123,11 +123,8 @@ import {
   splitMemory,
 } from "./memory";
 import { AI_SECTIONS, ProviderIcon } from "./providers/provider-parts";
-import {
-  providersHandler,
-  type ModelList,
-  type Provider,
-} from "./providers/providers-api";
+import { providersHandler, type Provider } from "./providers/providers-api";
+import { useModels } from "./providers/use-models";
 import {
   ApprovalChoice,
   ApprovalMode,
@@ -648,11 +645,7 @@ function ranFor(ms: number): string {
 
 // The step that waits for a command, while it runs, as Fluid's active step.
 function RunningStep({ running }: { running: Running }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const now = useNow(true);
   return (
     <ThinkingStep
       className="step running"
@@ -837,8 +830,8 @@ const STATE_NAMES: Record<ChatState, string> = {
 function when(updated: number): string {
   const date = new Date(updated);
   return date.toDateString() === new Date().toDateString()
-    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    : date.toLocaleDateString([], { month: "short", day: "numeric" });
+    ? clockText(updated)
+    : dateText(updated);
 }
 
 // Every saved chat, the one the user last wrote to first. A click goes to the
@@ -1229,7 +1222,7 @@ function PlusMenu({
                   closeOnClick={false}
                   data-chat-connector={connector.name}
                   data-note={NOTES[connector.state]}
-                  className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+                  className={menuItemNoteClass}
                   onSelect={() => chatHandler.setConnectorOn(connector.name, !connector.on)}
                 />
               ))
@@ -1266,7 +1259,7 @@ function PlusMenu({
                   : "Recall and keep memories in this chat"
               }
               data-note={memoryLocked ? "Locked" : undefined}
-              className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+              className={menuItemNoteClass}
               onSelect={onMemory}
             />
           </>
@@ -1616,15 +1609,9 @@ function Chat() {
   const [files, setFiles] = useState<File[]>([]);
   // Why files were left out of the composer, until it changes.
   const [leftOut, setLeftOut] = useState("");
-  const [providers, setProviders] = useState<Provider[] | null>(null);
-  const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
-    {},
-  );
-  const listed = useRef(new Set<string>());
   const [working, setWorking] = useState(false);
   const [since, setSince] = useState(0);
   const [trigger, setTrigger] = useState<TriggerState | null>(null);
-  const [, setNow] = useState(0);
   const [draft, setDraft] = useState("");
   // A prompt's argument values, while one is picked.
   const [promptValues, setPromptValues] = useState<Record<string, string>>({});
@@ -1648,13 +1635,7 @@ function Chat() {
   const list = useStickToBottom({ initial: "instant", resize: "instant" });
 
   // Keeps the header's minutes current while the agent works.
-  useEffect(() => {
-    if (!working) {
-      return;
-    }
-    const timer = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(timer);
-  }, [working]);
+  useNow(working, 15_000);
 
   useEffect(() => {
     const listeners = [
@@ -1753,7 +1734,6 @@ function Chat() {
     connect();
     loadSkills();
     loadConnectors();
-    loadProviders();
     chatHandler.getSuggestions().then(({ suggestions }) => {
       if (suggestions.length) {
         setSuggestions(suggestions);
@@ -1762,35 +1742,12 @@ function Chat() {
     return () => listeners.forEach((id) => chatPage.removeListener(id));
   }, []);
 
-  const loadProviders = async () => {
-    const { state } = await providersHandler.getState();
-    const usable = state.providers.filter((provider) => provider.servesLanguage);
-    setProviders(usable);
-    return usable;
-  };
-
-  // A provider is listed once; one whose list failed is asked again the next
-  // time the menu opens.
-  const listModels = (providerId: string) => {
-    if (listed.current.has(providerId)) {
-      return;
-    }
-    listed.current.add(providerId);
-    providersHandler.listModels(providerId).then(({ list }) => {
-      if (!list.ok) {
-        listed.current.delete(providerId);
-      }
-      setLists((before) => ({ ...before, [providerId]: list }));
-    });
-  };
-
   // The chat's own provider is listed at once, for its model's levels; the
   // others when the model menu opens, which also picks up new providers.
-  useEffect(() => {
-    if (model) {
-      listModels(model.providerId);
-    }
-  }, [model?.providerId]);
+  const models = useModels(model?.providerId);
+  const { lists, openModels } = models;
+  // Null until they are read, so the model chips wait for them.
+  const providers = models.loaded ? models.providers : null;
 
   // Marks the switch in the chat once it has begun, as the browser does:
   // switches in a row make one line.
@@ -2032,11 +1989,7 @@ function Chat() {
         gone={Boolean(gone)}
         manage
         className="h-7 max-w-[240px]"
-        onOpen={async () => {
-          for (const provider of await loadProviders()) {
-            listModels(provider.id);
-          }
-        }}
+        onOpen={openModels}
         onPick={pickModel}
       />
       <EffortChip
@@ -2239,11 +2192,7 @@ function Chat() {
             }
             providers={providers}
             lists={lists}
-            onOpenModels={async () => {
-              for (const provider of await loadProviders()) {
-                listModels(provider.id);
-              }
-            }}
+            onOpenModels={openModels}
             onClose={() => setCard(null)}
           />
         )}
@@ -2381,18 +2330,9 @@ function Chat() {
 // The chat fills the window. Its list and panels scroll; the page never does.
 document.documentElement.style.overflow = "hidden";
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <Chat />
-      <LinkHint />
-    </MotionConfig>
-  </StrictMode>,
+mount(
+  <>
+    <Chat />
+    <LinkHint />
+  </>,
 );

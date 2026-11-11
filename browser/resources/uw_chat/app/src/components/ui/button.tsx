@@ -44,6 +44,8 @@ const buttonVariants = cva(
       },
       iconLeft: { true: "" },
       iconRight: { true: "" },
+      // uw: a ghost button in the primary color, for a row's own action.
+      tone: { primary: "text-primary hover:bg-primary/[0.08] hover:text-primary" },
     },
     // An icon sits 4px closer to its edge than text does: 12px default and
     // 8px compact, against the 16px / 12px base padding.
@@ -149,6 +151,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className,
       variant,
       size,
+      tone,
       asChild = false,
       render,
       loading = false,
@@ -282,6 +285,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           buttonVariants({
             variant,
             size: resolvedSize,
+            tone,
             iconLeft: !isIconOnly && !!LeadingIcon,
             iconRight: !isIconOnly && !!TrailingIcon,
           }),

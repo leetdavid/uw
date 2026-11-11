@@ -6,10 +6,8 @@
 // docs/plans/connectors.md#the-ai-page.
 import "@/trusted-types";
 import "@/theme-colors";
-import { StrictMode, useCallback, useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
+import { useCallback, useEffect, useState } from "react";
 import { isMac } from "//resources/js/platform.js";
-import { MotionConfig } from "motion/react";
 import { ChevronRight, Loader2, MessageCircle, Plus } from "lucide-react";
 import {
   Banner,
@@ -20,6 +18,7 @@ import {
 } from "@/components/ui/banner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { mount } from "../mount";
 import { AddProviderDialog } from "./add-provider";
 import { EffortChip, ModelChip } from "./model-chip";
 import { ProviderPage } from "./provider-page";
@@ -596,17 +595,4 @@ function AiPage() {
   );
 }
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <AiPage />
-    </MotionConfig>
-  </StrictMode>,
-);
+mount(<AiPage />);

@@ -3,7 +3,7 @@
 // share them. See the frames "Watch this page: the card", "Watch this page:
 // every state", and "Scheduled page: watch a page (Fluid)" on the canvas page
 // "Agent chats".
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -24,11 +24,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ChatSchedule, ScheduleState, Step } from "../chat-api";
 import { ProviderIcon } from "../providers/provider-parts";
-import {
-  providersHandler,
-  type ModelList,
-  type Provider,
-} from "../providers/providers-api";
+import { useModels } from "../providers/use-models";
 import { WatchChart } from "../chart";
 import {
   FilledEye,
@@ -111,51 +107,6 @@ function pickOf(watchFor: string): { pick: Pick | null; below: string } {
   }
   const found = PICKS.find((each) => each.label === watchFor);
   return { pick: found?.pick ?? null, below: "" };
-}
-
-// The providers for the Model row, each listed once; one whose list failed is
-// asked again the next time the menu opens.
-export function useModels(providerId: string | undefined) {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [lists, setLists] = useState<Record<string, ModelList | undefined>>(
-    {},
-  );
-  const listed = useRef(new Set<string>());
-  const listModels = (id: string) => {
-    if (listed.current.has(id)) {
-      return;
-    }
-    listed.current.add(id);
-    providersHandler.listModels(id).then(({ list }) => {
-      if (!list.ok) {
-        listed.current.delete(id);
-      }
-      setLists((before) => ({ ...before, [id]: list }));
-    });
-  };
-  const loadProviders = async () => {
-    const { state } = await providersHandler.getState();
-    const usable = state.providers.filter((provider) => provider.servesLanguage);
-    setProviders(usable);
-    return usable;
-  };
-  useEffect(() => {
-    loadProviders();
-  }, []);
-  useEffect(() => {
-    if (providerId) {
-      listModels(providerId);
-    }
-  }, [providerId]);
-  return {
-    providers,
-    lists,
-    openModels: async () => {
-      for (const provider of await loadProviders()) {
-        listModels(provider.id);
-      }
-    },
-  };
 }
 
 function Heading({
@@ -465,9 +416,10 @@ export function Watched({
             <Button
               id="watch-check-now"
               variant="ghost"
+              tone="primary"
               size="compact"
               leadingIcon={RefreshCw}
-              className="-my-1 -mr-2 ml-auto h-6 shrink-0 text-primary hover:bg-primary/[0.08] hover:text-primary"
+              className="-my-1 -mr-2 ml-auto h-6 shrink-0"
               onClick={onCheckNow}
             >
               Check now

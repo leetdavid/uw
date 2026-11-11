@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BrainOff } from "../brain-off";
+import { clockText, dateText } from "../time-text";
 import { providersHandler, type MemoryInfo } from "./providers-api";
 
 function memoriesText(count: number): string {
@@ -28,8 +29,8 @@ function whenText(ms: number): string {
   const when = new Date(ms);
   const today = new Date().toDateString() === when.toDateString();
   return today
-    ? `Today, ${when.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    : when.toLocaleDateString([], { month: "short", day: "numeric" });
+    ? `Today, ${clockText(ms)}`
+    : dateText(ms);
 }
 
 // `text` with each of `words` marked where it appears.

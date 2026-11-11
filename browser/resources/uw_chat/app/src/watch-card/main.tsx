@@ -6,9 +6,7 @@
 // canvas, and docs/product.md, "Scheduled chats".
 import "@/trusted-types";
 import "@/theme-colors";
-import { StrictMode, useEffect, useRef, useState } from "react";
-import { createRoot } from "react-dom/client";
-import { MotionConfig } from "motion/react";
+import { useEffect, useState } from "react";
 import {
   connect,
   watchCardHandler,
@@ -16,6 +14,7 @@ import {
   type WatchCardState,
 } from "./watch-card-api";
 import { FadeOver, FitToContent } from "../fit-to-content";
+import { mount, usePopUp } from "../mount";
 import { WatchForm, WatchList, Watched, viewOf } from "./watch-parts";
 
 // What the card shows: the page's watches, one watch, a watch being changed,
@@ -29,7 +28,6 @@ type Showing =
 function WatchCard() {
   const [card, setCard] = useState<WatchCardState | null>(null);
   const [showing, setShowing] = useState<Showing>({ kind: "watches" });
-  const shown = useRef(false);
   useEffect(() => {
     const id = watchCardPage.onCard.addListener((next: WatchCardState) =>
       setCard(next),
@@ -39,15 +37,7 @@ function WatchCard() {
       watchCardPage.removeListener(id);
     };
   }, []);
-  useEffect(() => {
-    document.documentElement.classList.toggle("frosted", !!card?.frosted);
-  }, [card]);
-  useEffect(() => {
-    if (card && !shown.current) {
-      shown.current = true;
-      watchCardHandler.showUI();
-    }
-  }, [card]);
+  usePopUp(card !== null, !!card?.frosted, () => watchCardHandler.showUI());
   if (!card) {
     return null;
   }
@@ -157,17 +147,4 @@ function WatchCard() {
   );
 }
 
-// Fluid's parts read dark mode from a class on the root element.
-const dark = matchMedia("(prefers-color-scheme: dark)");
-const followScheme = () =>
-  document.documentElement.classList.toggle("dark", dark.matches);
-followScheme();
-dark.addEventListener("change", followScheme);
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <WatchCard />
-    </MotionConfig>
-  </StrictMode>,
-);
+mount(<WatchCard />);

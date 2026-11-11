@@ -341,5 +341,9 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
 
 MenuItem.displayName = "MenuItem";
 
-export { MenuItem };
+// uw: a note at the end of a row, read from its data-note.
+const menuItemNoteClass =
+  "after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]";
+
+export { MenuItem, menuItemNoteClass };
 export default MenuItem;

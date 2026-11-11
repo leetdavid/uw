@@ -31,6 +31,7 @@ import {
   type SimpleIcon,
 } from "simple-icons";
 import { cn } from "@/lib/utils";
+import { clockText, dateText } from "../time-text";
 import {
   CatalogSource,
   ConnectorState,
@@ -93,10 +94,9 @@ function hostOf(url: string) {
 // "today at 9:12", or "Oct 22 at 9:12".
 function whenRefreshed(ms: number) {
   const date = new Date(ms);
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const today = new Date().toDateString() === date.toDateString();
-  const day = today ? "today" : date.toLocaleDateString([], { month: "short", day: "numeric" });
-  return `${day} at ${time}`;
+  const day = today ? "today" : dateText(ms);
+  return `${day} at ${clockText(ms)}`;
 }
 
 export function EntryTile({ entry }: { entry: CatalogEntry }) {

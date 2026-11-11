@@ -11,6 +11,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { RunEnd, type Step, type TrackedValue } from "./chat-api";
+import { clockText, dateText, daysFromToday } from "./time-text";
 
 // A value's name as a person reads it: "in_stock" reads "In stock".
 export function valueLabel(name: string): string {
@@ -131,18 +132,7 @@ export function scrollToRun(time: number) {
 }
 
 function dayText(ms: number): string {
-  const day = new Date(ms).setHours(0, 0, 0, 0);
-  if (day === new Date().setHours(0, 0, 0, 0)) {
-    return "Today";
-  }
-  return new Date(ms).toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-function clockText(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return daysFromToday(ms) === 0 ? "Today" : dateText(ms);
 }
 
 function pointText(series: Series, point: Point): string {

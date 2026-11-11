@@ -14,6 +14,7 @@ import {
 import { ThinkingStep } from "@/components/ui/thinking-steps";
 import type { IconName } from "@/lib/icon-context";
 import { chatHandler, type Approval, type Step } from "@/chat-api";
+import { favicon } from "./favicon";
 
 const TAB_ICONS: Record<string, IconName> = {
   tabs: "layers",
@@ -52,10 +53,6 @@ const VERBS: Record<string, string> = {
 
 const CHIP =
   "tab-chip inline-flex h-[22px] max-w-[240px] items-center gap-1.5 rounded-md bg-accent px-2 align-middle text-xs font-medium text-muted-foreground";
-
-function favicon(url: string): string {
-  return `chrome://favicon2/?size=16&scaleFactor=2x&pageUrl=${encodeURIComponent(url)}`;
-}
 
 // What a tab's address says of it: its site, "terminal", or a uw page.
 function site(url: string): string {

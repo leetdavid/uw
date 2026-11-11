@@ -16,7 +16,7 @@ import {
   DropdownSeparator,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
-import { MenuItem } from "@/components/ui/menu-item";
+import { MenuItem, menuItemNoteClass } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
 import {
   Decides,
@@ -96,7 +96,7 @@ export function ModelChip({
         label={unset}
         checked={!choice}
         data-note={quick?.namesModel}
-        className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+        className={menuItemNoteClass}
         onSelect={onClear}
       />,
     );
@@ -168,7 +168,7 @@ export function ModelChip({
                 checked={checked}
                 disabled={unusable}
                 data-note={unusable ? "No tool calls" : undefined}
-                className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-destructive after:content-[attr(data-note)]"
+                className={cn(menuItemNoteClass, "after:text-destructive")}
                 onSelect={() => onPick(provider, model.name, language)}
               />
             );

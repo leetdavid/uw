@@ -6,7 +6,7 @@ import {
   DropdownMenu,
   DropdownTrigger,
 } from "@/components/ui/dropdown";
-import { MenuItem } from "@/components/ui/menu-item";
+import { MenuItem, menuItemNoteClass } from "@/components/ui/menu-item";
 import { cn } from "@/lib/utils";
 import { ApprovalMode } from "./chat-api";
 import { CHIP } from "./providers/model-chip";
@@ -63,7 +63,7 @@ export function ModeChip({
             label={each.name}
             checked={index === checkedIndex}
             data-note={each.note}
-            className="after:ml-auto after:pl-2 after:text-[11.5px] after:text-muted-foreground after:content-[attr(data-note)]"
+            className={menuItemNoteClass}
             onSelect={() => onPick(each.mode)}
           />
         ))}

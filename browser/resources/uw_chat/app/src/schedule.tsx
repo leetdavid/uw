@@ -51,6 +51,7 @@ import { costText } from "./usage";
 import { ModeChip } from "./mode-chip";
 import { EffortChip, ModelChip } from "./providers/model-chip";
 import type { ModelList, Provider } from "./providers/providers-api";
+import { clockText, dateText, daysFromToday } from "./time-text";
 
 const WEEKDAYS = [
   "Sunday",
@@ -93,29 +94,19 @@ function clock(hour: number, minute: number): string {
   return `${hour}:${String(minute).padStart(2, "0")}`;
 }
 
-function shortTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
 // A time as the strip says it: "today 9:02", "tomorrow 9:00", or "Oct 9".
 export function whenText(ms: number): string {
-  const date = new Date(ms);
-  const day = new Date(date).setHours(0, 0, 0, 0);
-  const today = new Date().setHours(0, 0, 0, 0);
-  const days = Math.round((day - today) / 86_400_000);
+  const days = daysFromToday(ms);
   if (days === 0) {
-    return `today ${shortTime(ms)}`;
+    return `today ${clockText(ms)}`;
   }
   if (days === 1) {
-    return `tomorrow ${shortTime(ms)}`;
+    return `tomorrow ${clockText(ms)}`;
   }
   if (days === -1) {
-    return `yesterday ${shortTime(ms)}`;
+    return `yesterday ${clockText(ms)}`;
   }
-  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return dateText(ms);
 }
 
 export function describeSchedule(schedule: ChatSchedule): string {
@@ -655,7 +646,7 @@ export function ScheduleRows({
     draft.repeat === ScheduleRepeat.kWeekdays ||
     draft.repeat === ScheduleRepeat.kWeekly;
   const zones =
-    typeof Intl.supportedValuesOf === "function"
+    changingZone && typeof Intl.supportedValuesOf === "function"
       ? Intl.supportedValuesOf("timeZone")
       : [];
   return (

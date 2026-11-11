@@ -8,23 +8,12 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RunEnd, type Step, type TrackedValue } from "../chat-api";
 import { didNotFinish, nearest, numberText, thresholdOf } from "../chart";
+import { dateText, daysFromToday } from "../time-text";
 
 const DAYS = 30;
 const WIDTH = 136;
 const HEIGHT = 30;
 const PAD = 3;
-
-export function daysFromToday(ms: number): number {
-  const day = new Date(ms).setHours(0, 0, 0, 0);
-  return Math.round((day - new Date().setHours(0, 0, 0, 0)) / 86_400_000);
-}
-
-export function dateText(ms: number): string {
-  return new Date(ms).toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
-}
 
 // "today", "yesterday", or "Oct 28".
 function dayWord(ms: number): string {
