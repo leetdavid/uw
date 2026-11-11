@@ -3,7 +3,7 @@
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_handler.h"
 
 #include <algorithm>
-#include <set>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -31,6 +31,19 @@ namespace {
 void OpenAtTopOfScratchpad(BrowserWindowInterface* window, const GURL& url) {
   TabOrganizationController::LinksFromAnotherApp links_from_another_app;
   chrome::AddTabAt(window, url, -1, true);
+}
+
+// The id of each chat's newest alert of a failed run: the one that offers
+// Retry.
+std::map<std::string, std::string> AlertsOfFailedRuns(
+    const ChatAlerts& alerts) {
+  std::map<std::string, std::string> newest;
+  for (const ChatAlerts::Alert& alert : alerts.alerts()) {
+    if (OffersRetry(alert.what)) {
+      newest.try_emplace(alert.chat_id, alert.id);
+    }
+  }
+  return newest;
 }
 
 }  // namespace
@@ -104,19 +117,12 @@ void UwInboxHandler::RetryAll() {
   if (!alerts || !chats) {
     return;
   }
-  const std::vector<std::string> ids = chats->ChatsToRetry();
-  const std::set<std::string> retried(ids.begin(), ids.end());
-  // A chat's newest alert of a failed run is the one that offered Retry.
-  std::set<std::string> seen;
-  std::vector<std::string> offered;
-  for (const ChatAlerts::Alert& alert : alerts->alerts()) {
-    if (OffersRetry(alert.what) && seen.insert(alert.chat_id).second &&
-        retried.contains(alert.chat_id)) {
-      offered.push_back(alert.id);
+  const std::map<std::string, std::string> offered =
+      AlertsOfFailedRuns(*alerts);
+  for (const std::string& id : chats->ChatsToRetry()) {
+    if (const auto alert = offered.find(id); alert != offered.end()) {
+      alerts->MarkRead(alert->second);
     }
-  }
-  for (const std::string& id : offered) {
-    alerts->MarkRead(id);
   }
   chats->RetryAll();
 }
@@ -212,8 +218,8 @@ void UwInboxHandler::SendAlerts() {
       ++scheduled;
     }
   }
-  // Chats whose newest alert of a failed run has been sent.
-  std::set<std::string> told_of_failure;
+  const std::map<std::string, std::string> failed =
+      AlertsOfFailedRuns(*alerts);
   for (const ChatAlerts::Alert& alert : alerts->alerts()) {
     auto shown = mojom::InboxAlert::New();
     shown->id = alert.id;
@@ -241,8 +247,9 @@ void UwInboxHandler::SendAlerts() {
     shown->time = alert.time.InMillisecondsFSinceUnixEpoch();
     shown->waiting = alert.waiting;
     shown->read = alert.read;
-    if (OffersRetry(alert.what) &&
-        told_of_failure.insert(alert.chat_id).second && chat && chat->failing) {
+    if (const auto newest = failed.find(alert.chat_id);
+        newest != failed.end() && newest->second == alert.id && chat &&
+        chat->failing) {
       shown->running = chats->Running(alert.chat_id);
       shown->retry = !shown->running;
     }

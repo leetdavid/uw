@@ -193,13 +193,15 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
     return page;
   }
 
+  bool Has(content::WebContents* page, std::string_view selector) {
+    return content::EvalJs(
+               page,
+               content::JsReplace("!!document.querySelector($1)", selector))
+        .ExtractBool();
+  }
+
   bool Shows(content::WebContents* page, std::string_view selector) {
-    return base::test::RunUntil([&] {
-      return content::EvalJs(
-                 page,
-                 content::JsReplace("!!document.querySelector($1)", selector))
-          .ExtractBool();
-    });
+    return base::test::RunUntil([&] { return Has(page, selector); });
   }
 
   std::string Text(content::WebContents* page, std::string_view selector) {
@@ -327,9 +329,7 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
   // Retry all.
   content::WebContents* page = OpenTheInbox();
   ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
-  EXPECT_FALSE(
-      content::EvalJs(page, "!!document.querySelector('#inbox-retry-all')")
-          .ExtractBool());
+  EXPECT_FALSE(Has(page, "#inbox-retry-all"));
   EXPECT_EQ(alerts()->Unread(), 1u);
   EXPECT_EQ(button()->GetTooltipText(), u"Inbox, 1 unread");
   EXPECT_NE(Text(page, "[data-alert]").find("Change alert"), std::string::npos);
@@ -379,8 +379,7 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
   EXPECT_TRUE(base::test::RunUntil([&] {
     return Text(page, "[data-alert]").find("Running now") != std::string::npos;
   }));
-  EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('[data-retry]')")
-                   .ExtractBool());
+  EXPECT_FALSE(Has(page, "[data-retry]"));
   EXPECT_TRUE(alerts()->alerts()[0].read);
   EXPECT_TRUE(button()->IsShowing());
   SaveWidgetScreenshot(
@@ -403,8 +402,7 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
   }));
   ASSERT_EQ(alerts()->alerts().size(), 2u);
   EXPECT_EQ(alerts()->alerts()[0].what, "No change");
-  EXPECT_FALSE(content::EvalJs(page, "!!document.querySelector('[data-retry]')")
-                   .ExtractBool());
+  EXPECT_FALSE(Has(page, "[data-retry]"));
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
@@ -453,11 +451,8 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
   EXPECT_FALSE(NewestAlertOf(paused).read);
   EXPECT_EQ(alerts()->Unread(), 2u);
   // Nothing is left to retry while the runs go, and the Inbox stays open.
-  EXPECT_TRUE(base::test::RunUntil([&] {
-    return !content::EvalJs(page,
-                            "!!document.querySelector('#inbox-retry-all')")
-                .ExtractBool();
-  }));
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !Has(page, "#inbox-retry-all"); }));
   EXPECT_TRUE(button()->IsShowing());
   SaveWidgetScreenshot(
       views::Widget::GetWidgetForNativeView(page->GetNativeView()),
@@ -527,11 +522,8 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AnAlertOpensItsPageOrItsChat) {
   page = OpenTheInbox();
   const std::string waiting = alerts()->alerts().front().id;
   ASSERT_TRUE(Shows(page, base::StrCat({"[data-alert='", waiting, "']"})));
-  EXPECT_FALSE(content::EvalJs(page, content::JsReplace(
-                                         "!!document.querySelector($1)",
-                                         base::StrCat({"[data-open-chat='",
-                                                       waiting, "']"})))
-                   .ExtractBool());
+  EXPECT_FALSE(
+      Has(page, base::StrCat({"[data-open-chat='", waiting, "']"})));
   Click(page, base::StrCat({"[data-alert='", waiting, "']"}));
   EXPECT_TRUE(base::test::RunUntil([&] { return ShowsChat(id); }));
 }

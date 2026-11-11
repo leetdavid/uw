@@ -63,8 +63,8 @@ constexpr UwCommand kUwCommands[] = {
     {kNewLittleWindowCommand, IDS_UW_NEW_LITTLE_WINDOW_MAC},
     {kNewWorkspaceCommand, IDS_UW_NEW_WORKSPACE},
     {kShowThemePicker, IDS_UW_THEME_MENU},
-    {kShowShortcutSettings, IDS_UW_KEYBOARD_SHORTCUTS_MAC},
     {kRetryFailedScheduledChats, IDS_UW_RETRY_FAILED_SCHEDULED_CHATS_MAC},
+    {kShowShortcutSettings, IDS_UW_KEYBOARD_SHORTCUTS_MAC},
     {kReportIssue, IDS_UW_REPORT_ISSUE_MAC},
 };
 
