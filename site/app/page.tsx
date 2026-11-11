@@ -1,5 +1,7 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
+import { SiteFooter } from "@/components/site-footer";
+import { download, repo } from "@/lib/shared";
 import { Brew } from "./brew";
 import { Dock } from "./dock";
 import { Film } from "./film";
@@ -10,14 +12,11 @@ import { Sidebar, type SidebarState } from "./sidebar";
 import { bike, launch, moved, sorted, tab, trip } from "./tabs";
 import "./home.css";
 
-const DOWNLOAD =
-  "https://github.com/leetdavid/uw/releases/latest/download/uw-macos-arm64.dmg";
-const REPO = "https://github.com/leetdavid/uw";
 const PAGES: [string, string][] = [
   ["How it works", "#how"],
   ["Features", "#features"],
   ["Help", "/help"],
-  ["GitHub", REPO],
+  ["GitHub", repo],
 ];
 
 const working: SidebarState = {
@@ -142,7 +141,7 @@ function Download({ place }: { place: string }) {
   return (
     <a
       className="btn"
-      href={DOWNLOAD}
+      href={download}
       data-event="download_click"
       data-place={place}
     >
@@ -225,7 +224,7 @@ export default function Home() {
             ))}
             <a
               className="get"
-              href={DOWNLOAD}
+              href={download}
               data-event="download_click"
               data-place="nav"
             >
@@ -252,7 +251,7 @@ export default function Home() {
           </div>
           <p className="meta">Apple silicon · macOS 13 or later</p>
         </div>
-        <Film download={DOWNLOAD}>
+        <Film download={download}>
           <HeroWindow />
         </Film>
         <div className="fade" />
@@ -519,19 +518,7 @@ export default function Home() {
           <Brew place="closing" />
         </div>
         <div className="horizon" />
-        <footer>
-          <a className="brand" href="/">
-            <Logo size={26} />
-            uw
-          </a>
-          <span>© 2026 uw. Built on Chromium.</span>
-          <nav>
-            <a href={`${REPO}/releases`}>Releases</a>
-            <a href={`${REPO}/issues/new`}>Report an issue</a>
-            <a href={REPO}>Source</a>
-            <a href="/help/privacy">Privacy</a>
-          </nav>
-        </footer>
+        <SiteFooter />
       </section>
     </main>
   );

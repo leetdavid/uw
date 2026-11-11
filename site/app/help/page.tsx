@@ -1,9 +1,8 @@
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Accent } from "@/components/accent";
 import { SearchButton } from "@/components/search-button";
-import { repo } from "@/lib/shared";
+import { SiteFooter } from "@/components/site-footer";
 import { groups } from "@/lib/source";
 import { SiteNav } from "./site-nav";
 
@@ -70,19 +69,7 @@ export default function HelpHome() {
           </ul>
         </div>
       </div>
-      <footer className="help-footer">
-        <a className="brand" href="/">
-          <Image src="/logo.svg" alt="" width={26} height={26} />
-          uw
-        </a>
-        <span>© 2026 uw. Built on Chromium.</span>
-        <nav>
-          <a href={`${repo}/releases`}>Releases</a>
-          <a href={`${repo}/issues/new`}>Report an issue</a>
-          <a href={repo}>Source</a>
-          <a href="/help/privacy">Privacy</a>
-        </nav>
-      </footer>
+      <SiteFooter className="help-footer" />
     </main>
   );
 }

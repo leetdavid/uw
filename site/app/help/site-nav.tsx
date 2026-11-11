@@ -1,7 +1,5 @@
 import Image from "next/image";
-import { repo } from "@/lib/shared";
-
-const DOWNLOAD = `${repo}/releases/latest/download/uw-macos-arm64.dmg`;
+import { download, repo } from "@/lib/shared";
 
 export function SiteNav() {
   return (
@@ -19,7 +17,7 @@ export function SiteNav() {
         <a href={repo}>GitHub</a>
         <a
           className="get"
-          href={DOWNLOAD}
+          href={download}
           data-event="download_click"
           data-place="nav"
         >
