@@ -321,6 +321,11 @@ void WorkspaceWindow::Restore(
   self->SaveSession();
   self->changes_.Notify();
   self->TakeTheme();
+  // A window already on screen, as the one a launch after a crash restores
+  // into is, goes behind its group.
+  if (self->hidden_ && window->GetWindow()->IsVisible()) {
+    window->GetWindow()->Hide();
+  }
   // A group shows one window. A window revealed before this one came back
   // goes behind it again.
   if (!self->hidden_) {

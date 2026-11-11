@@ -118,10 +118,10 @@ index 658f1de0fb6795ffcfaa369cf934cc712c2ca2ae..0c324466c225c29ab53bf2804b2f8b29
    // setting and clearing watermark on the view. It is also responsible for
    // notifying DataProtectionUIController to update screenshot policy.
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index 71e3a025159ae19050b358db9cb1c69438880056..be48ba2896ac7077bfaaff319a0284891bb90240 100644
+index 079728d505a9991b6a227e1d04025078e71348f6..07ff230f0496008a371d30e9a3233bea97802412 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
-@@ -1062,11 +1062,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1066,11 +1066,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
              browser->GetTabStripModel()->GetIndexOfTab(tab));
        }
  
@@ -147,7 +147,7 @@ index 71e3a025159ae19050b358db9cb1c69438880056..be48ba2896ac7077bfaaff319a028489
        }
      }
    }
-@@ -1172,6 +1181,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1176,6 +1185,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
        }
  
        CHECK(browser->GetTabStripModel()->GetSplitData(session_split_tab->id_));

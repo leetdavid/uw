@@ -28,6 +28,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_test_util.h"
+#include "chrome/browser/sessions/exit_type_service.h"
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -76,6 +77,7 @@
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/native_theme/native_theme.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
@@ -318,6 +320,47 @@ class WorkspacesBrowserTest : public headless::HeadlessModeBrowserTest {
       }
     }
     return false;
+  }
+
+  // Leaves `profile`'s session as one that ended in a crash, which the next
+  // launch restores without asking.
+  static void EndInACrash(Profile* profile) {
+    SessionStartupPref::SetStartupPref(
+        profile, SessionStartupPref(SessionStartupPref::LAST));
+    profile->GetPrefs()->SetBoolean(kRestoreAfterCrashPref, true);
+    ExitTypeService::GetInstanceForProfile(profile)
+        ->SetWaitingForUserToAckCrashForTest(true);
+  }
+
+  // Checks that a launch brought back one group of two windows: one that
+  // shows `front` with a tab on `front_page`, and one behind it for `back`
+  // with a tab on `back_page`. Switching then shows that one, not a new one.
+  static void ExpectTheGroupCameBack(const std::string& front,
+                                     const GURL& front_page,
+                                     const std::string& back,
+                                     const GURL& back_page) {
+    BrowserWindowInterface* shown = nullptr;
+    BrowserWindowInterface* behind = nullptr;
+    ASSERT_TRUE(base::test::RunUntil([&] {
+      shown = behind = nullptr;
+      for (BrowserWindowInterface* window : Windows()) {
+        const WorkspaceWindow* workspace = WorkspaceWindow::From(window);
+        const bool visible = window->GetWindow()->IsVisible();
+        if (workspace->workspace() == front && !workspace->hidden() &&
+            visible && HasTab(window, front_page)) {
+          shown = window;
+        } else if (workspace->workspace() == back && workspace->hidden() &&
+                   !visible && HasTab(window, back_page)) {
+          behind = window;
+        }
+      }
+      return shown && behind && Windows().size() == 2u;
+    }));
+    EXPECT_TRUE(std::ranges::contains(WorkspaceWindow::From(shown)->Partners(),
+                                      WorkspaceWindow::From(behind)));
+    WorkspaceWindow::From(shown)->Switch(back);
+    EXPECT_EQ(WaitForShown(shown, back), behind);
+    EXPECT_EQ(Windows().size(), 2u);
   }
 };
 
@@ -1011,6 +1054,54 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
   tabs->ActivateTabAt(tabs->GetIndexOfWebContents(later));
   EXPECT_TRUE(
       base::test::RunUntil([&] { return Committed(later) == GURL(kLater); }));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       PRE_EachWindowComesBackInItsWorkspaceAfterACrash) {
+  const std::string reading = AddWorkspace("Reading", profile());
+  Load(browser(), GURL(kNotes));
+  WorkspaceWindow::From(browser())->Switch(reading);
+  BrowserWindowInterface* partner = WaitForShown(browser(), reading);
+  ASSERT_TRUE(partner);
+  Load(partner, GURL(kArticle));
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+  EndInACrash(profile());
+}
+
+// A launch after a crash opens a window and restores into it. That window
+// takes the place of the first one saved, here the hidden one.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       EachWindowComesBackInItsWorkspaceAfterACrash) {
+  ASSERT_EQ(list().workspaces().size(), 2u);
+  ExpectTheGroupCameBack(list().workspaces()[1].id, GURL(kArticle),
+                         list().workspaces()[0].id, GURL(kNotes));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       PRE_AnotherProfilesWorkspaceComesBackAfterACrash) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  Profile& other = profiles::testing::CreateProfileSync(
+      manager, manager->user_data_dir().AppendASCII(kOtherProfile));
+  const std::string work = AddWorkspace("Work", &other);
+  Load(browser(), GURL(kNotes));
+  WorkspaceWindow::From(browser())->Switch(work);
+  BrowserWindowInterface* partner = WaitForShown(browser(), work);
+  ASSERT_TRUE(partner);
+  Load(partner, GURL(kArticle));
+  // Lets the session take the windows' data before the browser quits.
+  base::RunLoop().RunUntilIdle();
+  EndInACrash(profile());
+  EndInACrash(&other);
+}
+
+// Each profile restores into a window of its own, and the two are one group
+// again: the first profile's goes behind the other's, with its tabs.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       AnotherProfilesWorkspaceComesBackAfterACrash) {
+  ASSERT_EQ(list().workspaces().size(), 2u);
+  ExpectTheGroupCameBack(list().workspaces()[1].id, GURL(kArticle),
+                         list().workspaces()[0].id, GURL(kNotes));
 }
 
 // Run with pnpm run window-tests: only a real window is in macOS's Window

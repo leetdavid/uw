@@ -79,6 +79,7 @@ if (is_mac) {
       "//chrome/browser/headless:browser_tests",
       "//chrome/browser/profiles:profile",
       "//chrome/browser/profiles:profile_test_util",
+      "//chrome/browser/sessions",
       "//chrome/browser/themes",
       "//chrome/browser/ui",
       "//chrome/browser/ui/browser_window",

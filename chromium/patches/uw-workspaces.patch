@@ -52,7 +52,7 @@ index c8d07e45c8bfa88e2e63bab68f14ffe3f02ad456..fbeef2e0873119888726fc625e3bdebb
  
      if (is_mac) {
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index 31cc627e9a6f978367e994a44e39ff94d80908d4..71e3a025159ae19050b358db9cb1c69438880056 100644
+index 31cc627e9a6f978367e994a44e39ff94d80908d4..079728d505a9991b6a227e1d04025078e71348f6 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
 @@ -113,6 +113,7 @@
@@ -63,7 +63,18 @@ index 31cc627e9a6f978367e994a44e39ff94d80908d4..71e3a025159ae19050b358db9cb1c694
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/constants/ash_features.h"
-@@ -1132,7 +1133,13 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -827,6 +828,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+           ShouldRestoreToExistingBrowser()) {
+         // The first set of tabs is added to the existing browser.
+         browser = browser_;
++        // uw: it takes the saved window's workspace and group, as a window
++        // made for the session does. A launch after a crash restores into
++        // the window it opened.
++        uw::WorkspaceWindow::Restore(browser, window->extra_data);
+       } else {
+ #if BUILDFLAG(IS_CHROMEOS)
+         ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
+@@ -1132,7 +1137,13 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
      RestoredTab restored_tab(web_contents, is_selected_tab,
                               tab.extension_app_id.empty(), tab.pinned,
                               new_group, tab.split_id);
@@ -78,7 +89,7 @@ index 31cc627e9a6f978367e994a44e39ff94d80908d4..71e3a025159ae19050b358db9cb1c694
  
      if (tab.split_id) {
        // add tab to tabs_by_split_id.
-@@ -1332,6 +1339,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1332,6 +1343,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
      base::TimeTicks now = base::TimeTicks::Now();
      BrowserWindowInterface* browser_window =
          CreateBrowserWindow(std::move(params));
