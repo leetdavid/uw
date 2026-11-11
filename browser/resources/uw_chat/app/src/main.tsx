@@ -187,6 +187,16 @@ const PROSE_TAGS = [
   "td",
 ] as const;
 
+// Streamdown renders an answer again when any of these is a new object.
+const ANSWER_CONTROLS = {
+  code: { copy: true, download: false },
+  table: false,
+  mermaid: false,
+};
+const ANSWER_PLUGINS = { code };
+// Without Streamdown's raw HTML step, HTML in an answer shows as text.
+const ANSWER_REHYPE_PLUGINS = [defaultRehypePlugins.sanitize];
+
 const ANSWER_PARTS: Components = {
   ...Object.fromEntries(PROSE_TAGS.map((tag) => [tag, tag])),
   inlineCode: ({ node: _node, ...props }) => <code {...props} />,
@@ -726,17 +736,11 @@ function Line({
           <Streamdown
             className="answer typeset"
             components={ANSWER_PARTS}
-            controls={{
-              code: { copy: true, download: false },
-              table: false,
-              mermaid: false,
-            }}
+            controls={ANSWER_CONTROLS}
             lineNumbers={false}
             mode="static"
-            plugins={{ code }}
-            // Without Streamdown's raw HTML step, HTML in an answer shows
-            // as text.
-            rehypePlugins={[defaultRehypePlugins.sanitize]}
+            plugins={ANSWER_PLUGINS}
+            rehypePlugins={ANSWER_REHYPE_PLUGINS}
           >
             {line.text}
           </Streamdown>
