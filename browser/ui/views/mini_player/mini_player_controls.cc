@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "base/strings/stringprintf.h"
+#include "base/strings/utf_string_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
 #include "chrome/grit/generated_resources.h"
@@ -22,7 +24,7 @@
 #include "ui/gfx/text_constants.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
-#include "ui/views/controls/label.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 
 namespace uw {
@@ -36,13 +38,6 @@ constexpr SkColor kAdYellow = SkColorSetRGB(0xF7, 0xC9, 0x48);
 
 SkColor White(float alpha) {
   return SkColorSetA(SK_ColorWHITE, std::clamp(alpha, 0.f, 1.f) * 255);
-}
-
-// The system font at `size` points.
-gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
-  const gfx::FontList& base = views::Label::GetDefaultFontList();
-  return base.DeriveWithSizeDelta(size - base.GetFontSize())
-      .DeriveWithWeight(weight);
 }
 
 void PaintVerticalGradient(gfx::Canvas* canvas,
@@ -64,6 +59,19 @@ void PaintVerticalGradient(gfx::Canvas* canvas,
 }
 
 }  // namespace
+
+std::u16string FormatTime(base::TimeDelta time) {
+  const int64_t seconds = std::max<int64_t>(0, time.InSeconds());
+  const int64_t hours = seconds / 3600;
+  return base::UTF8ToUTF16(
+      hours > 0 ? base::StringPrintf("%lld:%02lld:%02lld",
+                                     static_cast<long long>(hours),
+                                     static_cast<long long>(seconds / 60 % 60),
+                                     static_cast<long long>(seconds % 60))
+                : base::StringPrintf("%lld:%02lld",
+                                     static_cast<long long>(seconds / 60),
+                                     static_cast<long long>(seconds % 60)));
+}
 
 void UpdateControlGlass(views::View* view, int glass, float radius) {
   if (!view->layer()) {

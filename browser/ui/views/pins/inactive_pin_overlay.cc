@@ -42,6 +42,7 @@
 #include "uw/browser/pins/pin_store.h"
 #include "uw/browser/pins/pin_sync.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 
@@ -122,8 +123,7 @@ class OpenHerePill : public views::View {
     icon_ = AddChildView(std::make_unique<views::ImageView>());
     label_ = AddChildView(std::make_unique<views::Label>(
         l10n_util::GetStringUTF16(IDS_UW_OPEN_HERE)));
-    const gfx::FontList base;
-    label_->SetFontList(base.DeriveWithSizeDelta(13 - base.GetFontSize())
+    label_->SetFontList(FontOfSize(gfx::FontList(), 13)
                             .DeriveWithWeight(gfx::Font::Weight::MEDIUM));
     label_->SetSubpixelRenderingEnabled(false);
     SetCanProcessEventsWithinSubtree(false);

@@ -344,66 +344,48 @@ CommandBar* CommandBar::From(BrowserWindowInterface* window) {
 }
 
 bool CommandBar::Open(BrowserWindowInterface* window) {
-  CommandBar* bar = From(window);
-  if (!bar || !bar->contents_) {
-    return false;
-  }
-  bar->task_.reset();
-  bar->pane_ = tabs::TabHandle();
-  bar->moving_ = false;
-  bar->Show();
-  return true;
+  return OpenWith(window, std::nullopt, nullptr, /*moving=*/false,
+                  /*reset_shell=*/std::nullopt);
 }
 
 bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
-  CommandBar* bar = From(window);
-  if (!bar || !bar->contents_) {
-    return false;
-  }
-  bar->task_.reset();
-  bar->pane_ = tabs::TabHandle();
-  bar->moving_ = false;
-  ResetCommandBar(bar->page(), /*shell=*/true);
-  bar->Show();
-  return true;
+  return OpenWith(window, std::nullopt, nullptr, /*moving=*/false,
+                  /*reset_shell=*/true);
 }
 
 bool CommandBar::OpenForTask(BrowserWindowInterface* window,
                              const tab_groups::TabGroupId& task) {
+  return OpenWith(window, task, nullptr, /*moving=*/false,
+                  /*reset_shell=*/std::nullopt);
+}
+
+bool CommandBar::OpenForPane(BrowserWindowInterface* window,
+                             tabs::TabInterface* pane) {
+  return OpenWith(window, std::nullopt, pane, /*moving=*/false,
+                  /*reset_shell=*/std::nullopt);
+}
+
+bool CommandBar::OpenToMoveTabs(BrowserWindowInterface* window) {
+  // The page asks for the tasks as it empties.
+  return OpenWith(window, std::nullopt, nullptr, /*moving=*/true,
+                  /*reset_shell=*/false);
+}
+
+bool CommandBar::OpenWith(BrowserWindowInterface* window,
+                          std::optional<tab_groups::TabGroupId> task,
+                          tabs::TabInterface* pane,
+                          bool moving,
+                          std::optional<bool> reset_shell) {
   CommandBar* bar = From(window);
   if (!bar || !bar->contents_) {
     return false;
   }
   bar->task_ = task;
-  bar->pane_ = tabs::TabHandle();
-  bar->moving_ = false;
-  bar->Show();
-  return true;
-}
-
-bool CommandBar::OpenForPane(BrowserWindowInterface* window,
-                             tabs::TabInterface* pane) {
-  CommandBar* bar = From(window);
-  if (!bar || !bar->contents_) {
-    return false;
+  bar->pane_ = pane ? pane->GetHandle() : tabs::TabHandle();
+  bar->moving_ = moving;
+  if (reset_shell) {
+    ResetCommandBar(bar->page(), *reset_shell);
   }
-  bar->task_.reset();
-  bar->pane_ = pane->GetHandle();
-  bar->moving_ = false;
-  bar->Show();
-  return true;
-}
-
-bool CommandBar::OpenToMoveTabs(BrowserWindowInterface* window) {
-  CommandBar* bar = From(window);
-  if (!bar || !bar->contents_) {
-    return false;
-  }
-  bar->task_.reset();
-  bar->pane_ = tabs::TabHandle();
-  bar->moving_ = true;
-  // The page asks for the tasks as it empties.
-  ResetCommandBar(bar->page(), /*shell=*/false);
   bar->Show();
   return true;
 }

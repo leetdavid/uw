@@ -35,6 +35,7 @@
 #include "ui/views/view_utils.h"
 #include "url/gurl.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/top_button.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
@@ -118,11 +119,9 @@ void InboxButton::PaintButtonContents(gfx::Canvas* canvas) {
   // At the icon's top right.
   const std::u16string count =
       unread > 99 ? u"99+" : base::NumberToString16(unread);
-  const gfx::FontList font = gfx::FontList()
-                                 .DeriveWithSizeDelta(
-                                     kBadgeFontSize -
-                                     gfx::FontList().GetFontSize())
-                                 .DeriveWithWeight(gfx::Font::Weight::SEMIBOLD);
+  const gfx::FontList font =
+      FontOfSize(gfx::FontList(), kBadgeFontSize)
+          .DeriveWithWeight(gfx::Font::Weight::SEMIBOLD);
   const int width = std::max(
       kBadgeHeight, gfx::GetStringWidth(count, font) + kBadgeHeight / 2);
   const gfx::RectF badge(kTopButtonSize - width, 0, width, kBadgeHeight);

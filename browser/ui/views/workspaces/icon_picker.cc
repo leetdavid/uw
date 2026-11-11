@@ -26,6 +26,7 @@
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/workspaces/workspace_list.h"
 
@@ -42,11 +43,6 @@ constexpr int kCellEmojiSize = 16;
 constexpr int kGap = 2;
 constexpr int kRingWidth = 2;
 constexpr int kColumns = 8;
-
-gfx::FontList EmojiFont(int size) {
-  const gfx::FontList base;
-  return base.DeriveWithSizeDelta(size - base.GetFontSize());
-}
 
 // The last character of `text`, as a reader sees one, emoji and all.
 std::u16string LastCharacter(const std::u16string& text) {
@@ -72,7 +68,7 @@ class IconCell : public views::Button {
     SetLayoutManager(std::make_unique<views::FillLayout>());
     auto* label =
         AddChildView(std::make_unique<views::Label>(base::UTF8ToUTF16(icon_)));
-    label->SetFontList(EmojiFont(kCellEmojiSize));
+    label->SetFontList(FontOfSize(gfx::FontList(), kCellEmojiSize));
     label->SetBackgroundColor(SK_ColorTRANSPARENT);
     label->SetSubpixelRenderingEnabled(false);
     GetViewAccessibility().SetName(base::UTF8ToUTF16(icon_));
@@ -122,7 +118,7 @@ IconField::IconField(const std::string& icon, IconPicked typed)
     : typed_(std::move(typed)), icon_(icon) {
   SetController(this);
   SetText(base::UTF8ToUTF16(icon_));
-  SetFontList(EmojiFont(kFieldEmojiSize));
+  SetFontList(FontOfSize(gfx::FontList(), kFieldEmojiSize));
   SetHorizontalAlignment(gfx::ALIGN_CENTER);
   SetPreferredSize(gfx::Size(kFieldSize, kFieldSize));
   SetBackgroundColor(kColorMenuCardHover);

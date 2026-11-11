@@ -26,6 +26,7 @@
 #include "uw/browser/ui/views/mini_player/app_activity.h"
 #include "uw/browser/ui/views/mini_player/auto_mini_player.h"
 #include "uw/browser/ui/views/mini_player/dock_cover.h"
+#include "uw/browser/ui/views/mini_player/mini_player_controls.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
 #include "uw/browser/ui/views/mini_player/mini_player_view.h"
@@ -50,7 +51,6 @@ constexpr int kRowGap = 6;
 // The rows slide up quickly and settle; they drop back a little faster.
 constexpr base::TimeDelta kFanIn = base::Milliseconds(220);
 constexpr base::TimeDelta kFanOut = base::Milliseconds(160);
-constexpr int kCornerRadius = 10;
 // Other apps' windows give no notice when they move, so the dock looks again
 // this often while another app is active.
 constexpr base::TimeDelta kCoverCheck = base::Milliseconds(500);
@@ -223,7 +223,8 @@ void MiniPlayerDock::OnPaint(gfx::Canvas* canvas) {
     peek.Offset(0, -kPeek * step);
     gfx::ScopedCanvas scoped(canvas);
     canvas->ClipPath(
-        SkPath::RRect(gfx::RectToSkRect(peek), kCornerRadius, kCornerRadius),
+        SkPath::RRect(gfx::RectToSkRect(peek), kDockedCornerRadius,
+                      kDockedCornerRadius),
         true);
     canvas->FillRect(peek, SK_ColorBLACK);
     const gfx::ImageSkia& still = paused[i].still;
@@ -367,7 +368,7 @@ void MiniPlayerDock::UpdateLook() {
   // shadow under the video.
   const SkColor text =
       GetColorProvider()->GetColor(kColorTabForegroundInactiveFrameActive);
-  player_->SetDockedLook(SkColorSetA(text, 0x1F),
+  player_->SetDockedLook(SkColorSetA(text, kRingAlpha),
                          /*shadow=*/color_utils::IsDark(text));
   InvalidateLayout();
 }

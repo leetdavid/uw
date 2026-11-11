@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "base/strings/stringprintf.h"
-#include "base/strings/utf_string_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/grit/generated_resources.h"
@@ -25,8 +23,9 @@
 #include "ui/gfx/text_elider.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/image_button.h"
-#include "ui/views/controls/label.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
+#include "uw/browser/ui/views/mini_player/mini_player_controls.h"
 
 namespace uw {
 namespace {
@@ -34,29 +33,8 @@ namespace {
 constexpr int kPadding = 4;
 constexpr gfx::Size kStill(78, 44);
 constexpr int kStillRadius = 7;
-constexpr int kRadius = 10;
 constexpr int kGap = 9;
 constexpr int kDropSize = 21;
-
-gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
-  const gfx::FontList& base = views::Label::GetDefaultFontList();
-  return base.DeriveWithSizeDelta(size - base.GetFontSize())
-      .DeriveWithWeight(weight);
-}
-
-// "4:12" or "1:02:41".
-std::u16string FormatTime(base::TimeDelta time) {
-  const int64_t seconds = std::max<int64_t>(0, time.InSeconds());
-  const int64_t hours = seconds / 3600;
-  return base::UTF8ToUTF16(
-      hours > 0 ? base::StringPrintf("%lld:%02lld:%02lld",
-                                     static_cast<long long>(hours),
-                                     static_cast<long long>(seconds / 60 % 60),
-                                     static_cast<long long>(seconds % 60))
-                : base::StringPrintf("%lld:%02lld",
-                                     static_cast<long long>(seconds / 60),
-                                     static_cast<long long>(seconds % 60)));
-}
 
 }  // namespace
 
@@ -127,7 +105,7 @@ void StackRow::PaintButtonContents(gfx::Canvas* canvas) {
   fill.setAntiAlias(true);
   fill.setColor(SkColorSetA(
       SK_ColorWHITE, hovered ? (light ? 0xFF : 0x29) : (light ? 0x75 : 0x14)));
-  canvas->DrawRoundRect(bounds, kRadius, fill);
+  canvas->DrawRoundRect(bounds, kDockedCornerRadius, fill);
 
   // The still, cropped to fill its box, darkened, with a play mark.
   const gfx::Rect still_box(kPadding, (height() - kStill.height()) / 2,

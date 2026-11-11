@@ -84,9 +84,6 @@ class LittleWindow {
   void MoveTo(std::string_view id);
   // Opens the menu of workspaces under Move to Workspace's arrow.
   void ShowWorkspaceMenu();
-  // Closes the window when it never showed a page, as Esc in its command bar
-  // does before anything is picked.
-  void CloseIfBlank();
 
  private:
   void OnActive(BrowserWindowInterface* window);

@@ -40,10 +40,11 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/image_button.h"
-#include "ui/views/controls/label.h"
 #include "ui/views/view_class_properties.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/mini_player/mini_player.h"
+#include "uw/browser/ui/views/mini_player/mini_player_controls.h"
 #include "uw/browser/ui/views/mini_player/mini_player_placement.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 #include "uw/browser/ui/views/mini_player/mini_player_stack.h"
@@ -61,7 +62,6 @@ constexpr int kGapAround = 6;
 constexpr int kPadding = 6;
 constexpr int kArt = 32;
 constexpr int kArtRadius = 6;
-constexpr int kRadius = 10;
 constexpr int kGap = 9;
 constexpr int kButton = 24;
 constexpr int kIcon = 13;
@@ -71,12 +71,6 @@ constexpr int kDismiss = 18;
 constexpr int kDismissIcon = 10;
 constexpr int kDismissInset = 1;
 constexpr SkColor kDismissFill = SkColorSetARGB(0xB8, 0x1E, 0x1B, 0x2E);
-
-gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
-  const gfx::FontList& base = views::Label::GetDefaultFontList();
-  return base.DeriveWithSizeDelta(size - base.GetFontSize())
-      .DeriveWithWeight(weight);
-}
 
 }  // namespace
 
@@ -522,7 +516,8 @@ void PlaybackControls::PaintButtonContents(gfx::Canvas* canvas) {
   fill.setAntiAlias(true);
   fill.setColor(SkColorSetA(
       SK_ColorWHITE, hovered ? (light ? 0xFF : 0x29) : (light ? 0x75 : 0x14)));
-  canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kRadius, fill);
+  canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kDockedCornerRadius,
+                        fill);
 
   // A soft circle behind the button under the pointer.
   for (views::ImageButton* button :

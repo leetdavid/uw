@@ -17,7 +17,6 @@
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/tabs/public/tab_interface.h"
-#include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
@@ -289,21 +288,6 @@ void LittleWindow::ShowWorkspaceMenu() {
   if (toolbar_) {
     toolbar_->ShowWorkspaceMenu();
   }
-}
-
-void LittleWindow::CloseIfBlank() {
-  tabs::TabInterface* tab = window_->GetTabStripModel()->GetActiveTab();
-  if (!tab) {
-    return;
-  }
-  content::NavigationController& history =
-      tab->GetContents()->GetController();
-  const GURL shown = tab->GetContents()->GetLastCommittedURL();
-  if (history.GetPendingEntry() ||
-      !(shown.is_empty() || shown.IsAboutBlank())) {
-    return;
-  }
-  window_->GetWindow()->Close();
 }
 
 void LittleWindow::OnActive(BrowserWindowInterface* window) {

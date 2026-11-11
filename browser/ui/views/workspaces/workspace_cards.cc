@@ -47,6 +47,7 @@
 #include "ui/views/view_class_properties.h"
 #include "ui/views/widget/widget.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
@@ -434,8 +435,7 @@ RenameCard::RenameCard(const std::string& id, CardBubble* bubble)
   const WorkspaceList::Workspace* workspace = WorkspaceList::Get().Find(id);
   auto* emoji = AddChildView(std::make_unique<views::Label>(
       workspace ? base::UTF8ToUTF16(workspace->icon) : std::u16string()));
-  emoji->SetFontList(gfx::FontList().DeriveWithSizeDelta(
-      kEmojiSize - gfx::FontList().GetFontSize()));
+  emoji->SetFontList(FontOfSize(gfx::FontList(), kEmojiSize));
   emoji->SetElideBehavior(gfx::NO_ELIDE);
   emoji->SetBackgroundColor(SK_ColorTRANSPARENT);
   emoji->SetSubpixelRenderingEnabled(false);

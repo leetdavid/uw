@@ -20,6 +20,14 @@
 namespace uw {
 
 MiniPlayerStack::Entry::Entry() = default;
+MiniPlayerStack::Entry::Entry(content::WebContents* page)
+    : contents(page->GetWeakPtr()), title(page->GetTitle()) {
+  if (content::NavigationEntry* entry =
+          page->GetController().GetLastCommittedEntry()) {
+    favicon = entry->GetFavicon().image.AsImageSkia();
+  }
+  still = favicon;
+}
 MiniPlayerStack::Entry::Entry(const Entry&) = default;
 MiniPlayerStack::Entry& MiniPlayerStack::Entry::operator=(const Entry&) =
     default;
@@ -39,14 +47,10 @@ MiniPlayerStack& MiniPlayerStack::Get() {
 void MiniPlayerStack::OnHidden(content::WebContents* contents,
                                gfx::ImageSkia still,
                                base::TimeDelta position) {
-  Entry entry;
-  entry.contents = contents->GetWeakPtr();
-  entry.title = contents->GetTitle();
-  if (content::NavigationEntry* page =
-          contents->GetController().GetLastCommittedEntry()) {
-    entry.favicon = page->GetFavicon().image.AsImageSkia();
+  Entry entry(contents);
+  if (!still.isNull()) {
+    entry.still = still;
   }
-  entry.still = still.isNull() ? entry.favicon : still;
   entry.paused_at = position;
   hidden_ = std::move(entry);
   // Chromium hides the old mini player and shows the new one in one go. A
@@ -146,7 +150,7 @@ void MiniPlayerStack::Remove(content::WebContents* contents) {
   }
 }
 
-void MiniPlayerStack::PushSiteWindow(Entry entry) {
+void MiniPlayerStack::PushFront(Entry entry) {
   paused_.insert(paused_.begin(), std::move(entry));
   if (paused_.size() > kMaxPaused) {
     Dropped(paused_.back());
@@ -177,13 +181,9 @@ void MiniPlayerStack::KeepHidden() {
     hidden_.reset();
     return;
   }
-  paused_.insert(paused_.begin(), std::move(*hidden_));
+  Entry entry = std::move(*hidden_);
   hidden_.reset();
-  if (paused_.size() > kMaxPaused) {
-    Dropped(paused_.back());
-    paused_.resize(kMaxPaused);
-  }
-  observers_.Notify();
+  PushFront(std::move(entry));
 }
 
 // static

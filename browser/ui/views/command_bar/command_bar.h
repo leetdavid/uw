@@ -88,6 +88,14 @@ class CommandBar : public views::WidgetObserver {
   void OnWidgetClosing(views::Widget* widget) override;
   void OnWidgetDestroying(views::Widget* widget) override;
 
+  // Shows the command bar of `window` for `task`, over `pane`, or to move
+  // tabs, each if given. With `reset_shell`, empties its page first, ready
+  // for a shell command when true.
+  static bool OpenWith(BrowserWindowInterface* window,
+                       std::optional<tab_groups::TabGroupId> task,
+                       tabs::TabInterface* pane,
+                       bool moving,
+                       std::optional<bool> reset_shell);
   void OnSettingChanged();
   void Show();
   // Opens a row picked in the command bar: in a new tab where Cmd+T's blank

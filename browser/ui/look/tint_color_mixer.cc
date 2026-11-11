@@ -31,9 +31,6 @@ constexpr SkAlpha kFillOnDarkAlpha = 0x14;
 constexpr SkAlpha kTopButtonIconAlpha = 0xBF;
 constexpr SkAlpha kTopButtonIconInactiveAlpha = 0x8C;
 
-// A menu card over frosted glass keeps 85% of its color.
-constexpr SkAlpha kMenuCardOverGlass = 0xD9;
-
 // uw's menu cards, light or on uw's blacks, as the window's light or dark
 // says.
 void AddMenuCardColors(ui::ColorMixer& mixer, bool dark) {

@@ -2,6 +2,7 @@
 # buttons, the fills of sidebar tabs, and the toolbar in the page's color.
 source_set("look") {
   sources = [
+    "font_of_size.h",
     "menu_card.h",
     "page_card.cc",
     "page_card.h",

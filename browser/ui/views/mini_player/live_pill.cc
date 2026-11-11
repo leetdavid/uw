@@ -19,7 +19,7 @@
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
-#include "ui/views/controls/label.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/views/mini_player/mini_player_prefs.h"
 
 namespace uw {
@@ -34,9 +34,7 @@ constexpr int kRight = 9;
 constexpr SkColor kLiveGreen = SkColorSetRGB(0x34, 0xC7, 0x59);
 
 gfx::FontList Font() {
-  const gfx::FontList& base = views::Label::GetDefaultFontList();
-  return base.DeriveWithSizeDelta(11 - base.GetFontSize())
-      .DeriveWithWeight(gfx::Font::Weight::SEMIBOLD);
+  return FontOfSize(11, gfx::Font::Weight::SEMIBOLD);
 }
 
 }  // namespace

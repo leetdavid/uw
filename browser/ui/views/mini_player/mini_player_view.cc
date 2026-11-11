@@ -8,8 +8,6 @@
 
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
-#include "base/strings/stringprintf.h"
-#include "base/strings/utf_string_conversions.h"
 #include "cc/layers/deadline_policy.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "chrome/grit/generated_resources.h"
@@ -31,6 +29,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/view_shadow.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/mini_player/mini_player_controls.h"
 #include "uw/browser/ui/views/mini_player/playback_speed.h"
@@ -52,24 +51,8 @@ constexpr int kFloatingSizesFrom = 320;
 
 constexpr int kFloatingCornerRadius = 12;
 // The floating window's edge: faint and even, so no side reads as a line.
-constexpr SkColor kFloatingEdge = SkColorSetA(SK_ColorWHITE, 0x1F);
-constexpr int kDockedCornerRadius = 10;
+constexpr SkColor kFloatingEdge = SkColorSetA(SK_ColorWHITE, kRingAlpha);
 constexpr int kDockedShadowElevation = 4;
-
-// "12:41" or "1:02:41".
-std::u16string FormatTime(base::TimeDelta time) {
-  const int64_t seconds = std::max<int64_t>(0, time.InSeconds());
-  const int64_t hours = seconds / 3600;
-  const int64_t minutes = seconds / 60 % 60;
-  if (hours > 0) {
-    return base::UTF8ToUTF16(base::StringPrintf(
-        "%lld:%02lld:%02lld", static_cast<long long>(hours),
-        static_cast<long long>(minutes), static_cast<long long>(seconds % 60)));
-  }
-  return base::UTF8ToUTF16(
-      base::StringPrintf("%lld:%02lld", static_cast<long long>(minutes),
-                         static_cast<long long>(seconds % 60)));
-}
 
 bool Seekable(const media_session::MediaPosition& position) {
   return position.duration().is_positive() && !position.duration().is_max();
@@ -530,9 +513,7 @@ void MiniPlayerView::Layout(PassKey) {
     x += s.seek + 12;
   }
 
-  const gfx::FontList& base = views::Label::GetDefaultFontList();
-  time_->SetFontList(base.DeriveWithSizeDelta(s.time_font - base.GetFontSize())
-                         .DeriveWithWeight(gfx::Font::Weight::MEDIUM));
+  time_->SetFontList(FontOfSize(s.time_font, gfx::Font::Weight::MEDIUM));
   const int time_height = time_->GetPreferredSize().height();
   time_->SetBounds(video.x() + s.bar_inset, row_center - time_height / 2,
                    video.width() / 2, time_height);

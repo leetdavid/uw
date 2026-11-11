@@ -17,13 +17,11 @@
 #include "ui/views/background.h"
 #include "ui/views/view.h"
 #include "uw/browser/ui/glass/glass.h"
+#include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/look/sidebar_tab_fill.h"
 
 namespace uw {
 namespace {
-
-// A card over glass keeps this much of its color, as menu cards do.
-constexpr SkAlpha kCardOverGlass = 0xD9;
 
 enum class Shape { kPill, kCard };
 
@@ -55,7 +53,7 @@ class GlassBackground : public views::Background {
     }
     gfx::ScopedCanvas scoped_canvas(canvas);
     canvas->ClipPath(outline, true);
-    flags.setColor(SkColorSetA(color, kCardOverGlass));
+    flags.setColor(SkColorSetA(color, kMenuCardOverGlass));
     canvas->DrawPath(outline, flags);
     PaintGlassEdge(canvas, view, outline, view->GetLocalBounds(), 1.0f);
   }

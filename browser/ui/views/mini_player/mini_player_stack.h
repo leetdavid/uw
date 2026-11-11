@@ -36,6 +36,8 @@ class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
   // A paused video.
   struct Entry {
     Entry();
+    // `page` with its title and icon, the icon as its still.
+    explicit Entry(content::WebContents* page);
     Entry(const Entry&);
     Entry& operator=(const Entry&);
     ~Entry();
@@ -81,8 +83,9 @@ class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
   void Drop(size_t index);
   // Drops the video of `contents`, as when the user goes to its tab.
   void Remove(content::WebContents* contents);
-  // A site's window that is not live waits here, newest first.
-  void PushSiteWindow(Entry entry);
+  // Puts `entry` on top, as a site's window that is not live waits here. The
+  // oldest past kMaxPaused is dropped.
+  void PushFront(Entry entry);
   // Takes the site's window of `contents` out without closing it, as when it
   // turns live again.
   void TakeSiteWindow(content::WebContents* contents);

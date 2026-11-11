@@ -20,10 +20,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/document_picture_in_picture_window_controller.h"
-#include "content/public/browser/favicon_status.h"
 #include "content/public/browser/media_session.h"
-#include "content/public/browser/navigation_controller.h"
-#include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/picture_in_picture_window_controller.h"
 #include "content/public/browser/web_contents.h"
 #include "ui/base/base_window.h"
@@ -57,7 +54,6 @@
 namespace uw {
 namespace {
 
-constexpr int kCornerRadius = 10;
 constexpr int kButton = 24;
 constexpr int kButtonIcon = 14;
 constexpr int kButtonInset = 8;
@@ -148,10 +144,10 @@ class PageControls : public views::View, public views::ViewTargeterDelegate {
     ring.setAntiAlias(true);
     ring.setStyle(cc::PaintFlags::kStroke_Style);
     ring.setStrokeWidth(1);
-    ring.setColor(SkColorSetA(text, 0x1F));
+    ring.setColor(SkColorSetA(text, kRingAlpha));
     gfx::RectF edge(GetLocalBounds());
     edge.Inset(0.5f);
-    canvas->DrawRoundRect(edge, kCornerRadius - 0.5f, ring);
+    canvas->DrawRoundRect(edge, kDockedCornerRadius - 0.5f, ring);
     if (!shown_) {
       return;
     }
@@ -247,7 +243,8 @@ class DockedPage : public views::View {
     // The page's own layer is clipped to the rounded corners.
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
-    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(kCornerRadius));
+    layer()->SetRoundedCornerRadius(
+        gfx::RoundedCornersF(kDockedCornerRadius));
     layer()->SetIsFastRoundedCorner(true);
     layer()->SetMasksToBounds(true);
     controls_ = AddChildView(std::make_unique<PageControls>(
@@ -600,19 +597,12 @@ void SiteWindow::Wait() {
   }
   content::MediaSession::Get(opener_)->Suspend(
       content::MediaSession::SuspendType::kUI);
-  MiniPlayerStack::Entry entry;
-  entry.contents = opener_->GetWeakPtr();
-  entry.title = opener_->GetTitle();
-  if (content::NavigationEntry* page =
-          opener_->GetController().GetLastCommittedEntry()) {
-    entry.favicon = page->GetFavicon().image.AsImageSkia();
-  }
-  entry.still = entry.favicon;
+  MiniPlayerStack::Entry entry(opener_);
   entry.play_site_window =
       base::BindRepeating(&SiteWindow::Resume, weak_factory_.GetWeakPtr());
   entry.drop_site_window =
       base::BindRepeating(&SiteWindow::Close, weak_factory_.GetWeakPtr());
-  MiniPlayerStack::Get().PushSiteWindow(std::move(entry));
+  MiniPlayerStack::Get().PushFront(std::move(entry));
 }
 
 void SiteWindow::Resume() {

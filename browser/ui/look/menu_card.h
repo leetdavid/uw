@@ -4,6 +4,7 @@
 #define UW_BROWSER_UI_LOOK_MENU_CARD_H_
 
 #include "chrome/browser/ui/color/chrome_color_id.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/color/color_id.h"
 
 namespace uw {
@@ -27,6 +28,9 @@ inline constexpr ui::ColorId kColorMenuCardGlass = kChromeColorsEnd + 25;
 inline constexpr ui::ColorId kColorMenuGlass = kChromeColorsEnd + 26;
 // The address bar's suggestion list color at 85%, while uw frosts it.
 inline constexpr ui::ColorId kColorOmniboxResultsGlass = kChromeColorsEnd + 27;
+
+// A card over frosted glass keeps 85% of its color.
+inline constexpr SkAlpha kMenuCardOverGlass = 0xD9;
 
 inline constexpr int kMenuCardWidth = 264;
 inline constexpr int kMenuCardRadius = 14;

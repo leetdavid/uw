@@ -64,6 +64,7 @@ source_set("mini_player") {
     "//ui/gfx/animation",
     "//ui/views/controls/webview",
     "//uw/browser/ui/glass",
+    "//uw/browser/ui/look",
     "//uw/browser/ui/vector_icons",
   ]
   if (is_mac) {

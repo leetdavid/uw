@@ -33,6 +33,7 @@
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/glass/glass_background.h"
+#include "uw/browser/ui/look/font_of_size.h"
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/workspaces/card_bubble.h"
@@ -92,9 +93,7 @@ class WorkspaceIcon : public views::Button {
       SetLayoutManager(std::make_unique<views::FillLayout>());
       auto* emoji = AddChildView(
           std::make_unique<views::Label>(base::UTF8ToUTF16(workspace.icon)));
-      const gfx::FontList base;
-      emoji->SetFontList(
-          base.DeriveWithSizeDelta(kEmojiSize - base.GetFontSize()));
+      emoji->SetFontList(FontOfSize(gfx::FontList(), kEmojiSize));
       emoji->SetBackgroundColor(SK_ColorTRANSPARENT);
       emoji->SetSubpixelRenderingEnabled(false);
     }

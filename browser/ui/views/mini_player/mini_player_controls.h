@@ -8,6 +8,7 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ref.h"
+#include "base/time/time.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/button/button.h"
@@ -18,6 +19,15 @@ struct VectorIcon;
 }
 
 namespace uw {
+
+// The corners of what sits in the dock: the mini player, a site's window, and
+// the rows.
+inline constexpr int kDockedCornerRadius = 10;
+// How much of its color the mini player's 1px ring keeps.
+inline constexpr SkAlpha kRingAlpha = 0x1F;
+
+// "4:12" or "1:02:41".
+std::u16string FormatTime(base::TimeDelta time);
 
 // How glassy the controls are, from 0, flat, to 100.
 using ControlsGlassOf = base::RepeatingCallback<int()>;
