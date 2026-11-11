@@ -3,6 +3,8 @@
 import type { Channel } from "./channel.ts";
 import { options, type Command, type Plan } from "./cli.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
+import { cut } from "./output.ts";
+import { site } from "./steps.ts";
 
 export const TABS_HELP = `uw tabs: list, show, move, and close your tabs, and rename tasks.
 
@@ -87,7 +89,7 @@ function tabsPlan(args: string[]): Plan | null {
   });
   if (values.help) return null;
   const [verb, ...rest] = positionals;
-  const where = values.workspace === undefined ? {} : { workspace: values.workspace };
+  const where = { workspace: values.workspace };
   const act = (method: string, params: object, said: (done: Done) => string): Plan => ({
     json: values.json,
     run: async ({ channel, out }) => {
@@ -169,30 +171,15 @@ function seenAgo(seen: string, now = Date.now()): string {
   return ago(Math.floor(minutes / (60 * 24)), "day");
 }
 
-/** What a tab's address says of it: its site, "terminal", or a uw page. */
-function site(url: string): string {
-  try {
-    const { protocol, hostname } = new URL(url);
-    if (protocol === "chrome:") return hostname === "terminal" ? "terminal" : `uw://${hostname}`;
-    return hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
-const MAX_TITLE = 40;
-
 /** The list as the canvas frame "Tab tools: uw tabs in the terminal" draws it. */
 function listText(list: List, query: string): string {
   if (!list.tabs.length) {
     return query ? `No tab in ${list.workspace} matches "${query}".\n` : `${list.workspace} has no tabs.\n`;
   }
   const rows = list.tabs.map((tab) => {
-    const title = tab.title || tab.url;
-    const cut = title.length > MAX_TITLE ? `${title.slice(0, MAX_TITLE - 1)}…` : title;
     const status = [tab.busy ? "busy" : "", tab.working ? "working" : "", tab.kept ? "kept" : "",
       tab.selected ? "selected" : tab.seen ? seenAgo(tab.seen) : ""].filter(Boolean).join(" · ");
-    return { tab, start: `${" ".repeat(2 + 2 * tab.depth)}${tab.id}  ${cut}`, site: site(tab.url), status };
+    return { tab, start: `${" ".repeat(2 + 2 * tab.depth)}${tab.id}  ${cut(tab.title || tab.url)}`, site: site(tab.url), status };
   });
   const startWidth = Math.max(...rows.map((row) => row.start.length)) + 3;
   const siteWidth = Math.max(...rows.map((row) => row.site.length)) + 3;

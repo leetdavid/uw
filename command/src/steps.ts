@@ -83,7 +83,7 @@ const TAB_VERBS: Record<string, string> = {
 const count = (n: number, one = "tab", many = "tabs") => `${n} ${n === 1 ? one : many}`;
 
 /** What a tab's address says of it: its site, "terminal", or a uw page. */
-function site(url: string): string {
+export function site(url: string): string {
   try {
     const { protocol, hostname } = new URL(url);
     if (protocol === "chrome:") return hostname === "terminal" ? "terminal" : `uw://${hostname}`;

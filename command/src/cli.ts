@@ -98,6 +98,13 @@ export function options<T extends ParseArgsOptionsConfig>(args: string[], own: T
   }
 }
 
+/** Checks --mode, which uw chat and uw mcp serve take. */
+export function checkMode(mode: string | undefined): void {
+  if (mode !== undefined && !["ask-first", "auto", "full-auto"].includes(mode)) {
+    throw new CommandError(`--mode takes ask-first, auto, or full-auto, not ${mode}.`, USAGE);
+  }
+}
+
 export interface Run extends Streams, Reach, Partial<Input> {
   place: Place;
 }

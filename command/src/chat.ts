@@ -2,8 +2,9 @@
 
 import { accessSync, constants, statSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { options, type Command, type Context, type Input, type Plan } from "./cli.ts";
+import { checkMode, options, type Command, type Context, type Input, type Plan } from "./cli.ts";
 import { CommandError, DONE, FAILED, NEEDS_YOU, USAGE } from "./errors.ts";
+import { cut, table } from "./output.ts";
 import {
   NO_MEMORY, approvalCard, countMemory, isMemoryStep, memoryLines, stepLine, type Approval, type Choice, type Step,
 } from "./steps.ts";
@@ -72,7 +73,6 @@ Examples:
   uw approve 3f9c2e18 decline --note "Cancel the yearly plan instead"
 `;
 
-const MODES = ["ask-first", "auto", "full-auto"];
 const FULL_AUTO = "▲ Full auto: the agent won't ask before changes on your sites, commands, or connector tools. "
   + "It still asks before reading a sensitive file.";
 const CHOICES = ["allow", "allow-for-chat", "always-allow", "decline", "stop"];
@@ -121,9 +121,7 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     file: { type: "string", multiple: true },
   });
   if (values.help) return null;
-  if (values.mode !== undefined && !MODES.includes(values.mode)) {
-    throw new CommandError(`--mode takes ask-first, auto, or full-auto, not ${values.mode}.`, USAGE);
-  }
+  checkMode(values.mode);
   if (values.continue && values.resume !== undefined) {
     throw new CommandError("uw chat takes -c or -r, not both.", USAGE);
   }
@@ -141,14 +139,14 @@ async function chatPlan(args: string[], input: Input): Promise<Plan | null> {
     throw new CommandError('uw chat needs a request.\n  uw chat -p "Did my latest Vercel deploy succeed?"', USAGE);
   }
   const params = {
-    ...(values.workspace === undefined ? {} : { workspace: values.workspace }),
+    workspace: values.workspace,
     ...(text ? { text } : {}),
     ...(material ? { material } : {}),
     ...(files.length ? { files } : {}),
-    ...(values.mode === undefined ? {} : { mode: values.mode }),
-    ...(values.model === undefined ? {} : { model: values.model }),
-    ...(values.effort === undefined ? {} : { effort: values.effort }),
-    ...(values.resume === undefined ? {} : { chat: values.resume }),
+    mode: values.mode,
+    model: values.model,
+    effort: values.effort,
+    chat: values.resume,
     ...(values["no-memory"] ? { memory_off: true } : {}),
   };
   const method = picking ? "chats.resume" : "chats.start";
@@ -267,9 +265,8 @@ export const CHATS: Command = {
     const { values, positionals } = options(args, { workspace: { type: "string" } });
     if (values.help) return null;
     if (positionals.length) throw new CommandError("uw chats takes no arguments.\n  uw chats", USAGE);
-    const where = values.workspace === undefined ? {} : { workspace: values.workspace };
     return { json: values.json, run: async ({ channel, out }) => {
-      const listed = await channel.request("chats.list", where) as { chats: Listed[] };
+      const listed = await channel.request("chats.list", { workspace: values.workspace }) as { chats: Listed[] };
       out.data(listed, () => chatTable(listed.chats));
       return DONE;
     } };
@@ -286,15 +283,13 @@ interface Listed {
 
 function chatTable(chats: Listed[]): string {
   if (!chats.length) return 'No chats yet.\n  uw chat -p "Did my latest Vercel deploy succeed?"\n';
-  const rows = [["ID", "Title", "State", "Started", "Last"], ...chats.map((chat) => [
+  return table([["ID", "Title", "State", "Started", "Last"], ...chats.map((chat) => [
     chat.id.slice(0, 8),
-    chat.title.length > 40 ? `${chat.title.slice(0, 39)}…` : chat.title,
+    cut(chat.title),
     chat.state[0]!.toUpperCase() + chat.state.slice(1),
     chat.fromTerminal ? "terminal" : "in uw",
     new Date(chat.updated).toLocaleDateString("en", { month: "short", day: "numeric" }),
-  ])];
-  const widths = [0, 1, 2, 3].map((column) => Math.max(...rows.map((row) => row[column]!.length)) + 2);
-  return rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("").trimEnd()).join("\n") + "\n";
+  ])]);
 }
 
 export const APPROVE: Command = {

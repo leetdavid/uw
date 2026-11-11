@@ -2,6 +2,7 @@
 
 import { options, type Command, type Context, type Input, type Plan } from "./cli.ts";
 import { CommandError, DONE, FAILED, NEEDS_YOU, USAGE } from "./errors.ts";
+import { table } from "./output.ts";
 
 export const CONNECTORS_HELP = `uw connectors: add, list, remove, and sign in to connectors, the MCP servers
 that give uw's agent tools. uw mcp is the same command.
@@ -70,7 +71,7 @@ async function connectorsPlan(args: string[], input: Input): Promise<Plan | null
   if (verb === "list" && name === undefined) {
     return { json: values.json, run: async ({ channel, out }) => {
       const listed = await channel.request("connectors.list") as Listed;
-      out.data(listed, () => table(listed.connectors));
+      out.data(listed, () => connectorTable(listed.connectors));
       return DONE;
     } };
   }
@@ -82,9 +83,8 @@ async function connectorsPlan(args: string[], input: Input): Promise<Plan | null
     } };
   }
   if (verb === "sign-in" && name !== undefined && extra.length === 0) {
-    const where = values.workspace === undefined ? {} : { workspace: values.workspace };
     return { json: values.json, run: async (context) => {
-      const signedIn = await signIn(context, name, where);
+      const signedIn = await signIn(context, name, { workspace: values.workspace });
       if (values.json) context.out.data({ connectors: [signedIn] }, () => "");
       return DONE;
     } };
@@ -173,7 +173,7 @@ function headers(entries: string[]): Record<string, string> {
 }
 
 function addingPlan(json: string, values: { json: boolean; workspace?: string }, warnings: string[]): Plan {
-  const where = values.workspace === undefined ? {} : { workspace: values.workspace };
+  const where = { workspace: values.workspace };
   return { json: values.json, run: async (context) => {
     const { channel, out, terminal } = context;
     const added = await channel.request("connectors.add", { json }) as Listed;
@@ -233,16 +233,14 @@ const STATE: Record<Connector["state"], string> = {
   "failed": "Failed",
 };
 
-function table(connectors: Connector[]): string {
+function connectorTable(connectors: Connector[]): string {
   if (!connectors.length) return "No connectors yet.\n  uw mcp add --transport http linear https://mcp.linear.app/mcp\n";
-  const rows = connectors.map((connector) => [
+  return table(connectors.map((connector) => [
     connector.name,
     connector.kind === "web" ? "Web" : "This Mac",
     connector.state === "ready" && connector.kind === "web" ? "Signed in" : STATE[connector.state],
     connector.state === "ready" ? tools(connector.tools)
       : connector.state === "needs-sign-in" ? `run uw mcp sign-in ${connector.name}`
       : connector.error,
-  ]);
-  const widths = [0, 1, 2].map((column) => Math.max(...rows.map((row) => row[column]!.length)) + 2);
-  return rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("").trimEnd()).join("\n") + "\n";
+  ]));
 }

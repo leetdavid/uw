@@ -6,12 +6,10 @@ import {
   type CallToolResult, type ClientCapabilities, type ElicitRequestFormParams, type Implementation, type JsonSchemaType, type ServerContext,
 } from "@modelcontextprotocol/server";
 import { StdioServerTransport, serveStdio } from "@modelcontextprotocol/server/stdio";
-import { options, type Context, type Input, type Plan } from "./cli.ts";
+import { checkMode, options, type Context, type Input, type Plan } from "./cli.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
 import { VERSION } from "./launch.ts";
 import { approvalCard, type Approval } from "./steps.ts";
-
-const MODES = ["ask-first", "auto", "full-auto"];
 
 interface Tool {
   name: string;
@@ -39,13 +37,8 @@ export async function servePlan(args: string[], input: Input): Promise<Plan | nu
   const { values, positionals } = options(args, { mode: { type: "string" }, workspace: { type: "string" } });
   if (values.help) return null;
   if (positionals.length) throw new CommandError("uw mcp serve takes no arguments.\n  claude mcp add uw -- uw mcp serve", USAGE);
-  if (values.mode !== undefined && !MODES.includes(values.mode)) {
-    throw new CommandError(`--mode takes ask-first, auto, or full-auto, not ${values.mode}.`, USAGE);
-  }
-  const asked = {
-    ...(values.mode === undefined ? {} : { mode: values.mode }),
-    ...(values.workspace === undefined ? {} : { workspace: values.workspace }),
-  };
+  checkMode(values.mode);
+  const asked = { mode: values.mode, workspace: values.workspace };
   return { json: false, run: (context) => serve(context, asked, input) };
 }
 

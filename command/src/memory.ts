@@ -2,6 +2,7 @@
 
 import { options, type Command, type Plan } from "./cli.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
+import { table } from "./output.ts";
 
 export const MEMORY_HELP = `uw memory: list and forget what uw's agent remembers about you.
 
@@ -43,7 +44,7 @@ function memoryPlan(args: string[]): Plan | null {
   const { values, positionals } = options(args, { search: { type: "string" }, workspace: { type: "string" } });
   if (values.help) return null;
   const [verb, id, ...extra] = positionals;
-  const where = values.workspace === undefined ? {} : { workspace: values.workspace };
+  const where = { workspace: values.workspace };
   if (verb === "list" && id === undefined) {
     const search = values.search?.trim() ?? "";
     return { json: values.json, run: async ({ channel, out }) => {
@@ -73,12 +74,10 @@ function misuse(verb: string | undefined): string {
 
 function memoryTable(memories: Listed[], search: string): string {
   if (!memories.length) return search ? `No memory mentions "${search}".\n` : "No memories yet.\n";
-  const rows = [["ID", "Memory", "From", "Changed"], ...memories.map((memory) => [
+  return table([["ID", "Memory", "From", "Changed"], ...memories.map((memory) => [
     String(memory.id),
     memory.text,
     memory.chat ? memory.chatTitle || "a deleted chat" : "",
     new Date(memory.changed).toLocaleDateString("en", { month: "short", day: "numeric" }),
-  ])];
-  const widths = [0, 1, 2].map((column) => Math.max(...rows.map((row) => row[column]!.length)) + 2);
-  return rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("").trimEnd()).join("\n") + "\n";
+  ])]);
 }

@@ -2,6 +2,7 @@
 
 import { options, type Command, type Plan } from "./cli.ts";
 import { CommandError, DONE, USAGE } from "./errors.ts";
+import { table } from "./output.ts";
 
 export const SETTINGS_HELP = `uw settings: list, read, and change uw's own settings.
 
@@ -34,7 +35,7 @@ function settingsPlan(args: string[]): Plan | null {
   const { values, positionals } = options(args, { workspace: { type: "string" } });
   if (values.help) return null;
   const [verb, name, value, ...extra] = positionals;
-  const where = values.workspace === undefined ? {} : { workspace: values.workspace };
+  const where = { workspace: values.workspace };
   const request = (method: string, params: object, describe: (result: unknown) => string): Plan => ({
     json: values.json,
     run: async ({ channel, out }) => {
@@ -44,7 +45,7 @@ function settingsPlan(args: string[]): Plan | null {
     },
   });
   if (verb === "list" && name === undefined) {
-    return request("settings.list", where, (result) => table((result as { settings: Setting[] }).settings));
+    return request("settings.list", where, (result) => settingsTable((result as { settings: Setting[] }).settings));
   }
   if (verb === "get" && name !== undefined && value === undefined) {
     return request("settings.get", { ...where, name }, (result) => `${(result as Setting).value}\n`);
@@ -69,10 +70,8 @@ function changed(setting: Setting): string {
   return `${setting.name} is now ${setting.value} for ${names} (same profile).\n`;
 }
 
-function table(rows: Setting[]): string {
-  const lines = [["Setting", "Value", "Takes", "Applies to"], ...rows.map((row) => [
+function settingsTable(rows: Setting[]): string {
+  return table([["Setting", "Value", "Takes", "Applies to"], ...rows.map((row) => [
     row.name, String(row.value), row.takes, row.appliesTo.join(", "),
-  ])];
-  const widths = [0, 1, 2].map((column) => Math.max(...lines.map((line) => line[column]!.length)) + 2);
-  return lines.map((line) => line.map((cell, column) => cell.padEnd(widths[column] ?? 0)).join("").trimEnd()).join("\n") + "\n";
+  ])]);
 }
