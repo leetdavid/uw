@@ -34,7 +34,7 @@ TEST(ConnectorToolsTest, AToolSchemaKeepsTheServersParameters) {
             "connector");
 }
 
-TEST(ConnectorToolsTest, TheInstructionsListFirstSentences) {
+TEST(ConnectorToolsTest, TheInstructionsListToolNames) {
   EXPECT_EQ(ConnectorsForInstructions({}), "");
   ConnectorTools linear;
   linear.name = "linear";
@@ -43,10 +43,11 @@ TEST(ConnectorToolsTest, TheInstructionsListFirstSentences) {
       MakeTool("save_issue", "Create or update an issue\nwith fields."),
       MakeTool("ping", "")};
   const std::string text = ConnectorsForInstructions({linear});
-  EXPECT_NE(text.find("\n- linear\n  - list_issues: List issues.\n  - "
-                      "save_issue: Create or update an issue\n  - ping"),
-            std::string::npos)
+  EXPECT_TRUE(text.ends_with("\n- linear: list_issues, save_issue, ping"))
       << text;
+  ConnectorTools empty;
+  empty.name = "exa";
+  EXPECT_TRUE(ConnectorsForInstructions({empty}).ends_with("\n- exa"));
 }
 
 }  // namespace

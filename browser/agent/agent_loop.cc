@@ -40,6 +40,8 @@ namespace {
 
 // A chat that takes this many turns without an answer has lost its way.
 constexpr int kMaxTurns = 40;
+// A tool that fails this many times in a row is not going to work.
+constexpr int kMaxFailures = 3;
 // A large model can think for a while before it answers.
 constexpr base::TimeDelta kModelTimeout = base::Minutes(2);
 // Long enough for a dozen full readings, short enough for most models.
@@ -152,7 +154,7 @@ void AgentLoop::SetSkills(const std::vector<Skill>& skills) {
     }
     skills_[skill.name] = skill.file;
     base::StrAppend(&list, {list.empty() ? "" : "\n", "- ", skill.name, ": ",
-                            skill.description});
+                            FirstSentence(skill.description)});
   }
   context_->SetSkills(list);
 }
@@ -165,6 +167,7 @@ void AgentLoop::Send(std::string_view text,
   }
   working_ = true;
   turns_ = 0;
+  failures_ = 0;
   context_->AddUser(text, files);
   if (!material.empty()) {
     context_->AddMaterial(material);
@@ -216,6 +219,7 @@ void AgentLoop::TryAgain() {
   }
   working_ = true;
   turns_ = 0;
+  failures_ = 0;
   AskModel();
 }
 
@@ -240,6 +244,7 @@ void AgentLoop::Steer(std::string_view text, std::vector<Attachment> files) {
     return;
   }
   turns_ = 0;
+  failures_ = 0;
   if (asking_) {
     client_.reset();
     asking_ = false;
@@ -653,6 +658,7 @@ void AgentLoop::OnToolCalled(ModelTurn turn,
     return;
   }
   if (refused) {
+    failures_ = -1;
     result = ToolError(
         "The user did not approve acting on this site, so the step did not "
         "happen.");
@@ -695,6 +701,7 @@ void AgentLoop::OnApproval(ModelTurn turn,
       }
       return;
     case ApprovalAnswer::Choice::kDecline: {
+      failures_ = -1;
       base::DictValue result = ToolError(
           "The user did not approve this step, so it did not happen.");
       if (!answer.note.empty()) {
@@ -1034,9 +1041,23 @@ void AgentLoop::OnTool(ModelTurn turn,
   step.args = std::move(args);
   step.result = std::move(result);
   on_step_.Run(step);
+  const bool failed = step.result.contains("error");
+  if (!failed || failed_tool_ != call.name) {
+    failed_tool_ = call.name;
+    failures_ = 0;
+  }
+  if (failed && ++failures_ == kMaxFailures) {
+    context_->CloseOpenCalls("Not run, because the chat stopped.");
+    const std::string* error = step.result.FindString("error");
+    Finish(Failed(base::StrCat(
+        {"The agent stopped: ", call.name, " failed ",
+         base::NumberToString(kMaxFailures),
+         " times in a row. The last error: ", error ? *error : "unknown"})));
+    return;
+  }
   // The steps after a failed or declined one in the same answer counted on
   // it, so they do not run.
-  if (step.result.contains("error") && index + 1 < turn.calls.size()) {
+  if (failed && index + 1 < turn.calls.size()) {
     context_->CloseOpenCalls(
         base::StrCat({"Not run, because step ",
                       base::NumberToString(step.number), " did not work."}));

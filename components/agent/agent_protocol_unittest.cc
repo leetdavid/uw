@@ -66,6 +66,18 @@ TEST(AgentProtocolTest, TellsOfTheTerminalOnlyWhereThereIsOne) {
   EXPECT_EQ(instructions.find("Mac") != std::string::npos, kAgentHasTerminal);
 }
 
+// A small model keeps to the rule for answers when it reads it last.
+TEST(AgentProtocolTest, TheRuleForAnswersComesAfterTheLists) {
+  const std::string instructions =
+      *AgentInstructions("\n\nSkills:\n- book-tours: Books tours.")
+           .FindString("content");
+
+  const size_t skills = instructions.find("Skills:\n- book-tours");
+  ASSERT_NE(skills, std::string::npos);
+  EXPECT_GT(instructions.find("Be brief:"), skills);
+  EXPECT_TRUE(instructions.ends_with("offers to do more."));
+}
+
 TEST(AgentProtocolTest, FindsTheMessageInAnErrorResponse) {
   EXPECT_EQ(
       ModelErrorMessage(

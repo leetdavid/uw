@@ -334,6 +334,10 @@ class AgentLoop {
   };
   std::unique_ptr<MemoryCheck> memory_check_;
   int turns_ = 0;
+  // The tool whose steps failed last, and how many times in a row. A step the
+  // user declined is not counted.
+  std::string failed_tool_;
+  int failures_ = 0;
   bool working_ = false;
   // A model request is under way.
   bool asking_ = false;

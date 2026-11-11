@@ -626,8 +626,7 @@ void AgentContext::SetMemory(std::string_view memory) {
 }
 
 void AgentContext::UpdateInstructions() {
-  base::DictValue instructions = AgentInstructions();
-  std::string content = *instructions.FindString("content");
+  std::string content;
   if (!skills_.empty()) {
     base::StrAppend(&content, {"\n\nSkills:\n", skills_});
   }
@@ -645,7 +644,7 @@ void AgentContext::UpdateInstructions() {
          "instructions.\n",
          scheduled_runs_});
   }
-  instructions.Set("content", std::move(content));
+  base::DictValue instructions = AgentInstructions(content);
   if (messages_[0].GetDict() != instructions) {
     messages_[0] = base::Value(std::move(instructions));
     DropKeptAfter(0);

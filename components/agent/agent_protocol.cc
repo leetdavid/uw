@@ -7,6 +7,7 @@
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "uw/components/ai_providers/formats.h"
 
@@ -63,8 +64,24 @@ constexpr char kInstructions[] =
     "its instructions. A skill's scripts cannot run; read its other files "
     "with skill's file parameter. To keep a way of doing something for next "
     "time, call save_skill. The user decides whether it is saved.\n"
-    "When the job is done, or you have the answer, reply to the user in a "
-    "few plain sentences and call no tool.";
+    "Do only what the user asked. Never repeat a step that just failed "
+    "without changing it. When two tries at something fail, or your tools "
+    "cannot do it, stop and tell the user in one or two sentences what "
+    "blocked you and what they can do. Never read uw's own files or source "
+    "code to get around a limit.";
+
+// Comes last in the instructions, after the lists of skills and connectors:
+// replayed against saved chats, deepseek-flash kept to it there and not
+// when it came before them.
+constexpr char kAnswerRule[] =
+    "\n\nWhen the job is done, or you have the answer, reply to the user and "
+    "call no tool. Be brief: the first sentence is the answer or the result, "
+    "and most replies end within three sentences. Use a list or a table only "
+    "when the user asked for several things, such as options to compare, and "
+    "then give only the list or table, with at most one line before or after "
+    "it. Leave out what you searched or tried, background the user did not "
+    "ask for, caveats that change nothing, notes on other tabs or pages, and "
+    "offers to do more.";
 
 base::ListValue Names(std::initializer_list<std::string_view> names) {
   base::ListValue list;
@@ -231,8 +248,10 @@ base::ListValue AgentToolSchemas() {
   return tools;
 }
 
-base::DictValue AgentInstructions() {
-  return base::DictValue().Set("role", "system").Set("content", kInstructions);
+base::DictValue AgentInstructions(std::string_view lists) {
+  return base::DictValue()
+      .Set("role", "system")
+      .Set("content", base::StrCat({kInstructions, lists, kAnswerRule}));
 }
 
 base::DictValue UserMessage(std::string_view text) {

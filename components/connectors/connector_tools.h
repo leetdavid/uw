@@ -39,8 +39,8 @@ inline constexpr char kLoadConnectorTool[] = "connector";
 base::DictValue LoadConnectorToolSchema();
 
 // What the instructions say about `connectors`: how to use them, and each
-// one with its tools' names and the first sentence of each description.
-// Empty for none.
+// one on a line with its tools' names. Loading a connector gives the model
+// each tool's description. Empty for none.
 std::string ConnectorsForInstructions(
     const std::vector<ConnectorTools>& connectors);
 

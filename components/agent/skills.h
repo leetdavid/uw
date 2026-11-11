@@ -30,6 +30,10 @@ struct Skill {
   std::string argument_hint;
 };
 
+// The first sentence of `description`, cut at 160 characters: what the
+// agent's instructions say of a skill.
+std::string FirstSentence(std::string_view description);
+
 // What the "---" lines that open a SKILL.md say, in the form Claude Code
 // reads. Nothing when the name or the description is missing.
 struct SkillFrontMatter {

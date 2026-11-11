@@ -48,8 +48,9 @@ base::DictValue ToolParameter(std::string_view type,
 // The tools of browser/agent/agent_tools.h, and recall, as a model is told
 // about them.
 base::ListValue AgentToolSchemas();
-// The instructions every chat starts with.
-base::DictValue AgentInstructions();
+// The instructions every chat starts with. `lists`, such as the skills and
+// connectors, goes before the rule for answers, which comes last.
+base::DictValue AgentInstructions(std::string_view lists = {});
 base::DictValue UserMessage(std::string_view text);
 // The model's turn as it goes back into the conversation.
 base::DictValue AssistantMessage(const ModelTurn& turn);

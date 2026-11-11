@@ -24,6 +24,15 @@ TEST(SkillsTest, ReadsANameAndADescription) {
   EXPECT_FALSE(front->made_in_chat);
 }
 
+TEST(SkillsTest, TheFirstSentenceOfADescription) {
+  EXPECT_EQ(FirstSentence("Books tours. Use when the user travels."),
+            "Books tours.");
+  EXPECT_EQ(FirstSentence(" Books tours\nand tickets "), "Books tours");
+  EXPECT_EQ(FirstSentence("Reads v2.0 files"), "Reads v2.0 files");
+  EXPECT_EQ(FirstSentence(std::string(200, 'a')),
+            std::string(160, 'a') + "…");
+}
+
 TEST(SkillsTest, ReadsQuotedAndMultiLineDescriptions) {
   EXPECT_EQ(ReadSkillFrontMatter(
                 "---\nname: a\ndescription: \"Says \\\"hi\\\" twice\"\n---\n")

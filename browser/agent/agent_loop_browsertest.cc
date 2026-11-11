@@ -256,9 +256,22 @@ IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, SaysWhenTheModelFails) {
   EXPECT_EQ(Ask("Hello").text, "The model's answer could not be read.");
 }
 
-IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, StopsWhenItGoesRoundInCircles) {
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, StopsWhenAToolKeepsFailing) {
   model_.Script({ScriptedModel::Calls(
       base::ListValue().Append(ScriptedModel::Call("fly")))});
+
+  const AgentLoop::Step& end = Ask("Fly to Lisbon");
+
+  EXPECT_EQ(end.kind, Kind::kFailed);
+  EXPECT_EQ(end.text,
+            "The agent stopped: fly failed 3 times in a row. The last error: "
+            "There is no tool called fly.");
+  EXPECT_EQ(model_.Requests().size(), 3u);
+}
+
+IN_PROC_BROWSER_TEST_F(AgentLoopBrowserTest, StopsWhenItGoesRoundInCircles) {
+  model_.Script({ScriptedModel::Calls(
+      base::ListValue().Append(ScriptedModel::Call("tabs")))});
 
   const AgentLoop::Step& end = Ask("Fly to Lisbon");
 

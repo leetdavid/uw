@@ -73,6 +73,21 @@ std::string Unquote(std::string_view value) {
 
 }  // namespace
 
+std::string FirstSentence(std::string_view description) {
+  constexpr size_t kMaxSentence = 160;
+  description = base::TrimWhitespaceASCII(description, base::TRIM_ALL);
+  size_t end = std::min(description.find('\n'), description.size());
+  if (const size_t stop = description.find(". "); stop < end) {
+    end = stop + 1;
+  }
+  std::string sentence(description.substr(0, end));
+  if (sentence.size() > kMaxSentence) {
+    base::TruncateUTF8ToByteSize(sentence, kMaxSentence, &sentence);
+    base::StrAppend(&sentence, {"…"});
+  }
+  return sentence;
+}
+
 std::optional<SkillFrontMatter> ReadSkillFrontMatter(std::string_view text) {
   std::optional<FrontMatter> split = SplitFrontMatter(text);
   if (!split) {

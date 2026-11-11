@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { favicon } from "./favicon";
+
 // Cmd is Ctrl on Windows.
 const isMac = navigator.userAgent.includes("Mac");
 const cmdName = isMac ? "Cmd" : "Ctrl";
@@ -43,8 +45,8 @@ function useCmdHeld(): boolean {
   );
 }
 
-// A link in an answer. Its tooltip names Cmd until Cmd is held, when the
-// label takes its place.
+// A link in an answer, after its site's icon. Its tooltip names Cmd until Cmd
+// is held, when the label takes its place.
 export function AnswerLink({
   href,
   children,
@@ -60,6 +62,11 @@ export function AnswerLink({
       data-answer-link=""
       title={held ? undefined : `${cmdName}-click to open in the background`}
     >
+      <img
+        src={favicon(href)}
+        alt=""
+        className="mr-1 inline size-3.5 rounded-[3px] align-[-0.15em]"
+      />
       {children}
     </a>
   );

@@ -1076,10 +1076,19 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AnAnswerIsDrawnFromItsMarkdown) {
   EXPECT_THAT(Lines(chat, ".answer p"),
               testing::ElementsAre("Fish & chips for two. Book it or run this.",
                                    "A map of the walk", "<b>raw</b>"));
-  EXPECT_EQ(Lines(chat, ".answer img"), std::vector<std::string>{});
   EXPECT_EQ(content::EvalJs(chat,
                             "[...document.querySelectorAll('.answer a')]"
                             "    .map(link => link.href)")
+                .ExtractList(),
+            base::ListValue().Append(Form()));
+  // The only picture is the link's site icon, from the browser.
+  EXPECT_EQ(content::EvalJs(chat,
+                            "[...document.querySelectorAll('.answer img')]"
+                            "    .map(icon => icon.closest('a') &&"
+                            "        icon.src.startsWith("
+                            "            'chrome://favicon2') &&"
+                            "        new URL(icon.src).searchParams.get("
+                            "            'pageUrl'))")
                 .ExtractList(),
             base::ListValue().Append(Form()));
   EXPECT_EQ(Lines(chat, ".answer b"), std::vector<std::string>{});
@@ -1472,8 +1481,7 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, TheAgentLoadsAConnectorAndUsesIt) {
 
   const std::vector<std::string> requests = model_.Requests();
   ASSERT_EQ(requests.size(), 3u);
-  EXPECT_THAT(requests[0],
-              ::testing::HasSubstr("- fake\\n  - echo: Says the text back."));
+  EXPECT_THAT(requests[0], ::testing::HasSubstr("\\n- fake: echo, "));
   EXPECT_THAT(requests[0],
               ::testing::Not(::testing::HasSubstr("\"fake__echo\"")));
   EXPECT_THAT(requests[1], ::testing::HasSubstr("\"name\":\"fake__echo\""));
