@@ -68,10 +68,6 @@ TabOrganizationController::LinksFromAnotherApp* g_links_from_another_app =
     nullptr;
 bool g_dropping_links = false;
 
-bool Has(const std::vector<PageId>& ids, const PageId& id) {
-  return std::ranges::find(ids, id) != ids.end();
-}
-
 // Sideways movement counts once it passes a dead zone, so a wobbly drag keeps
 // its depth. Then each indent is a level.
 int LevelsMoved(int dx) {
@@ -846,18 +842,15 @@ bool TabOrganizationController::CanExecute(
         return !page->task.empty() || !page->parent.value().empty();
       });
     case kNest:
+    case kMoveUp:
       return roots.size() == 1 &&
              shared_->tree().PreviousSibling(roots.front());
     case kOutdent:
       return roots.size() == 1 &&
              !shared_->tree().Find(roots.front())->parent.value().empty();
-    case kMoveUp:
-      return roots.size() == 1 &&
-             shared_->tree().PreviousSibling(roots.front());
     case kMoveDown:
       return roots.size() == 1 && shared_->tree().NextSibling(roots.front());
     case kCloseBranch:
-      return !Parents(ids).empty();
     case kToggleBranch:
       return !Parents(ids).empty();
     case kMoveToPreviousTask:
@@ -945,35 +938,29 @@ bool TabOrganizationController::MoveToTask(const std::vector<PageId>& ids,
                                            const tab_groups::TabGroupId& group,
                                            Origin origin,
                                            const std::vector<PageId>& staying) {
-  const std::vector<PageId> roots = Roots(ids);
   const std::string task = KeyOf(group);
-  if (roots.empty() || !GroupFor(task)) {
-    return false;
-  }
-  Record(roots, task);
-  LeaveBehind(roots, staying);
-  for (const PageId& root : roots) {
-    shared_->tree().MoveToTask(root, task);
-  }
-  Apply();
-  if (origin == Origin::kUser) {
-    NotifyManualMove(roots);
-  }
-  return true;
+  return GroupFor(task).has_value() && MoveTo(ids, task, origin, staying);
 }
 
 bool TabOrganizationController::MoveToScratchpad(
     const std::vector<PageId>& ids,
     Origin origin,
     const std::vector<PageId>& staying) {
+  return MoveTo(ids, std::string(), origin, staying);
+}
+
+bool TabOrganizationController::MoveTo(const std::vector<PageId>& ids,
+                                       const std::string& task,
+                                       Origin origin,
+                                       const std::vector<PageId>& staying) {
   const std::vector<PageId> roots = Roots(ids);
   if (roots.empty()) {
     return false;
   }
-  Record(roots, std::string());
+  Record(roots, task);
   LeaveBehind(roots, staying);
   for (const PageId& root : roots) {
-    shared_->tree().MoveToTask(root, std::string());
+    shared_->tree().MoveToTask(root, task);
   }
   Apply();
   if (origin == Origin::kUser) {
@@ -1111,30 +1098,22 @@ std::optional<PageId> TabOrganizationController::OpenBlankTab(
 }
 
 bool TabOrganizationController::Outdent(const PageId& id) {
-  Record({id});
-  if (!shared_->tree().Outdent(id)) {
-    shared_->undo().pop_back();
-    return false;
-  }
-  Apply();
-  NotifyManualMove({id});
-  return true;
+  return MoveInTree(id, &PageTree::Outdent);
 }
 
 bool TabOrganizationController::MoveUp(const PageId& id) {
-  Record({id});
-  if (!shared_->tree().MoveUp(id)) {
-    shared_->undo().pop_back();
-    return false;
-  }
-  Apply();
-  NotifyManualMove({id});
-  return true;
+  return MoveInTree(id, &PageTree::MoveUp);
 }
 
 bool TabOrganizationController::MoveDown(const PageId& id) {
+  return MoveInTree(id, &PageTree::MoveDown);
+}
+
+bool TabOrganizationController::MoveInTree(
+    const PageId& id,
+    bool (PageTree::*move)(const PageId&)) {
   Record({id});
-  if (!shared_->tree().MoveDown(id)) {
+  if (!(shared_->tree().*move)(id)) {
     shared_->undo().pop_back();
     return false;
   }
@@ -1719,11 +1698,14 @@ bool TabOrganizationController::HasGeneratedName(
          generated->second == TaskTitle(task);
 }
 
-bool TabOrganizationController::HasManualName(const std::string& task) const {
+bool TabOrganizationController::HasName(const std::string& task) const {
   const std::u16string title = TaskTitle(task);
   return !title.empty() &&
-         title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK) &&
-         !HasGeneratedName(task);
+         title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK);
+}
+
+bool TabOrganizationController::HasManualName(const std::string& task) const {
+  return HasName(task) && !HasGeneratedName(task);
 }
 
 void TabOrganizationController::NameAutomatically(const std::string& task) {
@@ -1922,13 +1904,13 @@ std::vector<PageId> TabOrganizationController::Roots(
     const std::vector<PageId>& ids) const {
   std::vector<PageId> roots;
   for (const Page& page : shared_->tree().pages()) {
-    if (!Has(ids, page.id)) {
+    if (!std::ranges::contains(ids, page.id)) {
       continue;
     }
     bool covered = false;
     for (const Page* up = shared_->tree().Find(page.parent); up && !covered;
          up = shared_->tree().Find(up->parent)) {
-      covered = Has(ids, up->id);
+      covered = std::ranges::contains(ids, up->id);
     }
     if (!covered) {
       roots.push_back(page.id);
@@ -1963,7 +1945,8 @@ void TabOrganizationController::LeaveBehind(
     const std::vector<PageId>& staying) {
   const auto inside = [&](const PageId& id) {
     return std::ranges::any_of(roots, [&](const PageId& root) {
-      return root != id && Has(shared_->tree().BranchOf(root), id);
+      return root != id &&
+             std::ranges::contains(shared_->tree().BranchOf(root), id);
     });
   };
   for (const PageId& id : staying) {

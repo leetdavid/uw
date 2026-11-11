@@ -20,10 +20,10 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/border.h"
 #include "ui/views/view_class_properties.h"
-#include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -31,13 +31,6 @@ namespace {
 constexpr int kIconSize = 13;
 constexpr int kPadding = 4;
 constexpr SkAlpha kRestingAlpha = 0x8C;
-
-BrowserView* WindowOf(const views::View* view) {
-  const views::Widget* widget = view->GetWidget();
-  return widget ? BrowserView::GetBrowserViewForNativeWindow(
-                      widget->GetPrimaryWindowWidget()->GetNativeWindow())
-                : nullptr;
-}
 
 }  // namespace
 
@@ -64,7 +57,7 @@ void NameLock::AddedToWidget() {
   }
   changed_ = controller->Observe(
       base::BindRepeating(&NameLock::Refresh, base::Unretained(this)));
-  prefs_.Init(WindowOf(this)->browser()->GetProfile()->GetPrefs());
+  prefs_.Init(BrowserViewOf(this)->browser()->GetProfile()->GetPrefs());
   prefs_.Add(kOrganizationEnabledPref,
              base::BindRepeating(&NameLock::Refresh, base::Unretained(this)));
   Refresh();
@@ -91,7 +84,7 @@ void NameLock::OnThemeChanged() {
 }
 
 TabOrganizationController* NameLock::Controller() const {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   return window ? TabOrganizationController::From(window->browser()) : nullptr;
 }
 
@@ -123,7 +116,7 @@ NamingSpinner::~NamingSpinner() = default;
 
 void NamingSpinner::AddedToWidget() {
   Throbber::AddedToWidget();
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   AutomaticOrganizer* organizer =
       window ? AutomaticOrganizer::From(window->browser()) : nullptr;
   if (!organizer) {
@@ -141,7 +134,7 @@ void NamingSpinner::RemovedFromWidget() {
 }
 
 void NamingSpinner::Refresh() {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   const AutomaticOrganizer* organizer =
       window ? AutomaticOrganizer::From(window->browser()) : nullptr;
   const bool naming =

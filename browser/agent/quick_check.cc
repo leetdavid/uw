@@ -18,19 +18,6 @@
 namespace uw {
 namespace {
 
-// The key in `account`: empty when there is no account, nothing when the key
-// is gone.
-std::optional<std::string> KeyIn(const std::string& account) {
-  if (account.empty()) {
-    return std::string();
-  }
-  std::optional<std::string> stored = ApiKeyStore().GetKey(account);
-  if (!stored || stored->empty()) {
-    return std::nullopt;
-  }
-  return stored;
-}
-
 // How long a language model that may think first has to answer.
 constexpr base::TimeDelta kThinkingTimeout = base::Seconds(90);
 

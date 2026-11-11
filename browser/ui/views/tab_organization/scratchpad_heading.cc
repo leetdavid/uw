@@ -29,7 +29,6 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
-#include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
@@ -195,11 +194,7 @@ void ScratchpadHeading::RemovedFromWidget() {
 }
 
 Browser* ScratchpadHeading::Window() const {
-  const views::Widget* widget = GetWidget();
-  BrowserView* window =
-      widget ? BrowserView::GetBrowserViewForNativeWindow(
-                   widget->GetPrimaryWindowWidget()->GetNativeWindow())
-             : nullptr;
+  BrowserView* window = BrowserViewOf(this);
   return window ? window->browser() : nullptr;
 }
 

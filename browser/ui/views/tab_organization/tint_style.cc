@@ -5,12 +5,14 @@
 #include "base/functional/bind.h"
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "components/tabs/public/tab_interface.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/gfx/text_constants.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/widget/widget.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/glass/glass.h"
 
 namespace uw {
@@ -39,6 +41,18 @@ GlassOf GlassOfView(const views::View* view) {
         return browser_view ? ElementGlassOfWindow(browser_view->browser()) : 0;
       },
       base::Unretained(view));
+}
+
+BrowserView* BrowserViewOf(const views::View* view) {
+  const views::Widget* widget = view->GetWidget();
+  return widget ? BrowserView::GetBrowserViewForNativeWindow(
+                      widget->GetPrimaryWindowWidget()->GetNativeWindow())
+                : nullptr;
+}
+
+TabOrganizationController* ControllerOf(tabs::TabInterface* tab) {
+  return tab ? TabOrganizationController::From(tab->GetBrowserWindowInterface())
+             : nullptr;
 }
 
 }  // namespace uw

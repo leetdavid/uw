@@ -18,6 +18,7 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/border.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -111,9 +112,7 @@ void KeptMark::OnThemeChanged() {
 }
 
 TabOrganizationController* KeptMark::Controller() const {
-  tabs::TabInterface* tab = tab_.Get();
-  return tab ? TabOrganizationController::From(tab->GetBrowserWindowInterface())
-             : nullptr;
+  return ControllerOf(tab_.Get());
 }
 
 void KeptMark::Refresh() {

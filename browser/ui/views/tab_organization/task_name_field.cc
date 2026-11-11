@@ -27,10 +27,10 @@
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view_class_properties.h"
-#include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -38,13 +38,6 @@ namespace {
 constexpr int kRingWidth = 2;
 constexpr float kRadius = 8;
 constexpr gfx::Insets kTextInsets = gfx::Insets::VH(2, 5);
-
-BrowserView* WindowOf(const views::View* view) {
-  const views::Widget* widget = view->GetWidget();
-  return widget ? BrowserView::GetBrowserViewForNativeWindow(
-                      widget->GetPrimaryWindowWidget()->GetNativeWindow())
-                : nullptr;
-}
 
 }  // namespace
 
@@ -87,7 +80,7 @@ void TaskNameField::Start() {
   if (editing() || !GetWidget()) {
     return;
   }
-  if (BrowserView* window = WindowOf(this)) {
+  if (BrowserView* window = BrowserViewOf(this)) {
     if (AutomaticOrganizer* organizer =
             AutomaticOrganizer::From(window->browser())) {
       organizer->DropAskedName(
@@ -152,7 +145,7 @@ bool TaskNameField::HandleKeyEvent(views::Textfield* sender,
 }
 
 TabOrganizationController* TaskNameField::Controller() const {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   return window ? TabOrganizationController::From(window->browser()) : nullptr;
 }
 
@@ -187,7 +180,7 @@ void TaskNameField::End(bool save, bool restore_focus) {
   if (!save || typed.empty() || typed == started_with_) {
     return;
   }
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   TabStripModel* tabs =
       window ? window->browser()->GetTabStripModel() : nullptr;
   if (!tabs || !tabs->SupportsTabGroups() ||

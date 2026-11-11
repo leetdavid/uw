@@ -38,14 +38,13 @@
 #include "ui/views/background.h"
 #include "ui/views/controls/focus_ring.h"
 #include "ui/views/controls/highlight_path_generator.h"
-#include "ui/views/view_utils.h"
-#include "ui/views/widget/widget.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
 #include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/tab_organization/second_click.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -59,13 +58,6 @@ constexpr int kRowRadius = 8;
 // the pointer.
 constexpr SkAlpha kRowTint = 0x1A;
 constexpr float kCloseHighlight = 0.14f;
-
-BrowserView* WindowOf(const views::View* view) {
-  const views::Widget* widget = view->GetWidget();
-  return widget ? BrowserView::GetBrowserViewForNativeWindow(
-                      widget->GetPrimaryWindowWidget()->GetNativeWindow())
-                : nullptr;
-}
 
 bool IsOn(BrowserWindowInterface* window, const char* pref) {
   return window && window->GetProfile()->GetPrefs()->GetBoolean(pref);
@@ -86,22 +78,12 @@ void LikeTheMenuButton(views::LabelButton* button) {
   button->SetVisible(false);
 }
 
-template <typename T>
-T* ChildOfClass(const views::View* row) {
-  for (views::View* child : row->children()) {
-    if (T* found = views::AsViewClass<T>(child)) {
-      return found;
-    }
-  }
-  return nullptr;
-}
-
 }  // namespace
 
 bool CloseBranchOnOptionClick(const views::View* row,
                               const tabs::TabInterface* tab,
                               const ui::Event& event) {
-  BrowserView* window = WindowOf(row);
+  BrowserView* window = BrowserViewOf(row);
   if (!tab || !window || !(event.flags() & ui::EF_ALT_DOWN)) {
     return false;
   }
@@ -118,7 +100,7 @@ bool CloseBranchOnOptionClick(const views::View* row,
 }
 
 bool TakesMiddleClick(const views::View* row, const ui::MouseEvent& event) {
-  BrowserView* window = WindowOf(row);
+  BrowserView* window = BrowserViewOf(row);
   return event.IsOnlyMiddleMouseButton() && window &&
          IsOn(window->browser(), kMiddleClickClosesTaskPref);
 }
@@ -130,7 +112,7 @@ bool CloseTaskOnMiddleClick(views::View* row,
     return false;
   }
   TabOrganizationController* controller =
-      TabOrganizationController::From(WindowOf(row)->browser());
+      TabOrganizationController::From(BrowserViewOf(row)->browser());
   if (controller && row->HitTestPoint(event.location())) {
     controller->CloseTask(task);
   }
@@ -166,7 +148,7 @@ TaskRowNewTabButton::TaskRowNewTabButton(const tab_groups::TabGroupId& task)
 TaskRowNewTabButton::~TaskRowNewTabButton() = default;
 
 void ShowTaskRowButtons(views::View* row, bool menu_shown) {
-  BrowserView* window = WindowOf(row);
+  BrowserView* window = BrowserViewOf(row);
   if (auto* plus = ChildOfClass<TaskRowNewTabButton>(row)) {
     plus->SetVisible(menu_shown && window &&
                      IsOn(window->browser(), kTaskRowNewTabPref));
@@ -178,7 +160,7 @@ void ShowTaskRowButtons(views::View* row, bool menu_shown) {
 
 SkColor TaskRowFill(const views::View* row) {
   const TaskRowCloseButton* close = ChildOfClass<TaskRowCloseButton>(row);
-  BrowserView* window = WindowOf(row);
+  BrowserView* window = BrowserViewOf(row);
   if (close && window && IsTaskCloseHinted(window->browser(), close->task())) {
     return SkColorSetA(CloseHintColor(row), kRowTint);
   }
@@ -197,7 +179,7 @@ void TaskRowNewTabButton::OnThemeChanged() {
 }
 
 void TaskRowNewTabButton::Open() {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   if (!window || CommandBar::OpenForTask(window->browser(), task_)) {
     return;
   }
@@ -232,7 +214,7 @@ void TaskRowCloseButton::AddedToWidget() {
 void TaskRowCloseButton::RemovedFromWidget() {
   hints_ = {};
   card_ = {};
-  if (BrowserView* window = WindowOf(this)) {
+  if (BrowserView* window = BrowserViewOf(this)) {
     SetTaskCloseHint(false, window->browser(), task_, false);
   }
   LabelButton::RemovedFromWidget();
@@ -269,7 +251,7 @@ void TaskRowCloseButton::StateChanged(ButtonState old_state) {
 
 std::u16string TaskRowCloseButton::GetRenderedTooltipText(
     const gfx::Point& point) const {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   TabStripModel* tabs = window ? window->browser()->tab_strip_model() : nullptr;
   if (!tabs || !tabs->group_model() ||
       !tabs->group_model()->ContainsTabGroup(task_)) {
@@ -282,7 +264,7 @@ std::u16string TaskRowCloseButton::GetRenderedTooltipText(
 }
 
 void TaskRowCloseButton::Close() {
-  BrowserView* window = WindowOf(this);
+  BrowserView* window = BrowserViewOf(this);
   if (TabOrganizationController* controller =
           window ? TabOrganizationController::From(window->browser())
                  : nullptr) {
@@ -291,7 +273,7 @@ void TaskRowCloseButton::Close() {
 }
 
 void TaskRowCloseButton::UpdateHint() {
-  if (BrowserView* window = WindowOf(this)) {
+  if (BrowserView* window = BrowserViewOf(this)) {
     SetTaskCloseHint(false, window->browser(), task_,
                      IsDrawn() && (GetState() == STATE_HOVERED ||
                                    GetState() == STATE_PRESSED));

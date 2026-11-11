@@ -21,12 +21,12 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/border.h"
 #include "ui/views/layout/proposed_layout.h"
-#include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/chat_mark.h"
 #include "uw/browser/ui/views/tab_organization/kept_mark.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/tab_organization/split_mark.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -40,16 +40,6 @@ constexpr SkAlpha kCountAlpha = 0x8C;
 SkColor TextColor(const views::View* view) {
   return view->GetColorProvider()->GetColor(
       kColorTabForegroundInactiveFrameActive);
-}
-
-template <typename T>
-T* ChildOfClass(views::View* row) {
-  for (views::View* child : row->children()) {
-    if (T* found = views::AsViewClass<T>(child)) {
-      return found;
-    }
-  }
-  return nullptr;
 }
 
 }  // namespace
@@ -86,9 +76,7 @@ void BranchToggle::OnThemeChanged() {
 }
 
 TabOrganizationController* BranchToggle::Controller() const {
-  tabs::TabInterface* tab = tab_.Get();
-  return tab ? TabOrganizationController::From(tab->GetBrowserWindowInterface())
-             : nullptr;
+  return ControllerOf(tab_.Get());
 }
 
 void BranchToggle::Refresh() {

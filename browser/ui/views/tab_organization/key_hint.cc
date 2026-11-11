@@ -27,12 +27,12 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
-#include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/branch_toggle.h"
 #include "uw/browser/ui/views/tab_organization/key_card.h"
 #include "uw/browser/ui/views/tab_organization/modifier_keys.h"
+#include "uw/browser/ui/views/tab_organization/tint_style.h"
 
 namespace uw {
 namespace {
@@ -91,11 +91,6 @@ base::RepeatingClosureList& Rows() {
   return *rows;
 }
 
-TabOrganizationController* ControllerOf(tabs::TabInterface* tab) {
-  return tab ? TabOrganizationController::From(tab->GetBrowserWindowInterface())
-             : nullptr;
-}
-
 bool ClosesBranches(tabs::TabInterface* tab) {
   return tab->GetBrowserWindowInterface()->GetProfile()->GetPrefs()->GetBoolean(
       kOptionClickClosesBranchPref);
@@ -148,16 +143,6 @@ std::u16string TabsUnder(size_t count) {
   return count == 1 ? std::u16string(u"the tab under it")
                     : base::StrCat({u"the ", base::NumberToString16(count),
                                     u" tabs under it"});
-}
-
-template <typename T>
-T* ChildOfClass(const views::View* row) {
-  for (views::View* child : row->children()) {
-    if (T* found = views::AsViewClass<T>(child)) {
-      return found;
-    }
-  }
-  return nullptr;
 }
 
 }  // namespace

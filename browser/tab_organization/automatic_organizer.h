@@ -158,7 +158,6 @@ class AutomaticOrganizer : public TabStripModelObserver {
   void Tidy();
   bool CanTidy() const { return CanAskForName(); }
   bool IsTidying() const;
-  base::WeakPtr<AutomaticOrganizer> AsWeakPtr();
   // Carries out the last suggestion: an answer that fell short of what a
   // move needs, as one undoable action. Does nothing when the tab has changed
   // or moved since. The acceptance goes to the organizer log as an example
@@ -390,9 +389,6 @@ class AutomaticOrganizer : public TabStripModelObserver {
   // Which page it was, where its branch was, where the answer put it, and
   // the numbers behind it.
   static base::DictValue LogDetails(const Request& request);
-  // False for a task that still has the name every new task starts with. The
-  // model is not offered such a task: its name says nothing about it.
-  bool Named(const std::string& task) const;
   // True while `task` has a name that uw gave it. A name the user typed is
   // theirs, and uw does not replace it.
   bool Generated(const std::string& task) const;

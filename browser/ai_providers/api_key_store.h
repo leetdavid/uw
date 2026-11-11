@@ -30,6 +30,19 @@ class ApiKeyStore {
   const std::string service_name_;
 };
 
+// The key in `account`: empty when there is no account, nothing when the key
+// is gone.
+inline std::optional<std::string> KeyIn(const std::string& account) {
+  if (account.empty()) {
+    return std::string();
+  }
+  std::optional<std::string> stored = ApiKeyStore().GetKey(account);
+  if (!stored || stored->empty()) {
+    return std::nullopt;
+  }
+  return stored;
+}
+
 #if BUILDFLAG(UW_DEV)
 // The first time uw dev starts with no keys of its own, it copies the
 // installed uw's model keys, and macOS asks for the login password once for

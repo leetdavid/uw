@@ -284,6 +284,9 @@ class TabOrganizationController : public TabStripModelObserver,
   // Gives a task a name of uw's own. It is not an organization action, so
   // undo leaves the name alone.
   void NameTask(const std::string& task, const std::u16string& title);
+  // False for a task that still has the name every new task starts with. The
+  // model is not offered such a task: its name says nothing about it.
+  bool HasName(const std::string& task) const;
   // True while `task` has the name uw gave it, in this session or an earlier
   // one. Any other name is the user's.
   bool HasGeneratedName(const std::string& task) const;
@@ -428,6 +431,14 @@ class TabOrganizationController : public TabStripModelObserver,
   // have all gone to another window.
   void CloseIfLeft();
 
+  // Moves the branches of `ids` to `task`, or to the Scratchpad when it is
+  // empty.
+  bool MoveTo(const std::vector<PageId>& ids,
+              const std::string& task,
+              Origin origin,
+              const std::vector<PageId>& staying);
+  // Makes `move` on the tree as one undoable action of the user's.
+  bool MoveInTree(const PageId& id, bool (PageTree::*move)(const PageId&));
   // Branch roots of `ids`: pages with no selected ancestor, in tree order.
   std::vector<PageId> Roots(const std::vector<PageId>& ids) const;
   // The task MoveToAdjacentTask would move `ids` to, empty for the

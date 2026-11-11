@@ -45,19 +45,6 @@ constexpr base::TimeDelta kDebounce = base::Milliseconds(750);
 // How long the new tab page lists a move or a new task.
 constexpr base::TimeDelta kChangesKept = base::Hours(1);
 
-// The key in `account`: empty when there is no account, nothing when the key
-// is gone.
-std::optional<std::string> KeyIn(const std::string& account) {
-  if (account.empty()) {
-    return std::string();
-  }
-  std::optional<std::string> stored = ApiKeyStore().GetKey(account);
-  if (!stored || stored->empty()) {
-    return std::nullopt;
-  }
-  return stored;
-}
-
 using Kind = AutomaticOrganizer::Event::Kind;
 
 // A folder as a shell prompt shows it, with the home folder as ~.
@@ -313,7 +300,7 @@ void AutomaticOrganizer::Tidy() {
   }
   std::vector<TidyTask> tasks;
   for (const std::string& task : tree.Tasks()) {
-    if (!Named(task)) {
+    if (!controller_->HasName(task)) {
       continue;
     }
     TidyTask offered{base::UTF16ToUTF8(controller_->TaskTitle(task)), {}};
@@ -439,10 +426,6 @@ void AutomaticOrganizer::OnTidy(RemoteModelClient::Outcome outcome) {
 void AutomaticOrganizer::TidyFailed(std::u16string reason) {
   Event event{Event::Kind::kTidyFailed, std::move(reason)};
   Broadcast(event);
-}
-
-base::WeakPtr<AutomaticOrganizer> AutomaticOrganizer::AsWeakPtr() {
-  return weak_factory_.GetWeakPtr();
 }
 
 bool AutomaticOrganizer::IsTidying() const {
@@ -806,11 +789,12 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
           : "opened from \"" + base::UTF16ToUTF8(parent->second.title) + "\"";
   request.context.excerpt = std::move(excerpt);
   request.context.folder = ShortFolder(activity->second.folder);
-  request.in_unnamed_task = !request.task.empty() && !Named(request.task);
+  request.in_unnamed_task =
+      !request.task.empty() && !controller_->HasName(request.task);
 
   std::vector<std::pair<std::string, std::string>> tasks;
   for (const std::string& task : controller_->tree().Tasks()) {
-    if (Named(task)) {
+    if (controller_->HasName(task)) {
       tasks.emplace_back(task, base::UTF16ToUTF8(controller_->TaskTitle(task)));
     }
   }
@@ -844,7 +828,7 @@ bool AutomaticOrganizer::SendDecision(const PageId& id,
 
 std::vector<std::string> AutomaticOrganizer::MemberTitles(
     const Page& page) const {
-  const bool named = Named(page.task);
+  const bool named = controller_->HasName(page.task);
   std::vector<std::string> titles;
   for (const Page& other : controller_->tree().pages()) {
     const auto activity = pages_.find(other.id);
@@ -969,7 +953,8 @@ void AutomaticOrganizer::OnDecision(uint64_t request_id,
                                          request.has_tasks, request.checks_name)
                  : std::nullopt;
   if (answer && answer->choice != kNewTaskOption &&
-      answer->choice != kScratchpadOption && !Named(answer->choice)) {
+      answer->choice != kScratchpadOption &&
+      !controller_->HasName(answer->choice)) {
     answer.reset();
   }
   // Another model names tasks, and is asked for the name.
@@ -1084,7 +1069,7 @@ std::vector<BranchPlacement> AutomaticOrganizer::PlaceBranchOf(
       kept_.erase(kept);
     }
   }
-  const bool named = Named(task);
+  const bool named = controller_->HasName(task);
   return PlaceBranch(tree, top, tabs,
                      {named ? task : std::string(), !task.empty() && !named,
                       named && !Generated(task)},
@@ -1269,7 +1254,8 @@ void AutomaticOrganizer::OnName(uint64_t request_id,
   const bool current = Current(request);
   if (!name) {
     owed_names_.insert(request.task);
-  } else if (current && (!Named(request.task) || Generated(request.task))) {
+  } else if (current && (!controller_->HasName(request.task) ||
+                         Generated(request.task))) {
     controller_->NameTask(request.task, *name);
   }
   // The card that waited for the name of a new task now says what the task
@@ -1383,14 +1369,8 @@ bool AutomaticOrganizer::Valid(const Kept& kept) const {
          controller_->TaskTitle(request.task) == request.task_title;
 }
 
-bool AutomaticOrganizer::Named(const std::string& task) const {
-  const std::u16string title = controller_->TaskTitle(task);
-  return !title.empty() &&
-         title != l10n_util::GetStringUTF16(IDS_UW_UNTITLED_TASK);
-}
-
 bool AutomaticOrganizer::Generated(const std::string& task) const {
-  return Named(task) && controller_->HasGeneratedName(task);
+  return controller_->HasName(task) && controller_->HasGeneratedName(task);
 }
 
 std::optional<AutomaticOrganizer::Pending> AutomaticOrganizer::Take(
