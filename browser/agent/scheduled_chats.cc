@@ -803,7 +803,8 @@ void ScheduledChats::OnTriggerRunDone(const std::string& chat_id,
                    .Set("counted", false)
                    .Set("paused", false)
                    .Set("steps", StepsValue(outcome.steps))
-                   .Set("trigger", command));
+                   .Set("trigger", command)
+                   .Set("usage", RunUsageValue(outcome.usage)));
   AddLines(chat_id, std::move(lines));
   // Only what is worth telling wakes the chat's model and the user.
   if (found) {
