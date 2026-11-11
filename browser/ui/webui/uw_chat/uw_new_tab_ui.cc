@@ -8,31 +8,23 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/grit/uw_chat_resources.h"
-#include "chrome/grit/uw_chat_resources_map.h"
 #include "components/favicon_base/favicon_url_parser.h"
 #include "content/public/browser/url_data_source.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
-#include "content/public/browser/web_ui_data_source.h"
-#include "services/network/public/mojom/content_security_policy.mojom.h"
 #include "ui/base/window_open_disposition.h"
-#include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_new_tab_handler.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_handler.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 
 namespace uw {
 
 UwNewTabUI::UwNewTabUI(content::WebUI* web_ui)
     : ui::MojoWebUIController(web_ui) {
   Profile* profile = Profile::FromWebUI(web_ui);
-  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      profile, chrome::kChromeUINewTabPageHost);
-  webui::SetupWebUIDataSource(source, kUwChatResources,
-                              IDR_UW_CHAT_NEWTAB_HTML);
-  // As on the chat page; see trusted-types.ts.
-  source->OverrideContentSecurityPolicy(
-      network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  AddChatAppSource(web_ui, chrome::kChromeUINewTabPageHost,
+                   IDR_UW_CHAT_NEWTAB_HTML);
   // The suggestions' icons, as in the command bar.
   content::URLDataSource::Add(
       profile, std::make_unique<FaviconSource>(

@@ -151,12 +151,8 @@ UwNewTabHandler::UwNewTabHandler(
 UwNewTabHandler::~UwNewTabHandler() = default;
 
 void UwNewTabHandler::NewSchedule(NewScheduleCallback callback) {
-  const PrefService& prefs = *profile()->GetPrefs();
-  const ScheduledChats* chats = ScheduledChats::For(profile());
-  std::move(callback).Run(ScheduleStateOf(
-      chats, {},
-      DefaultSchedule(chats, AgentChoice(prefs),
-                      ModeNamed(prefs.GetString(kAgentApprovalModePref)))));
+  std::move(callback).Run(NewScheduleState(ScheduledChats::For(profile()),
+                                           *profile()->GetPrefs()));
 }
 
 void UwNewTabHandler::Ask(const std::string& text,
@@ -186,11 +182,7 @@ void UwNewTabHandler::AskOnSchedule(mojom::ChatSchedulePtr schedule) {
 void UwNewTabHandler::OpenChat(const std::string& chat_id,
                                const std::string& alert_id) {
   Remove(chat_id, alert_id);
-  const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile(), chat_id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-  } else if (ChatFile::IsChatId(chat_id)) {
+  if (!GoToChat(profile(), chat_id) && ChatFile::IsChatId(chat_id)) {
     Become(ChatUrl(chat_id), std::nullopt);
   }
 }

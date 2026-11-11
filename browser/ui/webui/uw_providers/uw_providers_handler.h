@@ -34,6 +34,12 @@ class WebContents;
 
 namespace uw {
 
+// Goes to a tab of `profile` that shows the chat `id`, or else opens the chat
+// in a new tab of the window of `page`'s tab. `page` may be null.
+void GoToOrOpenChat(Profile* profile,
+                    content::WebContents* page,
+                    const std::string& id);
+
 // Mojo backend of uw://ai, and of the chat page's model chips. Profile-scoped:
 // it touches profile prefs and the providers' Keychain accounts. Keys never
 // reach prefs, logs, or the page.

@@ -6,26 +6,17 @@
 
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/grit/uw_chat_resources.h"
-#include "chrome/grit/uw_chat_resources_map.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
-#include "content/public/browser/web_ui_data_source.h"
-#include "services/network/public/mojom/content_security_policy.mojom.h"
-#include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_handler.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 
 namespace uw {
 
 UwScheduledUI::UwScheduledUI(content::WebUI* web_ui)
     : ui::MojoWebUIController(web_ui) {
-  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      Profile::FromWebUI(web_ui), kScheduledHost);
-  webui::SetupWebUIDataSource(source, kUwChatResources,
-                              IDR_UW_CHAT_SCHEDULED_HTML);
-  // As on the chat page; see trusted-types.ts.
-  source->OverrideContentSecurityPolicy(
-      network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  AddChatAppSource(web_ui, kScheduledHost, IDR_UW_CHAT_SCHEDULED_HTML);
 }
 
 UwScheduledUI::~UwScheduledUI() = default;

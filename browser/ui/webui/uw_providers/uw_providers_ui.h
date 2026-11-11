@@ -4,6 +4,7 @@
 #define UW_BROWSER_UI_WEBUI_UW_PROVIDERS_UW_PROVIDERS_UI_H_
 
 #include <memory>
+#include <string>
 
 #include "content/public/browser/webui_config.h"
 #include "content/public/common/url_constants.h"
@@ -12,12 +13,25 @@
 #include "uw/browser/ui/webui/uw_providers/uw_providers.mojom.h"
 #include "uw/browser/problem_reports/problem_reporter.h"
 
+namespace content {
+class WebUI;
+class WebUIDataSource;
+}  // namespace content
+
 namespace uw {
 
 inline constexpr char kAiHost[] = "ai";
 
 class UwProvidersHandler;
 class UwProvidersUI;
+
+// Adds the data source of a page built with the chat page, which ships in its
+// pak: `host` serves `html`. Its policy lets one fixed style of Radix's
+// scroll area through and refuses every other HTML string; see
+// trusted-types.ts.
+content::WebUIDataSource* AddChatAppSource(content::WebUI* web_ui,
+                                           const std::string& host,
+                                           int html);
 
 class UwProvidersUIConfig : public content::DefaultWebUIConfig<UwProvidersUI> {
  public:

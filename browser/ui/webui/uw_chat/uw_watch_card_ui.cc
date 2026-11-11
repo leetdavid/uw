@@ -6,14 +6,11 @@
 
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/grit/uw_chat_resources.h"
-#include "chrome/grit/uw_chat_resources_map.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
-#include "content/public/browser/web_ui_data_source.h"
-#include "services/network/public/mojom/content_security_policy.mojom.h"
-#include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 #include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 
 namespace uw {
 
@@ -23,13 +20,7 @@ bool UwWatchCardUIConfig::ShouldAutoResizeHost() {
 
 UwWatchCardUI::UwWatchCardUI(content::WebUI* web_ui)
     : TopChromeWebUIController(web_ui) {
-  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      Profile::FromWebUI(web_ui), kWatchCardHost);
-  webui::SetupWebUIDataSource(source, kUwChatResources,
-                              IDR_UW_CHAT_WATCH_CARD_HTML);
-  // As on the chat page; see trusted-types.ts.
-  source->OverrideContentSecurityPolicy(
-      network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  AddChatAppSource(web_ui, kWatchCardHost, IDR_UW_CHAT_WATCH_CARD_HTML);
 }
 
 UwWatchCardUI::~UwWatchCardUI() = default;

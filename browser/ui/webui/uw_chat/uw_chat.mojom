@@ -508,7 +508,6 @@ struct ChatUsage {
   double checks;
   double checks_cost;
   int32 check_count;
-  double memory_checks;
   double memory_checks_cost;
   int32 memory_check_count;
   double runs;

@@ -16,20 +16,23 @@
 
 namespace uw {
 
-UwProvidersUI::UwProvidersUI(content::WebUI* web_ui)
-    : ui::MojoWebUIController(web_ui) {
+content::WebUIDataSource* AddChatAppSource(content::WebUI* web_ui,
+                                           const std::string& host,
+                                           int html) {
   content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      web_ui->GetWebContents()->GetBrowserContext(), kAiHost);
-  // The page is built with the chat page and ships in its pak.
-  webui::SetupWebUIDataSource(source, kUwChatResources,
-                              IDR_UW_CHAT_PROVIDERS_HTML);
-  // Each section has its own address, such as uw://ai/skills, and
-  // uw://ai/providers/<id> opens one provider.
-  source->SetDefaultResource(IDR_UW_CHAT_PROVIDERS_HTML);
-  // Lets one fixed style of Radix's scroll area through; see
-  // trusted-types.ts.
+      web_ui->GetWebContents()->GetBrowserContext(), host);
+  webui::SetupWebUIDataSource(source, kUwChatResources, html);
   source->OverrideContentSecurityPolicy(
       network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  return source;
+}
+
+UwProvidersUI::UwProvidersUI(content::WebUI* web_ui)
+    : ui::MojoWebUIController(web_ui) {
+  // Each section has its own address, such as uw://ai/skills, and
+  // uw://ai/providers/<id> opens one provider.
+  AddChatAppSource(web_ui, kAiHost, IDR_UW_CHAT_PROVIDERS_HTML)
+      ->SetDefaultResource(IDR_UW_CHAT_PROVIDERS_HTML);
 }
 
 UwProvidersUI::~UwProvidersUI() = default;

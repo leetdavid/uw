@@ -231,6 +231,23 @@ UwProvidersHandler::ModelTest TestFor(ModelSlot slot,
 
 }  // namespace
 
+void GoToOrOpenChat(Profile* profile,
+                    content::WebContents* page,
+                    const std::string& id) {
+  if (!ChatFile::IsChatId(id) || GoToChat(profile, id)) {
+    return;
+  }
+  tabs::TabInterface* tab =
+      page ? tabs::TabInterface::MaybeGetFromContents(page) : nullptr;
+  if (!tab) {
+    return;
+  }
+  NavigateParams params(tab->GetBrowserWindowInterface(), ChatUrl(id),
+                        ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
+  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&params);
+}
+
 UwProvidersHandler::UwProvidersHandler(
     Profile* profile,
     content::WebContents* contents,
@@ -592,35 +609,13 @@ void UwProvidersHandler::ShowAiPage(const std::string& section) {
 void UwProvidersHandler::ShowChat() {
   tabs::TabInterface* tab =
       contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
-  if (!tab) {
-    return;
-  }
-  BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
-  if (tabs::TabInterface* chat = LastChatTab(window)) {
-    GoToTab(chat);
-  } else {
-    OpenChatTab(window);
+  if (tab) {
+    GoToLastChat(tab->GetBrowserWindowInterface());
   }
 }
 
 void UwProvidersHandler::OpenChat(const std::string& id) {
-  if (!ChatFile::IsChatId(id)) {
-    return;
-  }
-  std::vector<tabs::TabInterface*> showing = TabsShowingChat(profile_, id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-    return;
-  }
-  tabs::TabInterface* tab =
-      contents_ ? tabs::TabInterface::MaybeGetFromContents(contents_) : nullptr;
-  if (!tab) {
-    return;
-  }
-  NavigateParams params(tab->GetBrowserWindowInterface(), ChatUrl(id),
-                        ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
-  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&params);
+  GoToOrOpenChat(profile_, contents_, id);
 }
 
 void UwProvidersHandler::GetMemories(const std::string& query,
@@ -863,7 +858,6 @@ mojom::CatalogEntryPtr PageEntry(const CatalogEntry& entry) {
   page->name = entry.name;
   page->title = entry.title;
   page->description = entry.description;
-  page->website = entry.website;
   page->url = entry.url;
   for (const CatalogField& field : entry.fields) {
     page->fields.push_back(mojom::CatalogField::New(

@@ -41,6 +41,8 @@
 #include "uw/components/agent/skills.h"
 #include "uw/components/ai_providers/providers.h"
 
+class Profile;
+
 namespace content {
 class WebContents;
 }
@@ -209,6 +211,9 @@ class UwChatHandler : public mojom::ChatHandler,
   void OnVisibilityChanged(content::Visibility visibility) override;
 
  private:
+  Profile* profile() const;
+  // The tab the chat's page is in, or null.
+  tabs::TabInterface* Tab() const;
   void OnLoaded(std::optional<base::DictValue> saved);
   // Tells the page about the chat's schedule and how it stands, and shows a
   // step its run waits on.

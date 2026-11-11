@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
+#include "base/time/time.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "components/prefs/pref_service.h"
@@ -15,10 +16,9 @@
 #include "components/url_formatter/url_formatter.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
+#include "mojo/public/cpp/bindings/clone_traits.h"
 #include "uw/browser/agent/chat_file.h"
 #include "uw/browser/agent/chat_tab.h"
-#include "uw/browser/ai_providers/models.h"
-#include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
 
@@ -70,12 +70,8 @@ UwScheduledHandler::UwScheduledHandler(
 UwScheduledHandler::~UwScheduledHandler() = default;
 
 void UwScheduledHandler::NewSchedule(NewScheduleCallback callback) {
-  const PrefService& prefs = *profile()->GetPrefs();
-  const ScheduledChats* chats = schedules_.GetSource();
-  std::move(callback).Run(ScheduleStateOf(
-      chats, {},
-      DefaultSchedule(chats, AgentChoice(prefs),
-                      ModeNamed(prefs.GetString(kAgentApprovalModePref)))));
+  std::move(callback).Run(
+      NewScheduleState(schedules_.GetSource(), *profile()->GetPrefs()));
 }
 
 void UwScheduledHandler::LookUpAddress(const std::string& address,
@@ -154,12 +150,9 @@ void UwScheduledHandler::OpenPage(const std::string& chat_id) {
 }
 
 void UwScheduledHandler::OpenChat(const std::string& chat_id) {
-  const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile(), chat_id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-  } else if (tabs::TabInterface* own = tabs::TabInterface::MaybeGetFromContents(
-                 web_ui_->GetWebContents())) {
+  tabs::TabInterface* own =
+      tabs::TabInterface::MaybeGetFromContents(web_ui_->GetWebContents());
+  if (!GoToChat(profile(), chat_id) && own) {
     chrome::AddTabAt(own->GetBrowserWindowInterface(), ChatUrl(chat_id), -1,
                      true);
   }
@@ -184,16 +177,9 @@ void UwScheduledHandler::PauseAll(bool paused) {
 }
 
 void UwScheduledHandler::ShowChat() {
-  tabs::TabInterface* own =
-      tabs::TabInterface::MaybeGetFromContents(web_ui_->GetWebContents());
-  if (!own) {
-    return;
-  }
-  BrowserWindowInterface* window = own->GetBrowserWindowInterface();
-  if (tabs::TabInterface* chat = LastChatTab(window)) {
-    GoToTab(chat);
-  } else {
-    OpenChatTab(window);
+  if (tabs::TabInterface* own = tabs::TabInterface::MaybeGetFromContents(
+          web_ui_->GetWebContents())) {
+    GoToLastChat(own->GetBrowserWindowInterface());
   }
 }
 
@@ -250,16 +236,9 @@ void UwScheduledHandler::OnRunsLoaded(const std::string& chat_id,
   if (!Listed(chat_id)) {
     return;
   }
-  base::ListValue runs;
-  const base::ListValue* log = saved ? saved->FindList("log") : nullptr;
-  if (log) {
-    for (const base::Value& entry : *log) {
-      const base::DictValue* line = entry.GetIfDict();
-      const std::string* kind = line ? line->FindString("kind") : nullptr;
-      if (kind && *kind == "run") {
-        runs.Append(line->Clone().Set("steps", base::ListValue()));
-      }
-    }
+  std::vector<mojom::StepPtr> runs = RunStepsOf(saved, base::Time::Min());
+  for (mojom::StepPtr& run : runs) {
+    run->run->steps.clear();
   }
   runs_[chat_id] = std::move(runs);
   SendRows();
@@ -300,15 +279,7 @@ void UwScheduledHandler::SendRows() {
       }
     }
     if (const auto runs = runs_.find(entry.id); runs != runs_.end()) {
-      for (const base::Value& line : runs->second) {
-        auto run = mojom::Step::New();
-        run->kind = mojom::StepKind::kRun;
-        if (const std::string* text = line.GetDict().FindString("text")) {
-          run->text = *text;
-        }
-        run->run = RunLineFrom(line.GetDict());
-        watch->runs.push_back(std::move(run));
-      }
+      watch->runs = mojo::Clone(runs->second);
     }
     row->watch = std::move(watch);
     if (const ChatTriggers::Trigger* trigger = chats->TriggerOf(entry.id)) {

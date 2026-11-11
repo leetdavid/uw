@@ -184,11 +184,8 @@ const ChatAlerts::Alert* UwInboxHandler::Read(const std::string& id) {
 }
 
 void UwInboxHandler::ShowChat(const std::string& chat_id) {
-  const std::vector<tabs::TabInterface*> showing =
-      TabsShowingChat(profile(), chat_id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-  } else if (BrowserWindowInterface* window = Window()) {
+  BrowserWindowInterface* window = Window();
+  if (!GoToChat(profile(), chat_id) && window) {
     OpenAtTopOfScratchpad(window, ChatUrl(chat_id));
   }
   Close();

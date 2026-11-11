@@ -79,8 +79,25 @@ void GoToTab(tabs::TabInterface* tab) {
   window->GetWindow()->Activate();
 }
 
+bool GoToChat(Profile* profile, std::string_view id) {
+  const std::vector<tabs::TabInterface*> showing = TabsShowingChat(profile, id);
+  if (showing.empty()) {
+    return false;
+  }
+  GoToTab(showing[0]);
+  return true;
+}
+
 void OpenChatTab(BrowserWindowInterface* window) {
   chrome::AddTabAt(window, ChatUrl(), -1, true);
+}
+
+void GoToLastChat(BrowserWindowInterface* window) {
+  if (tabs::TabInterface* chat = LastChatTab(window)) {
+    GoToTab(chat);
+  } else {
+    OpenChatTab(window);
+  }
 }
 
 void AskInNewChat(BrowserWindowInterface* window,

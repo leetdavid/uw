@@ -41,8 +41,15 @@ tabs::TabInterface* LastChatTab(BrowserWindowInterface* window);
 // Selects `tab` and brings its window, and uw, to the front.
 void GoToTab(tabs::TabInterface* tab);
 
+// Goes to a tab of `profile` that shows the chat `id`. False when none does.
+bool GoToChat(Profile* profile, std::string_view id);
+
 // Opens a chat where a blank new tab would open.
 void OpenChatTab(BrowserWindowInterface* window);
+
+// Goes to the chat tab of `window` the user was on last, or opens a chat when
+// it has none.
+void GoToLastChat(BrowserWindowInterface* window);
 
 // What a chat opened by AskInNewChat starts with.
 struct ChatStart {

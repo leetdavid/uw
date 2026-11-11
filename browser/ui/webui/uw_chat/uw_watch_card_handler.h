@@ -92,9 +92,8 @@ class UwWatchCardHandler : public mojom::WatchCardHandler,
   mojo::Receiver<mojom::WatchCardHandler> receiver_;
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer>
       observation_{this};
-  // The lines of each watch's runs of the last 14 days, as its chat keeps
-  // them.
-  std::map<std::string, base::ListValue> runs_;
+  // Each watch's runs of the last 14 days.
+  std::map<std::string, std::vector<mojom::StepPtr>> runs_;
   base::WeakPtrFactory<UwWatchCardHandler> weak_factory_{this};
 };
 

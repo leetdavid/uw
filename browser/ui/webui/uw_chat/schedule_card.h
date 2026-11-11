@@ -5,11 +5,16 @@
 
 #include <optional>
 #include <string_view>
+#include <vector>
 
+#include "base/time/time.h"
+#include "base/values.h"
 #include "uw/browser/agent/agent_loop.h"
 #include "uw/browser/ui/webui/uw_chat/uw_chat.mojom.h"
 #include "uw/components/agent/scheduled_chat.h"
 #include "uw/components/ai_providers/providers.h"
+
+class PrefService;
 
 namespace uw {
 
@@ -33,8 +38,19 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
                                         std::string_view chat_id,
                                         const ScheduledChat& chat);
 
+// A new schedule card's state: DefaultSchedule() with the agent model and the
+// approval mode `prefs` keep.
+mojom::ScheduleStatePtr NewScheduleState(const ScheduledChats* chats,
+                                         const PrefService& prefs);
+
 // A run's line as a chat file keeps it, for the page.
 mojom::RunLinePtr RunLineFrom(const base::DictValue& line);
+
+// The runs the chat file `saved` keeps that ran at `since` or later, oldest
+// first, as the page shows them.
+std::vector<mojom::StepPtr> RunStepsOf(
+    const std::optional<base::DictValue>& saved,
+    base::Time since);
 
 // What a schedule card saved, as uw keeps it. Nothing when it asks nothing or
 // its schedule cannot run.

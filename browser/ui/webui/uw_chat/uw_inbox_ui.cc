@@ -4,14 +4,10 @@
 
 #include <utility>
 
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/grit/uw_chat_resources.h"
-#include "chrome/grit/uw_chat_resources_map.h"
 #include "content/public/browser/web_ui.h"
-#include "content/public/browser/web_ui_data_source.h"
-#include "services/network/public/mojom/content_security_policy.mojom.h"
-#include "ui/webui/webui_util.h"
 #include "uw/browser/ui/webui/uw_chat/uw_inbox_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_ui.h"
 
 namespace uw {
 
@@ -21,13 +17,7 @@ bool UwInboxUIConfig::ShouldAutoResizeHost() {
 
 UwInboxUI::UwInboxUI(content::WebUI* web_ui)
     : TopChromeWebUIController(web_ui) {
-  content::WebUIDataSource* source = content::WebUIDataSource::CreateAndAdd(
-      Profile::FromWebUI(web_ui), kInboxHost);
-  webui::SetupWebUIDataSource(source, kUwChatResources,
-                              IDR_UW_CHAT_INBOX_HTML);
-  // As on the chat page; see trusted-types.ts.
-  source->OverrideContentSecurityPolicy(
-      network::mojom::CSPDirectiveName::TrustedTypes, "trusted-types default;");
+  AddChatAppSource(web_ui, kInboxHost, IDR_UW_CHAT_INBOX_HTML);
 }
 
 UwInboxUI::~UwInboxUI() = default;

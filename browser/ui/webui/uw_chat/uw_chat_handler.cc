@@ -62,6 +62,7 @@
 #include "uw/browser/ui/webui/uw_chat/schedule_card.h"
 #include "uw/browser/ui/webui/uw_chat/uw_scheduled_ui.h"
 #include "uw/browser/ui/webui/uw_chat/uw_watch_card_handler.h"
+#include "uw/browser/ui/webui/uw_providers/uw_providers_handler.h"
 #include "uw/components/agent/agent_context.h"
 #include "uw/components/agent/attachment.h"
 #include "uw/components/agent/schedule_tool.h"
@@ -315,26 +316,24 @@ UwChatHandler::UwChatHandler(content::WebContents* contents,
   if (start_ && start_->text.empty()) {
     start_.reset();
   }
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
-  if (ChatIndex* index = ChatIndex::For(profile)) {
+  if (ChatIndex* index = ChatIndex::For(profile())) {
     index_observation_.Observe(index);
   }
-  if (ScheduledChats* chats = ScheduledChats::For(profile)) {
+  if (ScheduledChats* chats = ScheduledChats::For(profile())) {
     schedules_observation_.Observe(chats);
     chats->SetPage(id_, this);
   }
-  prefs_.Init(profile->GetPrefs());
+  prefs_.Init(profile()->GetPrefs());
   prefs_.Add(kAgentMemoryPref, base::BindRepeating(&UwChatHandler::SendMemory,
                                                    base::Unretained(this)));
   LoadSkills(base::DoNothing());
   Connectors::Get().Start();
   connectors_observation_.Observe(&Connectors::Get());
-  if (profile->IsOffTheRecord()) {
+  if (profile()->IsOffTheRecord()) {
     OnLoaded(std::nullopt);
     return;
   }
-  file_ = std::make_unique<ChatFile>(profile->GetPath(), id_);
+  file_ = std::make_unique<ChatFile>(profile()->GetPath(), id_);
   file_->Load(
       base::BindOnce(&UwChatHandler::OnLoaded, weak_factory_.GetWeakPtr()));
 }
@@ -347,15 +346,13 @@ UwChatHandler::~UwChatHandler() {
   if (ScheduledChats* chats = schedules_observation_.GetSource()) {
     chats->SetPage(id_, nullptr);
   }
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
   // What the chat waited for can't be given once its page is gone, so its
   // notification goes rather than stay after uw quits.
   if (approval_answer_ || password_tab_) {
-    CloseChatNotification(profile, id_);
+    CloseChatNotification(profile(), id_);
   }
   // A private chat ends with its page, and keeps none of its files.
-  if (profile->IsOffTheRecord()) {
+  if (profile()->IsOffTheRecord()) {
     files_sequence_->PostTask(
         FROM_HERE,
         base::BindOnce(base::IgnoreResult(&base::DeletePathRecursively),
@@ -416,15 +413,13 @@ void UwChatHandler::AskFromCommand(CommandAsk ask) {
     return;
   }
   // A model of the chat's provider, as the composer's model menu picks one.
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
   const std::optional<Provider> provider =
-      FindProvider(*profile->GetPrefs(), model_->provider_id);
+      FindProvider(*profile()->GetPrefs(), model_->provider_id);
   if (!provider) {
     SendFromCommand(ask.text, std::move(ask.material), std::move(ask.files));
     return;
   }
-  CatalogStore::For(profile)->FormatOf(
+  CatalogStore::For(profile())->FormatOf(
       *provider, ask.model,
       base::BindOnce(
           [](base::WeakPtr<UwChatHandler> self, std::string provider_id,
@@ -494,10 +489,16 @@ void UwChatHandler::OnCommandFilesPrepared(
   SendAttached(text, AttachmentsFrom(files));
 }
 
+Profile* UwChatHandler::profile() const {
+  return Profile::FromBrowserContext(contents_->GetBrowserContext());
+}
+
+tabs::TabInterface* UwChatHandler::Tab() const {
+  return tabs::TabInterface::MaybeGetFromContents(contents_);
+}
+
 base::FilePath UwChatHandler::FilesFolder() const {
-  return ChatFile::FilesFolderFor(
-      Profile::FromBrowserContext(contents_->GetBrowserContext())->GetPath(),
-      id_);
+  return ChatFile::FilesFolderFor(profile()->GetPath(), id_);
 }
 
 std::vector<Attachment> UwChatHandler::AttachmentsFrom(
@@ -931,19 +932,17 @@ void UwChatHandler::ReadFile(const std::string& saved,
 }
 
 void UwChatHandler::ShowUserTab(const std::string& id) {
-  RunTabTool(Profile::FromBrowserContext(contents_->GetBrowserContext()),
-             kSelectTool, base::DictValue().Set("tab", id), TabOwners(),
-             base::DoNothing());
+  RunTabTool(profile(), kSelectTool, base::DictValue().Set("tab", id),
+             TabOwners(), base::DoNothing());
 }
 
 void UwChatHandler::ShowUserTask(const std::string& id) {
-  ShowTask(Profile::FromBrowserContext(contents_->GetBrowserContext()), id);
+  ShowTask(profile(), id);
 }
 
 void UwChatHandler::OpenFile(const std::string& saved) {
   const base::FilePath path = CopyNamed(FilesFolder(), saved);
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat = Tab();
   if (path.empty() || !chat) {
     return;
   }
@@ -951,8 +950,7 @@ void UwChatHandler::OpenFile(const std::string& saved) {
   net::GetWellKnownMimeTypeFromFile(path, &type);
   if (!type.starts_with("image/") && type != "application/pdf" &&
       !type.starts_with("text/") && type != "application/json") {
-    platform_util::ShowItemInFolder(
-        Profile::FromBrowserContext(contents_->GetBrowserContext()), path);
+    platform_util::ShowItemInFolder(profile(), path);
     return;
   }
   NavigateParams params(chat->GetBrowserWindowInterface(),
@@ -1004,37 +1002,17 @@ void UwChatHandler::TryAgain() {
 }
 
 void UwChatHandler::OpenChat(const std::string& id) {
-  if (!ChatFile::IsChatId(id)) {
-    return;
-  }
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
-  std::vector<tabs::TabInterface*> showing = TabsShowingChat(profile, id);
-  if (!showing.empty()) {
-    GoToTab(showing[0]);
-    return;
-  }
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
-  if (!chat) {
-    return;
-  }
-  NavigateParams params(chat->GetBrowserWindowInterface(), ChatUrl(id),
-                        ui::PAGE_TRANSITION_AUTO_TOPLEVEL);
-  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
-  Navigate(&params);
+  GoToOrOpenChat(profile(), contents_, id);
 }
 
 void UwChatHandler::NewChat() {
-  if (tabs::TabInterface* chat =
-          tabs::TabInterface::MaybeGetFromContents(contents_)) {
+  if (tabs::TabInterface* chat = Tab()) {
     OpenChatTab(chat->GetBrowserWindowInterface());
   }
 }
 
 void UwChatHandler::ShowScheduled() {
-  if (tabs::TabInterface* chat =
-          tabs::TabInterface::MaybeGetFromContents(contents_)) {
+  if (tabs::TabInterface* chat = Tab()) {
     ShowSingletonTab(chat->GetBrowserWindowInterface(), GURL(kScheduledUrl));
   }
 }
@@ -1047,8 +1025,7 @@ void UwChatHandler::DeleteChat(const std::string& id) {
     index->Delete(id);
   }
   std::vector<tabs::TabHandle> showing;
-  for (tabs::TabInterface* tab : TabsShowingChat(
-           Profile::FromBrowserContext(contents_->GetBrowserContext()), id)) {
+  for (tabs::TabInterface* tab : TabsShowingChat(profile(), id)) {
     showing.push_back(tab->GetHandle());
   }
   // This page's own tab may be among them, and closing it ends this handler.
@@ -1073,8 +1050,7 @@ void UwChatHandler::ShowTab(int32_t number) {
 }
 
 void UwChatHandler::SetSideBySide(bool on, int32_t number) {
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat = Tab();
   if (!chat) {
     return;
   }
@@ -1111,8 +1087,7 @@ void UwChatHandler::SetSideBySide(bool on, int32_t number) {
 }
 
 void UwChatHandler::GetSuggestions(GetSuggestionsCallback callback) {
-  ChatSuggestions* suggestions = ChatSuggestions::For(
-      Profile::FromBrowserContext(contents_->GetBrowserContext()));
+  ChatSuggestions* suggestions = ChatSuggestions::For(profile());
   if (!suggestions) {
     std::move(callback).Run({});
     return;
@@ -1230,8 +1205,7 @@ void UwChatHandler::OnVisibilityChanged(content::Visibility visibility) {
 
 void UwChatHandler::BringWaitingTab() {
   ScheduledChats* chats = schedules_observation_.GetSource();
-  tabs::TabInterface* chat_tab =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat_tab = Tab();
   if (chats && chat_tab && chats->Waiting(id_) &&
       contents_->GetVisibility() == content::Visibility::VISIBLE) {
     chats->BringWaitingTab(id_, *chat_tab);
@@ -1240,9 +1214,7 @@ void UwChatHandler::BringWaitingTab() {
 
 void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   loaded_ = true;
-  mode_ = ModeNamed(Profile::FromBrowserContext(contents_->GetBrowserContext())
-                        ->GetPrefs()
-                        ->GetString(kAgentApprovalModePref));
+  mode_ = ModeNamed(profile()->GetPrefs()->GetString(kAgentApprovalModePref));
   if (saved) {
     if (const std::string* title = saved->FindString("title")) {
       title_ = *title;
@@ -1300,9 +1272,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
     }
   }
   if (!model_) {
-    model_ =
-        AgentChoice(*Profile::FromBrowserContext(contents_->GetBrowserContext())
-                         ->GetPrefs());
+    model_ = AgentChoice(*profile()->GetPrefs());
   }
   page_->OnOpened(id_, title_, std::move(lines));
   page_->OnModel(PageModel(model_));
@@ -1315,9 +1285,7 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
   if (!start_) {
     return;
   }
-  const PrefService& prefs = *Profile::FromBrowserContext(
-                                  contents_->GetBrowserContext())
-                                  ->GetPrefs();
+  const PrefService& prefs = *profile()->GetPrefs();
   if (!start_->model.empty() && FindProvider(prefs, start_->provider_id)) {
     ask_after_model_ = true;
     SetModel(start_->provider_id, start_->model);
@@ -1327,16 +1295,14 @@ void UwChatHandler::OnLoaded(std::optional<base::DictValue> saved) {
 }
 
 bool UwChatHandler::Start() {
-  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* tab = Tab();
   if (!tab) {
     ShowStep(Failed("A chat works only in a tab."));
     return false;
   }
   // A chat opened before any model was picked takes the agent model now.
   if (!model_) {
-    model_ =
-        AgentChoice(*Profile::FromBrowserContext(contents_->GetBrowserContext())
-                         ->GetPrefs());
+    model_ = AgentChoice(*profile()->GetPrefs());
     page_->OnModel(PageModel(model_));
     TellSettings();
   }
@@ -1443,20 +1409,17 @@ std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
   if (!model_) {
     return std::nullopt;
   }
-  return AgentModelFor(
-      *Profile::FromBrowserContext(contents_->GetBrowserContext()), *model_);
+  return AgentModelFor(*profile(), *model_);
 }
 
 void UwChatHandler::SetModel(const std::string& provider_id,
                              const std::string& model) {
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
   const std::optional<Provider> provider =
-      FindProvider(*profile->GetPrefs(), provider_id);
+      FindProvider(*profile()->GetPrefs(), provider_id);
   if (!loaded_ || !provider || model.empty()) {
     return;
   }
-  CatalogStore::For(profile)->FormatOf(
+  CatalogStore::For(profile())->FormatOf(
       *provider, model,
       base::BindOnce(&UwChatHandler::OnModelFormat, weak_factory_.GetWeakPtr(),
                      provider_id, model));
@@ -1496,15 +1459,13 @@ void UwChatHandler::SetMemoryOff(bool off) {
 }
 
 mojom::ChatMemory UwChatHandler::MemoryNow() const {
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
-  if (profile->IsOffTheRecord()) {
+  if (profile()->IsOffTheRecord()) {
     return mojom::ChatMemory::kPrivate;
   }
   if (memory_off_) {
     return mojom::ChatMemory::kOff;
   }
-  return profile->GetPrefs()->GetBoolean(kAgentMemoryPref)
+  return profile()->GetPrefs()->GetBoolean(kAgentMemoryPref)
              ? mojom::ChatMemory::kOn
              : mojom::ChatMemory::kPaused;
 }
@@ -1526,9 +1487,7 @@ void UwChatHandler::SetMode(mojom::ApprovalMode mode) {
     agent_->SetMode(mode_);
   }
   if (title_.empty()) {
-    Profile::FromBrowserContext(contents_->GetBrowserContext())
-        ->GetPrefs()
-        ->SetString(kAgentApprovalModePref, NameOf(mode_));
+    profile()->GetPrefs()->SetString(kAgentApprovalModePref, NameOf(mode_));
   }
   Save();
   page_->OnMode(mode);
@@ -1737,7 +1696,6 @@ void UwChatHandler::SendUsage() {
   usage->checks = summary.checks.tokens;
   usage->checks_cost = summary.checks.cost;
   usage->check_count = summary.check_count;
-  usage->memory_checks = summary.memory_checks.tokens;
   usage->memory_checks_cost = summary.memory_checks.cost;
   usage->memory_check_count = summary.memory_check_count;
   usage->runs = summary.runs.tokens;
@@ -1758,12 +1716,10 @@ void UwChatHandler::SendUsage() {
   usage->counted_since =
       records.empty() ? 0
                       : records.front().time.InMillisecondsFSinceUnixEpoch();
-  Profile* profile =
-      Profile::FromBrowserContext(contents_->GetBrowserContext());
   if (model_) {
     usage->model = model_->model;
     if (const std::optional<Provider> provider =
-            FindProvider(*profile->GetPrefs(), model_->provider_id)) {
+            FindProvider(*profile()->GetPrefs(), model_->provider_id)) {
       usage->provider = provider->name;
       usage->on_this_mac = provider->preset == ProviderPreset::kOllama;
     }
@@ -1794,8 +1750,7 @@ void UwChatHandler::Save() {
     updated_ = base::Time::Now();
   }
   base::ListValue tabs;
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat = Tab();
   TabOrganizationController* tree =
       chat ? TabOrganizationController::From(chat->GetBrowserWindowInterface())
            : nullptr;
@@ -1890,8 +1845,7 @@ void UwChatHandler::OnToolStep(const AgentLoop::Step& step) {
     }
   }
   // Side by side, the chat follows the agent to its other tabs.
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat = Tab();
   if (moved && chat && chat->GetSplit() &&
       tab->GetSplit() != chat->GetSplit()) {
     SetSideBySide(true, number);
@@ -1936,8 +1890,7 @@ void UwChatHandler::SendTabs() {
     sent->screen = card.screen;
     cards.push_back(std::move(sent));
   }
-  tabs::TabInterface* chat =
-      tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* chat = Tab();
   page_->OnTabs(std::move(cards), current_tab_,
                 chat && chat->GetSplit().has_value());
 }
@@ -1974,9 +1927,7 @@ std::vector<Skill> UwChatHandler::UserSkills() const {
 
 std::vector<Skill> UwChatHandler::EnabledSkills() const {
   const base::ListValue& off =
-      Profile::FromBrowserContext(contents_->GetBrowserContext())
-          ->GetPrefs()
-          ->GetList(kAgentDisabledSkillsPref);
+      profile()->GetPrefs()->GetList(kAgentDisabledSkillsPref);
   std::vector<Skill> on;
   for (const Skill& skill : skills_) {
     if (!off.contains(skill.name)) {
@@ -2027,10 +1978,8 @@ void UwChatHandler::AskApproval(
              ? base::StrCat({approval.action, " on ", approval.site, "?"})
              : base::StrCat({approval.action, " in tab ",
                              base::NumberToString(approval.tab), "?"}));
-  waiting_ =
-      PageApproval(approval, /*can_always_allow=*/
-                   !Profile::FromBrowserContext(contents_->GetBrowserContext())
-                        ->IsOffTheRecord());
+  waiting_ = PageApproval(approval, /*can_always_allow=*/
+                          !profile()->IsOffTheRecord());
   for (Watcher& watcher : watchers_) {
     watcher.OnApproval(waiting_.get());
   }
@@ -2069,13 +2018,12 @@ void UwChatHandler::Notify(const std::string& what, const std::string& text) {
   if (!watchers_.empty()) {
     return;
   }
-  tabs::TabInterface* tab = tabs::TabInterface::MaybeGetFromContents(contents_);
+  tabs::TabInterface* tab = Tab();
   if (tab && contents_->GetVisibility() == content::Visibility::VISIBLE &&
       tab->GetBrowserWindowInterface()->GetWindow()->IsActive()) {
     return;
   }
-  NotifyAboutChat(Profile::FromBrowserContext(contents_->GetBrowserContext()),
-                  id_, title_, what, text);
+  NotifyAboutChat(profile(), id_, title_, what, text);
 }
 
 void UwChatHandler::UpdateIndex() {
@@ -2103,7 +2051,8 @@ void UwChatHandler::NewSchedule(NewScheduleCallback callback) {
 }
 
 ScheduledChat UwChatHandler::NewCard() const {
-  ScheduledChat chat;
+  ScheduledChat chat =
+      DefaultSchedule(schedules_observation_.GetSource(), model_, mode_);
   for (const base::Value& entry : log_) {
     const base::DictValue* line = entry.GetIfDict();
     const std::string* kind = line ? line->FindString("kind") : nullptr;
@@ -2113,17 +2062,6 @@ ScheduledChat UwChatHandler::NewCard() const {
       break;
     }
   }
-  const ScheduledChats* chats = schedules_observation_.GetSource();
-  std::optional<ModelChoice> model = chats ? chats->LastModel() : std::nullopt;
-  if (!model) {
-    model = model_;
-  }
-  if (model) {
-    chat.provider_id = model->provider_id;
-    chat.model = model->model;
-    chat.effort = model->effort;
-  }
-  chat.approval_mode = std::string(NameOf(mode_));
   return chat;
 }
 
@@ -2141,8 +2079,7 @@ base::DictValue UwChatHandler::OpenScheduleCard(const base::DictValue& args) {
       "user saves it.";
   std::vector<std::string> others;
   if (chats && !card->page.empty()) {
-    const ChatIndex* index = ChatIndex::For(
-        Profile::FromBrowserContext(contents_->GetBrowserContext()));
+    const ChatIndex* index = ChatIndex::For(profile());
     const std::vector<ChatIndex::Entry> entries =
         index ? index->Entries() : std::vector<ChatIndex::Entry>();
     for (const std::string& id : chats->ChatsWatching(GURL(card->page))) {
@@ -2175,8 +2112,8 @@ void UwChatHandler::DescribePage(const std::string& page,
     std::move(callback).Run(std::string(), std::string());
     return;
   }
-  LookUpPage(Profile::FromBrowserContext(contents_->GetBrowserContext()),
-             WatchedAddress(url), &page_tasks_, std::move(callback));
+  LookUpPage(profile(), WatchedAddress(url), &page_tasks_,
+             std::move(callback));
 }
 
 void UwChatHandler::SaveSchedule(mojom::ChatSchedulePtr schedule) {
@@ -2259,16 +2196,11 @@ base::DictValue UwChatHandler::StartTrigger(const TriggerAsk& ask,
   trigger.request = ask.request;
   trigger.folder = folder;
   // Runs on its wakes use the runs model, as a schedule card would.
-  std::optional<ModelChoice> model = chats->LastModel();
-  if (!model) {
-    model = model_;
-  }
-  if (model) {
-    trigger.provider_id = model->provider_id;
-    trigger.model = model->model;
-    trigger.effort = model->effort;
-  }
-  trigger.approval_mode = std::string(NameOf(mode_));
+  const ScheduledChat card = DefaultSchedule(chats, model_, mode_);
+  trigger.provider_id = card.provider_id;
+  trigger.model = card.model;
+  trigger.effort = card.effort;
+  trigger.approval_mode = card.approval_mode;
   base::expected<void, std::string> started =
       chats->StartTrigger(id_, std::move(trigger));
   if (!started.has_value()) {

@@ -91,8 +91,8 @@ class UwScheduledHandler : public mojom::ScheduledHandler,
   base::ScopedObservation<ScheduledChats, ScheduledChats::Observer> schedules_{
       this};
   base::ScopedObservation<ChatIndex, ChatIndex::Observer> index_{this};
-  // The runs of each listed chat, as its chat keeps them, without steps.
-  std::map<std::string, base::ListValue> runs_;
+  // The runs of each listed chat, without their steps.
+  std::map<std::string, std::vector<mojom::StepPtr>> runs_;
   // The title and icon of each watched page, by its address, once looked up.
   std::map<std::string, Look> looks_;
   base::CancelableTaskTracker tracker_;

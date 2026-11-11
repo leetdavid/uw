@@ -11,9 +11,12 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/time/time.h"
+#include "components/prefs/pref_service.h"
 #include "third_party/icu/source/i18n/unicode/timezone.h"
 #include "url/gurl.h"
 #include "uw/browser/agent/scheduled_chats.h"
+#include "uw/browser/ai_providers/models.h"
+#include "uw/browser/tab_organization/ai_connection.h"
 
 namespace uw {
 namespace {
@@ -139,6 +142,14 @@ mojom::ScheduleStatePtr ScheduleStateOf(const ScheduledChats* chats,
   return state;
 }
 
+mojom::ScheduleStatePtr NewScheduleState(const ScheduledChats* chats,
+                                         const PrefService& prefs) {
+  return ScheduleStateOf(
+      chats, {},
+      DefaultSchedule(chats, AgentChoice(prefs),
+                      ModeNamed(prefs.GetString(kAgentApprovalModePref))));
+}
+
 mojom::RunLinePtr RunLineFrom(const base::DictValue& line) {
   auto run = mojom::RunLine::New();
   run->time = base::ValueToTime(line.Find("time"))
@@ -199,6 +210,32 @@ mojom::RunLinePtr RunLineFrom(const base::DictValue& line) {
     run->trigger = *trigger;
   }
   return run;
+}
+
+std::vector<mojom::StepPtr> RunStepsOf(
+    const std::optional<base::DictValue>& saved,
+    base::Time since) {
+  std::vector<mojom::StepPtr> runs;
+  const base::ListValue* log = saved ? saved->FindList("log") : nullptr;
+  if (!log) {
+    return runs;
+  }
+  for (const base::Value& entry : *log) {
+    const base::DictValue* line = entry.GetIfDict();
+    const std::string* kind = line ? line->FindString("kind") : nullptr;
+    if (!kind || *kind != "run" ||
+        base::ValueToTime(line->Find("time")).value_or(base::Time()) < since) {
+      continue;
+    }
+    auto run = mojom::Step::New();
+    run->kind = mojom::StepKind::kRun;
+    if (const std::string* text = line->FindString("text")) {
+      run->text = *text;
+    }
+    run->run = RunLineFrom(*line);
+    runs.push_back(std::move(run));
+  }
+  return runs;
 }
 
 std::optional<ScheduledChat> ScheduledChatFrom(

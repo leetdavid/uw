@@ -257,7 +257,6 @@ struct CatalogEntry {
   string name;
   string title;
   string description;
-  string website;
   string url;
   array<CatalogField> fields;
   // A connector at its address is already added.
