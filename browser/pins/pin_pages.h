@@ -49,6 +49,7 @@ class PinPages : public base::SupportsUserData::Data,
   std::unique_ptr<content::WebContents> Take(std::string_view id);
   bool Holds(std::string_view id) const;
 
+  // Does nothing when pin `id` is gone.
   void SetPicture(std::string id, gfx::ImageSkia picture);
   // Pin `id`'s picture, empty if there is none yet.
   gfx::ImageSkia PictureOf(std::string_view id) const;
@@ -65,6 +66,7 @@ class PinPages : public base::SupportsUserData::Data,
 
  private:
   void DropAll();
+  void DropPicturesOfRemovedPins();
 
   const raw_ptr<Profile> profile_;
   std::map<std::string, std::unique_ptr<content::WebContents>, std::less<>>
@@ -73,6 +75,7 @@ class PinPages : public base::SupportsUserData::Data,
   base::RepeatingClosureList picture_observers_;
   std::unique_ptr<ScopedProfileKeepAlive> keep_alive_;
   base::CallbackListSubscription terminating_;
+  base::CallbackListSubscription pins_changed_;
   base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
   base::ScopedObservation<ProfileManager, ProfileManagerObserver>
       manager_observation_{this};

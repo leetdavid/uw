@@ -12,6 +12,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "content/public/browser/web_contents.h"
+#include "uw/browser/pins/pin_store.h"
 
 namespace uw {
 namespace {
@@ -41,6 +42,8 @@ PinPages::PinPages(Profile* profile) : profile_(profile) {
   }
   terminating_ = browser_shutdown::AddAppTerminatingCallback(
       base::BindOnce(&PinPages::DropAll, base::Unretained(this)));
+  pins_changed_ = PinStore::For(profile)->Observe(base::BindRepeating(
+      &PinPages::DropPicturesOfRemovedPins, base::Unretained(this)));
 }
 
 PinPages::~PinPages() = default;
@@ -73,6 +76,9 @@ bool PinPages::Holds(std::string_view id) const {
 }
 
 void PinPages::SetPicture(std::string id, gfx::ImageSkia picture) {
+  if (!PinStore::For(profile_)->Find(id)) {
+    return;
+  }
   pictures_[std::move(id)] = std::move(picture);
   picture_observers_.Notify();
 }
@@ -104,7 +110,15 @@ void PinPages::OnProfileManagerDestroying() {
 
 void PinPages::DropAll() {
   pages_.clear();
+  pictures_.clear();
   keep_alive_.reset();
+}
+
+void PinPages::DropPicturesOfRemovedPins() {
+  const PinStore* pins = PinStore::For(profile_);
+  std::erase_if(pictures_, [pins](const auto& picture) {
+    return !pins->Find(picture.first);
+  });
 }
 
 }  // namespace uw
