@@ -198,7 +198,6 @@ void ConnectorCatalogStore::OnRegistryPage(Body body) {
     catalog_.registry_since = catalog_.registry_pass;
     registry_done_ = true;
   }
-  Save();
   Changed();
   if (last) {
     FetchDirectories();
