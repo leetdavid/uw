@@ -16,7 +16,6 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/task/bind_post_task.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
@@ -547,12 +546,10 @@ mojom::NewTabRowPtr UwNewTabHandler::RowOf(const ChatIndex::Entry& entry) {
       row->favicon = page->second.second;
     } else {
       // Kept empty until the page is looked up, so that it is looked up once.
-      // An open tab answers at once, so the answer waits for this send to end.
       pages_.try_emplace(chat->page);
       LookUpPage(profile(), GURL(chat->page), &tracker_,
-                 base::BindPostTaskToCurrentDefault(
-                     base::BindOnce(&UwNewTabHandler::OnLooked,
-                                    weak_factory_.GetWeakPtr(), chat->page)));
+                 base::BindOnce(&UwNewTabHandler::OnLooked,
+                                weak_factory_.GetWeakPtr(), chat->page));
     }
   }
   return row;

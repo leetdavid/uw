@@ -13,6 +13,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -85,9 +86,14 @@ void LookUpPage(Profile* profile,
                 base::CancelableTaskTracker* tracker,
                 base::OnceCallback<void(const std::string& title,
                                         const std::string& favicon)> done) {
+  // An open tab answers on a later task too, so no caller hears back inside
+  // its own call.
   if (tabs::TabInterface* tab = TabOfPage(profile, page)) {
-    std::move(done).Run(base::UTF16ToUTF8(tab->GetContents()->GetTitle()),
-                        FaviconOf(tab->GetContents()));
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(std::move(done),
+                       base::UTF16ToUTF8(tab->GetContents()->GetTitle()),
+                       FaviconOf(tab->GetContents())));
     return;
   }
   history::HistoryService* history = HistoryServiceFactory::GetForProfile(
