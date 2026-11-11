@@ -23,7 +23,7 @@ export const SYNC_STAMP = ".uw-sync.json";
 const CONFIG_SEAL = ".uw-gclient.sha256";
 const DEPENDENCY_HISTORY = ".uw-dependencies.json";
 const ROOT_PREFIX = "UW_CHECKOUT_ROOT=";
-const OUTPUT = "out/uw";
+export const OUTPUT = "out/uw";
 export const GIB = 1024 ** 3;
 export const WINDOW_VM = "uw-window-tests";
 export const COMMAND_CHECK_TEST = "CommandCheckBrowserTest.MANUAL_JudgesTheExamples";
@@ -129,7 +129,7 @@ export function checkoutPath(value: string): string {
 }
 
 // A Mac builds uw for macOS; a Linux host cross-builds it for Windows.
-export function layoutAt(root: string, platform: string = process.platform): Layout {
+export function layoutAt(root = process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"), platform: string = process.platform): Layout {
   const normalized = checkoutPath(root);
   return {
     root: normalized, tools: join(normalized, "depot_tools"), source: join(normalized, "src"),
@@ -819,7 +819,7 @@ export function main(argv = process.argv.slice(2)): number {
     if (values.help) { console.log(help(name)); return 0; }
     const jobs = positiveInteger(String(values.jobs ?? "2"), "--jobs");
     const timeout = positiveInteger(String(values.timeout ?? "120"), "--timeout") * 1000;
-    const layout = layoutAt(String(values["checkout-dir"] ?? (process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"))));
+    const layout = layoutAt(values["checkout-dir"]);
     if (name === "root") { console.log(layout.root); return 0; }
     const chromium = new Chromium(layout, loadPins());
     if (name === "doctor") return chromium.doctor() ? 0 : 1;

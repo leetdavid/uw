@@ -11,7 +11,7 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { COMMAND_CHECK_TEST, layoutAt, REPO } from "./chromium.ts";
+import { COMMAND_CHECK_TEST, layoutAt, OUTPUT, REPO } from "./chromium.ts";
 
 type Model = {
   format: "chat" | "decisions" | "systemone";
@@ -105,8 +105,8 @@ function main(): number {
     console.error(`Unknown model ${unknown.join(", ")}. Choose from ${Object.keys(MODELS).join(", ")}.`);
     return 2;
   }
-  const layout = layoutAt(process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"));
-  const tests = join(layout.source, "out/uw/browser_tests");
+  const layout = layoutAt();
+  const tests = join(layout.source, OUTPUT, "browser_tests");
   if (!existsSync(tests)) {
     console.error(`${tests} is missing. Build browser_tests in out/uw first.`);
     return 1;

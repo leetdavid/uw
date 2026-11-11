@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
-import { BuildError, REPO, layoutAt } from "./chromium.ts";
+import { BuildError, layoutAt } from "./chromium.ts";
 
 // The requests uw keeps on purpose, per "Kept" in docs/plans/google-requests.md.
 export const KEPT: readonly { name: string; url: RegExp }[] = [
@@ -183,8 +183,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     if (values.help) { console.log(HELP); return 0; }
     const seconds = Number(values.seconds ?? "300");
     if (!Number.isSafeInteger(seconds) || seconds < 1) throw new BuildError("--seconds must be a positive integer", 2);
-    const binary = values.binary ??
-      layoutAt(values["checkout-dir"] ?? (process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"))).binary;
+    const binary = values.binary ?? layoutAt(values["checkout-dir"]).binary;
     return await check(binary, seconds) ? 0 : 1;
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`);

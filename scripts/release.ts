@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { parseArgs } from "node:util";
-import { BuildError, REPO, nativeRuntime } from "./chromium.ts";
+import { BuildError, OUTPUT, REPO, nativeRuntime } from "./chromium.ts";
 import type { Runtime } from "./chromium.ts";
 
 export const TEAM_ID = "24MD6K3S56";
@@ -285,9 +285,9 @@ export class Release {
     this.step(["node", "scripts/chromium.ts", "build", "--jobs", String(jobs), "--symbols", "--release"], worktree);
     this.step(["node", "scripts/chromium.ts", "smoke"], worktree);
     this.step(["node", "scripts/google-check.ts"], worktree);
-    this.step([join(this.tools, "autoninja"), "-C", "out/uw", `-j${jobs}`, "chrome/installer/mac"], this.source);
+    this.step([join(this.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome/installer/mac"], this.source);
 
-    const output = join(this.source, "out/uw");
+    const output = join(this.source, OUTPUT);
     // Sentry reads a crash report with the dSYMs of exactly this build.
     this.runtime.log(`[${output}] sentry-cli debug-files upload --type dsym`);
     this.runtime.run([cli, "debug-files", "upload", "--org", SENTRY_ORG, "--project", SENTRY_PROJECT, "--type", "dsym",

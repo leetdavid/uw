@@ -65,8 +65,7 @@ export class PatchSet {
   check(): string {
     const diff = this.git([...this.diffArgs, "HEAD"]);
     const recorded = this.readState();
-    const files = new Map(recorded?.diff.split(/(?=^diff --git )/m)
-      .map((file) => [file.split("\n", 1)[0], file]));
+    const files = this.sections(recorded?.diff ?? "");
     const interrupted = recorded && recorded.phase !== "applied" && (!diff ||
       diff.split(/(?=^diff --git )/m).every((file) => {
         const header = file.split("\n", 1)[0]!;

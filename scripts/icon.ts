@@ -5,10 +5,10 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
+import { REPO } from "./chromium.ts";
 
-const REPO = fileURLToPath(new URL("../", import.meta.url));
 const OUTPUT = join(REPO, "browser/branding/mac");
 const WINDOWS_OUTPUT = join(REPO, "browser/branding/win");
 const BROWSER = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

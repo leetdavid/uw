@@ -14,7 +14,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { parseArgs } from "node:util";
-import { BuildError, Chromium, REPO, layoutAt, loadPins, nativeRuntime } from "./chromium.ts";
+import { BuildError, Chromium, OUTPUT, REPO, layoutAt, loadPins, nativeRuntime } from "./chromium.ts";
 import type { Runtime } from "./chromium.ts";
 import {
   CRASH_REPORT_URL, POSTHOG_HOST, SENTRY_CLI_VERSION, SENTRY_ORG, SENTRY_PROJECT, WINDOWS_BUILT, WINDOWS_FAILED, WINDOWS_FEED_URL,
@@ -70,7 +70,7 @@ export class WindowsRelease {
         ],
       });
       const installer = join(this.directory, WINDOWS_INSTALLER);
-      copyFileSync(join(this.source, "out/uw/mini_installer.exe"), installer);
+      copyFileSync(join(this.source, OUTPUT, "mini_installer.exe"), installer);
       const bytes = readFileSync(installer);
       const build = {
         version: [...pins.version.split(".").slice(0, 3), patch].join("."),
@@ -88,7 +88,7 @@ export class WindowsRelease {
   /** Uploads the shipped programs and their PDBs, so Sentry can read Windows crash reports. */
   symbols(token: string): void {
     if (!token) throw new BuildError("Give the Sentry token on standard input", 2);
-    const output = join(this.source, "out/uw");
+    const output = join(this.source, OUTPUT);
     const files = readdirSync(output).filter((name) => /\.(exe|dll)$/.test(name) && existsSync(join(output, `${name}.pdb`)))
       .flatMap((name) => [name, `${name}.pdb`]);
     if (!files.includes("chrome.dll.pdb")) throw new BuildError(`${output} has no chrome.dll.pdb. Build with symbols first.`);
