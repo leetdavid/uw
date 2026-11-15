@@ -56,13 +56,14 @@ Proposed on 2026-11-15; being worked out, not agreed. The owner asked for monthl
 
 | Plan | Status | Implementability |
 | --- | --- | --- |
-| OpenCode Go | Proposed | 8/10: an API key, formats uw already speaks, and each model's format and address in the model catalog |
+| OpenCode Go | Proposed | 7/10: an API key and formats uw already speaks, but each model has its own format and address, which the model catalog gives |
 | Codex | Proposed | 5/10: OpenAI's sign-in, answers read as a stream, and request rules only a live account can check |
 | Claude Pro and Max | Not planned | Decided on 2026-11-15. [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance) do not let other apps sign in with a Claude plan or send requests through one. A Claude plan works in Claude Code, which can run in a terminal tab with uw's tools through `uw mcp serve`. |
 
 - **Each subscription is a provider preset.** Agreed on 2026-11-15. It sits in the Add provider menu beside the others, apart from the same company's pay-as-you-go preset, so each model menu shows which one a model bills. A preset that signs in shows a sign-in button where others take a key.
 - **Codex** is the preset for a ChatGPT Plus or Pro plan, with OpenAI's icon and the description "Your ChatGPT Plus or Pro plan". Agreed on 2026-11-15. It lists every model the plan's own list returns for the account. uw sends the requests itself over OpenAI Responses; it does not run OpenAI's Codex app. Its sign-in button reads "Continue with ChatGPT", as [OpenAI's guidelines](https://developers.openai.com/siwc/quickstart) require.
 - **Codex is a trial.** Agreed on 2026-11-15. OpenAI offers plan usage to open-source apps and to private apps it selects, and uw's source is public but has [no license](distribution.md#license). The owner is uw's one real user, so uw signs in as a locally hosted app to find out whether Codex is worth keeping. The owner can send OpenAI's [interest form](https://openai.com/form/sign-in-with-chatgpt-interest/) alongside. If OpenAI refuses uw or turns its sign-in off, Codex is removed. Codex ships in public releases like any feature, with no flag; agreed on 2026-11-15.
+- **OpenCode Go's models each go over their own format.** Agreed on 2026-11-15. The model catalog's `opencode-go` entry names each model's format and address: Anthropic Messages at `/anthropic/v1`, and OpenAI Responses or chat completions at `/openai/v1`. A model in Google's format goes over chat completions, which OpenCode translates. See [ADR 0007](../adr/0007-uw-speaks-three-wire-formats-to-language-models.md).
 - **Any job.** Agreed on 2026-11-15. A subscription's models can fill every model row and the chat composer, like any provider's. Neither preset has decision models, so uw never probes them, and quick choices on one run as a language model. Help says the organizer's requests count against the plan's limits.
 
 ## Design

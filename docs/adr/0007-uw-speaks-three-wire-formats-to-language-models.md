@@ -18,6 +18,8 @@ An [effort](../CONTEXT.md#language) level goes in the field each format reads: `
 
 A [proxy](../CONTEXT.md#language) such as CLIProxyAPI speaks all three formats and translates between them. A Custom provider can take the format "Each model's own", so each model goes over its maker's format and keeps its native thinking: the [model catalog](../CONTEXT.md#language) names the maker, per [ADR 0008](0008-uw-reads-what-a-model-can-do-from-models-dev.md). A Custom provider sends its key as a Bearer token, and over Messages also as `x-api-key`; only the Anthropic preset sends `x-api-key` alone. Decided on 2026-10-16 for T103, over a name rule such as `claude-*` (rejected: model names in uw's code) and one format per provider (rejected: Claude and GPT through one proxy would need two providers at one address).
 
+Some providers serve another maker's models in that maker's format, at an address of their own for each format, such as OpenCode Go's MiniMax over Messages at `/anthropic/v1`. When the catalog's entry for the provider names each model's format and address, each model goes over that format at that address. Decided on 2026-11-15 for OpenCode Go, over chat completions for every model (rejected: the problem this record began with).
+
 The two decision formats in [ADR 0003](0003-decision-model-beside-the-language-model.md) stay as they are.
 
 Considered options: chat completions only, with Anthropic through its compatible endpoint (rejected: OpenAI's reasoning models lose tools, Anthropic loses thinking); chat completions plus Anthropic, adding Responses when an OpenAI model fails (rejected: the failure is already known, so waiting for it only delays the fix).
