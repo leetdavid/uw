@@ -1,8 +1,8 @@
 # AI providers
 
-Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16. Changed on 2026-10-21: the page moves to `uw://ai/providers`, per the [connectors plan](connectors.md#the-ai-page). Changed on 2026-10-29: [quick choices](#quick-choices), not built yet.
+Status: scope agreed on 2026-10-15 for v2.1. The user signed off on the design the same day, with the model check replaced by the [model catalog](../CONTEXT.md#language). T77 built on 2026-10-15, and T78 and T79 on 2026-10-16. Changed on 2026-10-21: the page moves to `uw://ai/providers`, per the [connectors plan](connectors.md#the-ai-page). Changed on 2026-10-29: [quick choices](#quick-choices), not built yet. Changed on 2026-11-15: [subscriptions](#subscriptions), not built yet.
 
-Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss. Quick choices are also **6/10**: probes are new, OpenRouter's System One address is untested, and the organizer must send each request to the right model in its format.
+Implementability: **6/10** using the [roadmap convention](roadmap.md#implementability-estimates). Two of the three formats are new to uw, it is a second React page, and the connections users already saved have to move without loss. Quick choices are also **6/10**: probes are new, OpenRouter's System One address is untested, and the organizer must send each request to the right model in its format. Subscriptions are **7/10** for OpenCode Go and **5/10** for Codex; see [Subscriptions](#subscriptions).
 
 ## Agreed scope
 
@@ -52,18 +52,21 @@ Agreed on 2026-10-29; not built yet (T264 to T266). Found when the user added Ve
 
 ## Subscriptions
 
-Proposed on 2026-11-15; being worked out, not agreed. The owner asked for monthly plans that pay for model requests, such as OpenCode Go and ChatGPT Plus, as a way to reach models.
+Agreed on 2026-11-15; not built yet (T387 to T389). The owner asked for monthly plans that pay for model requests, such as OpenCode Go and ChatGPT Plus, as a way to reach models.
 
 | Plan | Status | Implementability |
 | --- | --- | --- |
-| OpenCode Go | Proposed | 7/10: an API key and formats uw already speaks, but each model has its own format and address, which the model catalog gives |
-| Codex | Proposed | 5/10: OpenAI's sign-in, answers read as a stream, and request rules only a live account can check |
+| OpenCode Go | Agreed | 7/10: an API key and formats uw already speaks, but each model has its own format and address, which the model catalog gives |
+| Codex | Agreed, as a trial | 5/10: OpenAI's sign-in, answers read as a stream, and request rules only a live account can check |
 | Claude Pro and Max | Not planned | Decided on 2026-11-15. [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance) do not let other apps sign in with a Claude plan or send requests through one. A Claude plan works in Claude Code, which can run in a terminal tab with uw's tools through `uw mcp serve`. |
 
 - **Each subscription is a provider preset.** Agreed on 2026-11-15. It sits in the Add provider menu beside the others, apart from the same company's pay-as-you-go preset, so each model menu shows which one a model bills. A preset that signs in shows a sign-in button where others take a key.
 - **Codex** is the preset for a ChatGPT Plus or Pro plan, with OpenAI's icon and the description "Your ChatGPT Plus or Pro plan". Agreed on 2026-11-15. It lists every model the plan's own list returns for the account. uw sends the requests itself over OpenAI Responses; it does not run OpenAI's Codex app. Its sign-in button reads "Continue with ChatGPT", as [OpenAI's guidelines](https://developers.openai.com/siwc/quickstart) require.
 - **Codex is a trial.** Agreed on 2026-11-15. OpenAI offers plan usage to open-source apps and to private apps it selects, and uw's source is public but has [no license](distribution.md#license). The owner is uw's one real user, so uw signs in as a locally hosted app to find out whether Codex is worth keeping. The owner can send OpenAI's [interest form](https://openai.com/form/sign-in-with-chatgpt-interest/) alongside. If OpenAI refuses uw or turns its sign-in off, Codex is removed. Codex ships in public releases like any feature, with no flag; agreed on 2026-11-15.
 - **Codex answers come whole.** Agreed on 2026-11-15. The plan takes only streamed requests, so uw reads the stream to `response.completed` and then shows the answer, as it does for every provider. Showing text as it arrives is a separate change for every provider.
+- **Codex's sign-in.** Agreed on 2026-11-15. It follows OpenAI's [open-source flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in) in a uw tab, as a connector's sign-in does, and uw catches the return to `127.0.0.1` in that tab. The tab closes when it is done. The tokens go to Keychain under the provider's account and refresh on their own. Sign out deletes them, and the provider then shows as a rejected key does until the user continues with ChatGPT again. One Codex provider is one ChatGPT account; a second account is a second provider.
+- **Codex's requests.** Agreed on 2026-11-15. Its models come from the plan's own list: those marked `"visibility": "list"`, under their `display_name`. uw leaves out the request fields the plan [refuses](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations), such as `max_output_tokens`. If the owner's live check shows that plain tools are refused, uw sends them in the namespaces OpenAI describes. A usage limit shows OpenAI's message where any provider error shows.
+- **Help.** The AI providers Help page covers both presets, says that the organizer's requests count against a plan's limits, and says that a Claude plan works in Claude Code in a terminal tab.
 - **OpenCode Go's models each go over their own format.** Agreed on 2026-11-15. The model catalog's `opencode-go` entry names each model's format and address: Anthropic Messages at `/anthropic/v1`, and OpenAI Responses or chat completions at `/openai/v1`. A model in Google's format goes over chat completions, which OpenCode translates. See [ADR 0007](../adr/0007-uw-speaks-three-wire-formats-to-language-models.md).
 - **uw names itself.** Agreed on 2026-11-15. Every model request, to every provider, carries `User-Agent: uw/<version>` in place of the browser's. OpenCode Go also gets the `x-opencode-session` header it [asks clients for](https://opencode.ai/docs/go/): a chat's id, a run's own id, and a new id for each request of the organizer, task naming, and the command and memory checks.
 - **Any job.** Agreed on 2026-11-15. A subscription's models can fill every model row and the chat composer, like any provider's. Neither preset has decision models, so uw never probes them, and quick choices on one run as a language model. Help says the organizer's requests count against the plan's limits.
@@ -120,6 +123,12 @@ Each stage is a ticket on the [board](roadmap.md#board) and ends with tests that
 14. With OpenRouter added, its decision models are listed, and one places a tab over `/systemone`.
 15. With a language model making quick choices and another naming tasks, the first places a new tab and the second names its task. The chip says "Language model".
 16. With only Anthropic added, the quick choices menu lists its language models, the hint, and Add provider.
+17. With OpenCode Go added with its key, a chat runs on `kimi-k3` over chat completions and `gpt-6-luna` over Responses, both at `/openai/v1`, and on `minimax-m3` over Messages at `/anthropic/v1`.
+18. Every model request carries `User-Agent: uw/<version>`. OpenCode Go's requests carry `x-opencode-session`: the same id for each request of one chat, and a new one for each organizer request.
+19. Continue with ChatGPT signs in from a tab, the tab closes, and Codex lists the plan's models by their display names.
+20. A Codex chat request is streamed with `store: false` and no `max_output_tokens`, and its answer shows once `response.completed` arrives.
+21. An expired Codex token refreshes without the user. Sign out deletes the tokens and the provider shows as signed out.
+22. A usage limit in the middle of a Codex answer shows OpenAI's message in the chat.
 
 ## Open questions
 
