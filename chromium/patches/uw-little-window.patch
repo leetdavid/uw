@@ -945,7 +945,7 @@ index de6d2b8a3a374b430515b061dd7fe4fd03c0f157..83accaef283626a8712e487f71174050
      }
    } else {
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 44db02068879fccb495b6ca4179593629fd648e2..49d0c1919e5d859eaf0e304bb953323c763a29fd 100644
+index 44db02068879fccb495b6ca4179593629fd648e2..719ef5e8934cf7a6fe3c4a16357fcc5f5c337e0b 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -356,6 +356,7 @@
@@ -956,16 +956,25 @@ index 44db02068879fccb495b6ca4179593629fd648e2..49d0c1919e5d859eaf0e304bb953323c
  #include "uw/browser/workspaces/workspace_window.h"
  
  #if BUILDFLAG(IS_CHROMEOS)
-@@ -4719,6 +4720,14 @@ int BrowserView::NonClientHitTest(const gfx::Point& point) {
+@@ -4719,6 +4720,23 @@ int BrowserView::NonClientHitTest(const gfx::Point& point) {
        // code is given the mouse position...
        return HTNOWHERE;
      }
 +  } else if (uw::IsLittleWindow(browser())) {
-+    // uw: a little window has no title bar, so its toolbar's empty space
-+    // moves it, as a regular window's does. See ADR 0033.
-+    gfx::Point test_point(point);
-+    if (ConvertedHitTest(parent(), top_container_, &test_point) &&
-+        top_container_->IsPositionInWindowCaption(test_point)) {
++    // uw: a little window has no title bar, so the margin around its page
++    // card moves it, and so does its toolbar's empty space, as a regular
++    // window's does. See ADR 0033.
++    const auto in_card = [&](views::View* part) {
++      gfx::Point test_point(point);
++      return part && part->GetVisible() &&
++             ConvertedHitTest(parent(), part, &test_point);
++    };
++    gfx::Point in_top(point);
++    if (ConvertedHitTest(parent(), top_container_, &in_top)) {
++      if (top_container_->IsPositionInWindowCaption(in_top)) {
++        return HTNOWHERE;
++      }
++    } else if (!in_card(infobar_container_) && !in_card(multi_contents_view_)) {
 +      return HTNOWHERE;
 +    }
    }

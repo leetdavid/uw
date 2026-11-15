@@ -27,6 +27,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -162,10 +163,11 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
                        "little-window-page");
 }
 
-// The toolbar's empty space moves the window, as a regular window's does. Its
-// buttons and the address still take clicks.
+// The margin around the page and the toolbar's empty space move the window,
+// as a title bar would. The page, the toolbar's buttons, and the address still
+// take clicks.
 IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
-                       ItMovesByItsToolbarsEmptySpace) {
+                       ItMovesByTheMarginAndTheToolbarsEmptySpace) {
   BrowserWindowInterface* little = OpenWithPage(Page("/title1.html"));
   ASSERT_TRUE(little);
   BrowserView* view = BrowserView::GetBrowserViewForBrowser(little);
@@ -175,12 +177,27 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
   const auto in_widget = [](const views::View* v) {
     return v->ConvertRectToWidget(v->GetLocalBounds());
   };
+  const gfx::Rect window = in_widget(widget->GetRootView());
+  const gfx::Rect page = in_widget(view->multi_contents_view());
   const gfx::Rect address = in_widget(view->GetLocationBarView());
   const gfx::Point above_address(address.CenterPoint().x(),
                                  in_widget(view->toolbar()).y() + 1);
   ASSERT_LT(above_address.y(), address.y());
+  ASSERT_GT(page.x(), window.x());
+  ASSERT_LT(page.right(), window.right());
+  ASSERT_LT(page.bottom(), window.bottom());
 
   EXPECT_EQ(HTCAPTION, widget->GetNonClientComponent(above_address));
+  EXPECT_EQ(HTCAPTION,
+            widget->GetNonClientComponent(gfx::Point(
+                (window.x() + page.x()) / 2, page.CenterPoint().y())));
+  EXPECT_EQ(HTCAPTION,
+            widget->GetNonClientComponent(gfx::Point(
+                (page.right() + window.right()) / 2, page.CenterPoint().y())));
+  EXPECT_EQ(HTCAPTION, widget->GetNonClientComponent(
+                           gfx::Point(page.CenterPoint().x(),
+                                      (page.bottom() + window.bottom()) / 2)));
+  EXPECT_EQ(HTCLIENT, widget->GetNonClientComponent(page.CenterPoint()));
   EXPECT_EQ(HTCLIENT, widget->GetNonClientComponent(address.CenterPoint()));
   EXPECT_EQ(
       HTCLIENT,

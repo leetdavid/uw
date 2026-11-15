@@ -31,6 +31,7 @@ A [little window](../CONTEXT.md#language) is a small, temporary window for a qui
 - The first little window opens in the middle of the screen the user is working on, about 900 by 650. Later ones open at the size the user last left one, each a little offset from the one before.
 - It opens on the Space the user is looking at, and over a full-screen app too. It never moves the user to another Space.
 - It is an ordinary window. Other apps' windows can cover it.
+- It has no title bar, so it moves by the margin around the page and by the toolbar's empty space. Added on 2026-11-15 at the owner's request.
 
 ### Keeping the page
 
@@ -105,7 +106,7 @@ Drawn on 2026-11-07 as T357, on the "Little windows" page of the Doop canvas nam
   - `WindowFeatureController` gives a little window the toolbar and location bar, and no title bar. The toolbar takes its normal mode, so the address can change.
   - On the Mac, the window takes a browser window's style with its title hidden. Its title bar is as tall as the card's margin and toolbar together, so macOS's buttons sit centered on the toolbar, and the toolbar starts after them.
   - The pop-up layout insets the toolbar and the page by the card's margin and rounds the card. The frame paints the theme around it, as in a regular window.
-  - `BrowserView::NonClientHitTest` treats the toolbar's empty space as the title bar, as a regular window's is, so the window moves by it.
+  - `BrowserView::NonClientHitTest` treats the margin around the page card and the toolbar's empty space as the title bar, so the window moves by them.
   - The navigator sends a little window's new-tab links to the window used last on its workspace, and places them with `TabOrganizationController::LinksFromAnotherApp`.
   - Cmd+Shift+T: `UnloadController` records a little window that showed a page, and `BrowserLiveTabContext` saves its workspace under `uw.little_window` and brings it back as one.
   - `IDC_OPEN_FILE` in a little window runs Move to Workspace. On Windows, `IDC_SHOW_BOOKMARK_MANAGER` there opens the workspace menu.
@@ -133,7 +134,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built and checked on th
 
 1. With uw in front, Option+Cmd+N opens a little window with the command bar. An address picked there loads in it. Esc before a pick closes the window.
 2. File → New Little Window and the ▾ menu's New Little Window do the same and show the key.
-3. The little window has no sidebar, takes the theme of the workspace used last, and has the full toolbar and Move to Workspace. A click on the address opens the command bar. A window screenshot matches the frames.
+3. The little window has no sidebar, takes the theme of the workspace used last, and has the full toolbar and Move to Workspace. A click on the address opens the command bar. The margin around the page and the toolbar's empty space move the window. A window screenshot matches the frames.
 4. Cmd+O moves the page, the same live page with its form text, to the top of the Scratchpad in the workspace's window used last, selected, and the little window closes. With no window on that workspace, one opens. Cmd+Shift+O lists the workspaces, and picking another one on the same profile moves the page there.
 5. A Cmd-click in a little window opens a background tab at the top of the Scratchpad, and the little window stays in front.
 6. Option+Cmd-click on a link and "Open Link in Little Window" open the link in a new little window.
