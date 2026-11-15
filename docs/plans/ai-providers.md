@@ -62,6 +62,7 @@ Proposed on 2026-11-15; being worked out, not agreed. The owner asked for monthl
 
 - **Each subscription is a provider preset.** Agreed on 2026-11-15. It sits in the Add provider menu beside the others, apart from the same company's pay-as-you-go preset, so each model menu shows which one a model bills. A preset that signs in shows Sign in where others take a key.
 - **Codex** is the preset for a ChatGPT Plus or Pro plan, with OpenAI's icon and the description "Your ChatGPT Plus or Pro plan". Agreed on 2026-11-15. It lists every model the plan's own list returns for the account. uw sends the requests itself over OpenAI Responses; it does not run OpenAI's Codex app.
+- **Any job.** Agreed on 2026-11-15. A subscription's models can fill every model row and the chat composer, like any provider's. Neither preset has decision models, so uw never probes them, and quick choices on one run as a language model. Help says the organizer's requests count against the plan's limits.
 
 ## Design
 
