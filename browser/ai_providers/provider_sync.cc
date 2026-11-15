@@ -19,6 +19,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/prefs/scoped_user_pref_update.h"
 #include "uw/browser/ai_providers/api_key_store.h"
+#include "uw/browser/ai_providers/plan_sign_in.h"
 #include "uw/components/ai_providers/providers.h"
 
 namespace uw {
@@ -41,6 +42,7 @@ bool Has(const base::ListValue& providers, const std::string& id) {
 void RegisterSharedProviderPrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(kSharedProvidersPref);
   registry->RegisterListPref(kJoinedProfilesPref);
+  registry->RegisterStringPref(kPlanHostIdPref, std::string());
 }
 
 // static

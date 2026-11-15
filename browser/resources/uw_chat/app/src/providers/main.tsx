@@ -37,6 +37,7 @@ import {
   Decides,
   ModelSlot,
   ProviderFormat,
+  ProviderPreset,
   TestOutcome,
   UpgradeNotice,
   providersHandler,
@@ -206,12 +207,21 @@ function ProviderStatus({ provider, list }: { provider: Provider; list?: ModelLi
   if (!list) {
     return <span className="text-muted-foreground">Listing models…</span>;
   }
-  const dot = list.ok ? "bg-success" : "bg-destructive";
+  const codex = provider.preset === ProviderPreset.kCodex;
+  const dot = list.ok && (!codex || provider.hasKey) ? "bg-success" : "bg-destructive";
   return (
     <span className="flex min-w-0 items-center gap-[7px] text-[12.5px] text-muted-foreground">
       <i className={`size-[7px] shrink-0 rounded-full ${dot}`} />
       <span className="truncate" title={list.ok ? undefined : list.error}>
-        {!list.ok ? list.error : provider.hasKey ? KEY_SAVED : "No key"}
+        {codex && !provider.hasKey
+          ? "Signed out"
+          : !list.ok
+            ? list.error
+            : codex
+              ? "Signed in"
+              : provider.hasKey
+                ? KEY_SAVED
+                : "No key"}
       </span>
     </span>
   );
@@ -388,7 +398,7 @@ function ProvidersList({
               <div className="min-w-0">
                 <div className="text-[13.5px] font-semibold">{provider.name}</div>
                 <div className="mt-px truncate text-[12px] text-muted-foreground">
-                  {provider.address.replace(/^https?:\/\//, "")}
+                  {provider.account || provider.address.replace(/^https?:\/\//, "")}
                 </div>
               </div>
               <span

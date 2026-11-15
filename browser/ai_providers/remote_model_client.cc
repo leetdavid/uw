@@ -3,6 +3,7 @@
 #include "uw/browser/ai_providers/remote_model_client.h"
 
 #include "base/functional/bind.h"
+#include "base/json/json_writer.h"
 #include "base/location.h"
 #include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
@@ -16,8 +17,10 @@
 #include "services/network/public/mojom/url_response_head.mojom.h"
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/models.h"
+#include "uw/browser/ai_providers/plan_sign_in.h"
 #include "uw/browser/ai_providers/rejected_keys.h"
 #include "uw/browser/branding/release_version.h"
+#include "uw/components/ai_providers/chatgpt_plan.h"
 #include "uw/components/ai_providers/formats.h"
 
 namespace uw {
@@ -56,6 +59,14 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         setting: "Automatic organization is off unless the user enables it."
         policy_exception_justification: "Not implemented."
       })");
+
+// An error answer in the shape ProviderMessage and the chat read.
+std::string ErrorBody(const std::string& message) {
+  return base::WriteJson(
+             base::DictValue().Set("error",
+                                   base::DictValue().Set("message", message)))
+      .value_or("");
+}
 
 // What uw calls itself to providers, in place of the browser's own agent,
 // as OpenCode Go asks of the clients it serves.
@@ -120,6 +131,10 @@ std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
                            ? base::Uuid::GenerateRandomV4().AsLowercaseString()
                            : model.session;
   }
+  if (model.preset == ProviderPreset::kCodex) {
+    client->request_body_ = chatgpt::ForPlan(client->request_body_);
+    client->plan_account_ = model.key_account;
+  }
   return client;
 }
 
@@ -131,8 +146,36 @@ void RemoteModelClient::SendGet(ResultCallback callback) {
   StartRequest(/*post=*/false, std::move(callback));
 }
 
+void RemoteModelClient::UsePlan(std::string account) {
+  plan_account_ = std::move(account);
+}
+
 void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   callback_ = std::move(callback);
+  if (!plan_account_.empty()) {
+    PlanTokens::Get().Access(plan_account_, loader_factory_,
+                             base::BindOnce(&RemoteModelClient::OnPlanToken,
+                                            weak_factory_.GetWeakPtr(), post));
+    return;
+  }
+  Begin(post);
+}
+
+void RemoteModelClient::OnPlanToken(
+    bool post,
+    base::expected<std::string, std::string> token) {
+  if (!token.has_value()) {
+    Outcome outcome;
+    outcome.http_status = 401;
+    outcome.body = ErrorBody(token.error());
+    Finish(std::move(outcome));
+    return;
+  }
+  api_key_ = std::move(token).value();
+  Begin(post);
+}
+
+void RemoteModelClient::Begin(bool post) {
   auto resource = std::make_unique<network::ResourceRequest>();
   resource->url = endpoint_;
   resource->method = post ? "POST" : "GET";
@@ -180,10 +223,11 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   if (post) {
     loader_->AttachStringForUpload(request_body_, "application/json");
   }
-  loader_->DownloadToString(loader_factory_.get(),
-                            base::BindOnce(&RemoteModelClient::OnComplete,
-                                           weak_factory_.GetWeakPtr()),
-                            post ? kMaxResponseBytes : kMaxListBytes);
+  loader_->DownloadToString(
+      loader_factory_.get(),
+      base::BindOnce(&RemoteModelClient::OnComplete,
+                     weak_factory_.GetWeakPtr()),
+      post && plan_account_.empty() ? kMaxResponseBytes : kMaxListBytes);
 }
 
 // Runs inside the loader, so the answer goes out from a fresh task.
@@ -206,6 +250,19 @@ void RemoteModelClient::OnComplete(std::optional<std::string> body) {
   outcome.body = std::move(body).value_or(std::string());
   outcome.ok = outcome.net_error == net::OK && outcome.http_status >= 200 &&
                outcome.http_status < 300;
+  // A plan request's answer is a stream of events, the last of which holds
+  // the whole response.
+  if (outcome.ok && !plan_account_.empty() && answer_format_) {
+    chatgpt::StreamEnd end = chatgpt::ReadStream(outcome.body);
+    if (end.response) {
+      outcome.body = std::move(*end.response);
+    } else {
+      outcome.ok = false;
+      outcome.http_status = chatgpt::ErrorStatus(end.error_code);
+      outcome.body =
+          ErrorBody(chatgpt::ErrorSentence(end.error_code, end.error_message));
+    }
+  }
   if (outcome.ok && answer_format_) {
     if (std::optional<std::string> chat =
             AnswerFrom(*answer_format_, outcome.body, address_, model_)) {

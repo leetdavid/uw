@@ -22,6 +22,8 @@ namespace uw {
 
 struct ListedModel {
   std::string name;
+  // The name its provider shows people, when that is not `name`.
+  std::string label;
   ModelAbilities abilities;
   // The format requests to the model go over.
   ProviderFormat format = ProviderFormat::kChatCompletions;

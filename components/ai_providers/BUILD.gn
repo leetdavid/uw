@@ -4,6 +4,8 @@ source_set("ai_providers") {
   sources = [
     "catalog.cc",
     "catalog.h",
+    "chatgpt_plan.cc",
+    "chatgpt_plan.h",
     "formats.cc",
     "formats.h",
     "providers.cc",
@@ -23,6 +25,7 @@ source_set("unit_tests") {
   testonly = true
   sources = [
     "catalog_unittest.cc",
+    "chatgpt_plan_unittest.cc",
     "formats_unittest.cc",
     "providers_unittest.cc",
     "usage_unittest.cc",
@@ -32,7 +35,9 @@ source_set("unit_tests") {
     "//base",
     "//base/test:test_support",
     "//components/prefs:test_support",
+    "//net",
     "//testing/gmock",
     "//testing/gtest",
+    "//url",
   ]
 }

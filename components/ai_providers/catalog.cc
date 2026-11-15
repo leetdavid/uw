@@ -18,15 +18,20 @@ constexpr int kSavedVersion = 5;
 // gives no input limit of its own.
 constexpr int64_t kAnswerRoom = 16000;
 
+// The models.dev provider of a preset in the catalog.
+std::string_view KeyOfFacts(const PresetFacts& facts) {
+  return facts.catalog.empty() ? facts.slug : facts.catalog;
+}
+
 // The models.dev provider behind each preset that has one.
 std::optional<std::string_view> CatalogKey(ProviderPreset preset) {
   const PresetFacts& facts = FactsOf(preset);
-  return facts.in_catalog ? std::optional(facts.slug) : std::nullopt;
+  return facts.in_catalog ? std::optional(KeyOfFacts(facts)) : std::nullopt;
 }
 
 bool IsPresetKey(std::string_view key) {
   return std::ranges::any_of(kPresetFacts, [&](const PresetFacts& facts) {
-    return facts.in_catalog && facts.slug == key;
+    return facts.in_catalog && KeyOfFacts(facts) == key;
   });
 }
 

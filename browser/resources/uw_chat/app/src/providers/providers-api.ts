@@ -5,6 +5,7 @@ import {
   ConnectorState,
   Decides,
   ModelSlot,
+  PlanSignInOutcome,
   ProviderFormat,
   ProviderPreset,
   ProvidersHandler,
@@ -28,7 +29,7 @@ import type {
   MemoryInfo,
 } from "uw-providers-mojom";
 
-export { CatalogSource, ConnectorState, Decides, ModelSlot, ProviderFormat, ProviderPreset, SkillSource, TestOutcome, UpgradeNotice };
+export { CatalogSource, ConnectorState, Decides, ModelSlot, PlanSignInOutcome, ProviderFormat, ProviderPreset, SkillSource, TestOutcome, UpgradeNotice };
 export type { Model, ModelChoice, ModelList, NewProvider, Provider, ProvidersState, ModelTestResult, SkillInfo, ConnectorInfo, NewConnector, CatalogAnswer, CatalogEntry, MemoryInfo };
 
 export const providersHandler = ProvidersHandler.getRemote();

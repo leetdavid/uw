@@ -234,6 +234,7 @@ std::optional<Callback> ParseCallback(const GURL& url) {
   net::GetValueForKeyInQuery(url, "state", &callback.state);
   net::GetValueForKeyInQuery(url, "iss", &callback.issuer);
   net::GetValueForKeyInQuery(url, "error", &callback.error);
+  net::GetValueForKeyInQuery(url, "client_id", &callback.client_id);
   if (callback.code.empty() && callback.error.empty()) {
     callback.error = "no code";
   }

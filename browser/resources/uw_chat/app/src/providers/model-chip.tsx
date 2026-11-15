@@ -115,7 +115,9 @@ export function ModelChip({
       const key = `${language ? "language" : "decision"}-${provider.id}`;
       const list = lists[provider.id];
       const models = (list?.models ?? []).filter(
-        (model) => fits(model) && model.name.toLowerCase().includes(needle),
+        (model) =>
+          fits(model) &&
+          `${model.name} ${model.label}`.toLowerCase().includes(needle),
       );
       // How many models uw is still asking whether they make decisions.
       const checking =
@@ -164,7 +166,7 @@ export function ModelChip({
               <MenuItem
                 key={model.name}
                 index={index++}
-                label={model.name}
+                label={model.label || model.name}
                 checked={checked}
                 disabled={unusable}
                 data-note={unusable ? "No tool calls" : undefined}
@@ -295,7 +297,11 @@ export function ModelChip({
                   "line-through decoration-muted-foreground",
               )}
             >
-              {choice?.model ?? unset ?? "Pick a model"}
+              {choice
+                ? lists[choice.providerId]?.models.find(
+                    (model) => model.name === choice.model,
+                  )?.label || choice.model
+                : (unset ?? "Pick a model")}
             </span>
             <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
           </button>

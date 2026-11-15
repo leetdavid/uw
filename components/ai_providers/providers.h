@@ -48,6 +48,7 @@ enum class ProviderPreset {
   kOllama = 5,
   kJev = 6,
   kOpenCodeGo = 7,
+  kCodex = 8,
 };
 
 // What uw knows of a preset.
@@ -62,6 +63,8 @@ struct PresetFacts {
   // The format of its decision models, when the preset alone decides it.
   std::optional<ProviderFormat> decision_format;
   bool in_catalog = false;
+  // Its models.dev provider, when that is not its slug.
+  std::string_view catalog;
 };
 
 // One row for each ProviderPreset, in its order.
@@ -79,9 +82,11 @@ inline constexpr auto kPresetFacts = std::to_array<PresetFacts>({
     {"jev", "Jev", "https://api.typesafe.ai/v1", ProviderFormat::kSystemOne},
     {"opencode-go", "OpenCode Go", "https://opencode.ai/inference/go/v1",
      ProviderFormat::kEachModel, std::nullopt, true},
+    {"codex", "Codex", "https://api.openai.com/v1",
+     ProviderFormat::kOpenAiResponses, std::nullopt, true, "openai"},
 });
 static_assert(kPresetFacts.size() ==
-              static_cast<size_t>(ProviderPreset::kOpenCodeGo) + 1);
+              static_cast<size_t>(ProviderPreset::kCodex) + 1);
 
 constexpr const PresetFacts& FactsOf(ProviderPreset preset) {
   return kPresetFacts[static_cast<size_t>(preset)];

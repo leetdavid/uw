@@ -12,6 +12,8 @@ source_set("ai_providers") {
     "model_lister.h",
     "models.cc",
     "models.h",
+    "plan_sign_in.cc",
+    "plan_sign_in.h",
     "provider_sync.cc",
     "provider_sync.h",
     "rejected_keys.cc",
@@ -50,6 +52,7 @@ source_set("ai_providers") {
     "//services/network/public/mojom",
     "//uw/browser/branding:release_version",
     "//uw/components/agent",
+    "//uw/components/connectors",
   ]
   if (is_win) {
     deps += [ "//chrome/common:constants" ]

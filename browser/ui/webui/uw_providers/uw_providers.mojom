@@ -22,6 +22,7 @@ enum ProviderPreset {
   kOllama,
   kJev,
   kOpenCodeGo,
+  kCodex,
 };
 
 // Matches uw::ModelSlot.
@@ -47,6 +48,9 @@ struct Provider {
   string address;
   ProviderFormat format;
   bool has_key;
+  // The ChatGPT account a Codex provider signed in with, kept after sign-out.
+  // Empty for other providers.
+  string account;
   // Whether it can serve the language and agent models.
   bool serves_language;
   // Whether it can serve the decision model.
@@ -81,6 +85,20 @@ struct Model {
   bool writes_text;
   // As its provider's list says, or as uw found by asking it.
   Decides decides;
+  // The name its provider shows people, when that is not `name`, as the
+  // ChatGPT names of Codex's models.
+  string label;
+};
+
+// How a Codex sign-in ended.
+enum PlanSignInOutcome {
+  kSignedIn,
+  // The user said no on OpenAI's page.
+  kDeclined,
+  // The account has no plan uw can use.
+  kNoPlan,
+  kFailed,
+  kCancelled,
 };
 
 // Matches uw::UpgradeNotice.
@@ -298,6 +316,16 @@ interface ProvidersHandler {
   // Moves the provider to `address` once its models list there. Returns the
   // list, which says why when the move did not happen.
   ChangeAddress(string provider_id, string address) => (ModelList list);
+  // Signs a ChatGPT account in with OpenAI's page in a new tab: for the
+  // Codex provider `provider_id`, or a new one when it is empty. Answers
+  // with its id once signed in, or a sentence that says why not.
+  SignInWithChatGpt(string provider_id)
+      => (PlanSignInOutcome outcome, string provider_id, string message);
+  // Closes the sign-in tab and ends the sign-in.
+  CancelPlanSignIn();
+  // Drops a Codex provider's tokens and asks OpenAI to revoke them. It keeps
+  // its account, for the next sign-in.
+  SignOutProvider(string provider_id) => ();
   // Removes its key from the Keychain. Model choices that used it stay, and
   // wait for the user to pick another model.
   RemoveProvider(string provider_id) => ();

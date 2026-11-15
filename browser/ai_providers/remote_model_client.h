@@ -10,6 +10,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
+#include "base/types/expected.h"
 #include "url/gurl.h"
 #include "uw/components/ai_providers/providers.h"
 
@@ -74,8 +75,14 @@ class RemoteModelClient {
   void Send(ResultCallback callback);
   void SendGet(ResultCallback callback);
 
+  // Sends with the Codex sign-in under `account` in place of a key: a fresh
+  // access token, fetched just before the request goes.
+  void UsePlan(std::string account);
+
  private:
   void StartRequest(bool post, ResultCallback callback);
+  void OnPlanToken(bool post, base::expected<std::string, std::string> token);
+  void Begin(bool post);
   void OnRedirect();
   void OnComplete(std::optional<std::string> body);
   void Finish(Outcome outcome);
@@ -92,6 +99,8 @@ class RemoteModelClient {
   // Sent as x-opencode-session to OpenCode Go, which refuses a request
   // without one.
   std::string session_;
+  // The Keychain account of a Codex sign-in. Its answers come as a stream.
+  std::string plan_account_;
   // Set for a language model that does not speak chat completions: its
   // answers are read back into that shape.
   std::optional<ProviderFormat> answer_format_;

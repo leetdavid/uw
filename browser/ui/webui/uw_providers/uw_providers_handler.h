@@ -19,6 +19,7 @@
 #include "mojo/public/cpp/bindings/receiver.h"
 #include "uw/browser/agent/memory_store.h"
 #include "uw/browser/ai_providers/model_lister.h"
+#include "uw/browser/ai_providers/plan_sign_in.h"
 #include "uw/browser/ai_providers/remote_model_client.h"
 #include "uw/browser/connectors/connector_catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
@@ -121,6 +122,11 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   void SignInConnector(const std::string& name) override;
   void CancelSignIn(const std::string& name) override;
   void SignOutConnector(const std::string& name) override;
+  void SignInWithChatGpt(const std::string& provider_id,
+                         SignInWithChatGptCallback callback) override;
+  void CancelPlanSignIn() override;
+  void SignOutProvider(const std::string& provider_id,
+                       SignOutProviderCallback callback) override;
   void OpenConnectorInTerminal(const std::string& name) override;
   void ShowConnectorLog(const std::string& name) override;
   void SearchCatalog(const std::string& query,
@@ -161,6 +167,8 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
                     const std::string& model,
                     bool language,
                     std::optional<ProviderFormat> format);
+  void OnPlanSignedIn(std::string provider_id,
+                      base::expected<chatgpt::Session, PlanSignInError> result);
   void OnAddressListed(Provider moved,
                        ChangeAddressCallback callback,
                        ModelListing listing);
@@ -187,6 +195,9 @@ class UwProvidersHandler : public mojom::ProvidersHandler,
   std::set<std::string> sign_in_when_asked_;
   mojo::Receiver<mojom::ProvidersHandler> receiver_;
   ModelLister lister_;
+  // The Codex sign-in under way, and who waits for it.
+  std::unique_ptr<PlanSignIn> plan_sign_in_;
+  SignInWithChatGptCallback plan_done_;
   std::map<int, std::unique_ptr<RemoteModelClient>> requests_;
   int next_request_ = 0;
   base::WeakPtrFactory<UwProvidersHandler> weak_factory_{this};

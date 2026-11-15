@@ -88,6 +88,9 @@ struct Callback {
   std::string issuer;
   // The server's error, such as "access_denied".
   std::string error;
+  // The client ID a server issued with this answer, as OpenAI does on a
+  // first sign-in.
+  std::string client_id;
 };
 std::optional<Callback> ParseCallback(const GURL& url);
 

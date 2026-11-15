@@ -5,15 +5,18 @@
 #include <string>
 #include <vector>
 
+#include "base/base64url.h"
 #include "base/base_paths.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
 #include "base/path_service.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/synchronization/lock.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
@@ -33,6 +36,7 @@
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
+#include "net/base/url_util.h"
 #include "net/http/http_status_code.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
@@ -48,6 +52,7 @@
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/model_test_server.h"
+#include "uw/browser/ai_providers/plan_sign_in.h"
 #include "uw/browser/ai_providers/scoped_memory_keychain.h"
 #include "uw/browser/connectors/connector_catalog_store.h"
 #include "uw/browser/connectors/connectors.h"
@@ -59,6 +64,7 @@
 namespace uw {
 namespace {
 
+using ::testing::AllOf;
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::IsEmpty;
@@ -157,6 +163,137 @@ constexpr char kCatalog[] = R"({"openrouter": {"models": {
 constexpr char kCatalogModels[] =
     R"({"data":[{"id":"maker/thinker"},{"id":"maker/talker"}]})";
 
+// A ChatGPT plan's model list and a streamed answer, as Codex gets them.
+constexpr char kPlanModels[] =
+    R"({"models":[{"slug":"gpt-6.1-sol","display_name":"GPT-6.1 Sol",)"
+    R"("visibility":"list"},{"slug":"codex-auto-review",)"
+    R"("display_name":"Auto review","visibility":"hide"}]})";
+constexpr char kPlanAnswer[] =
+    "event: response.created\n"
+    "data: {\"type\":\"response.created\",\"response\":{\"status\":"
+    "\"in_progress\"}}\n\n"
+    "event: response.completed\n"
+    "data: {\"type\":\"response.completed\",\"response\":{\"status\":"
+    "\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\","
+    "\"content\":[{\"type\":\"output_text\",\"text\":\"Hello\"}]}]}}\n\n";
+
+// Plays OpenAI's sign-in for apps under /auth of the test server: the
+// authorize page, the token endpoint, and revocation.
+class FakeOpenAiSignIn {
+ public:
+  // What the user does on OpenAI's page.
+  enum class Answer { kAllow, kDeny, kNoPlan };
+
+  explicit FakeOpenAiSignIn(net::test_server::EmbeddedTestServer* server) {
+    server->RegisterRequestHandler(
+        base::BindRepeating(&FakeOpenAiSignIn::Serve, base::Unretained(this)));
+  }
+
+  void SetAnswer(Answer answer) {
+    base::AutoLock hold(lock_);
+    answer_ = answer;
+  }
+  // The query of every authorize page that opened.
+  std::vector<std::string> Authorizations() {
+    base::AutoLock hold(lock_);
+    return authorizations_;
+  }
+  // The form of every token request.
+  std::vector<std::string> TokenForms() {
+    base::AutoLock hold(lock_);
+    return token_forms_;
+  }
+  std::vector<std::string> Revocations() {
+    base::AutoLock hold(lock_);
+    return revocations_;
+  }
+
+ private:
+  static std::string Query(const GURL& url, const std::string& key) {
+    std::string value;
+    net::GetValueForKeyInQuery(url, key, &value);
+    return value;
+  }
+
+  std::unique_ptr<net::test_server::HttpResponse> Serve(
+      const net::test_server::HttpRequest& request) {
+    const GURL url = request.GetURL();
+    const std::string issuer = url.Resolve("/auth").spec();
+    auto response = std::make_unique<net::test_server::BasicHttpResponse>();
+    base::AutoLock hold(lock_);
+    if (url.path() == "/auth/api/accounts/authorize") {
+      authorizations_.emplace_back(url.query());
+      nonce_ = Query(url, "nonce");
+      GURL back(Query(url, "redirect_uri"));
+      const std::string state = Query(url, "state");
+      back =
+          answer_ == Answer::kDeny
+              ? net::AppendQueryParameter(
+                    net::AppendQueryParameter(back, "error", "access_denied"),
+                    "state", state)
+              : net::AppendQueryParameter(
+                    net::AppendQueryParameter(
+                        net::AppendQueryParameter(back, "code", "c1"), "state",
+                        state),
+                    "client_id", "oaiapp_test");
+      response->set_code(net::HTTP_FOUND);
+      response->AddCustomHeader("Location", back.spec());
+      return response;
+    }
+    if (url.path() == "/auth/api/accounts/oauth/token") {
+      token_forms_.push_back(request.content);
+      const int n = static_cast<int>(token_forms_.size());
+      std::string payload =
+          base::WriteJson(base::DictValue()
+                              .Set("iss", issuer)
+                              .Set("aud", "oaiapp_test")
+                              .Set("sub", "user-1")
+                              .Set("email", "ada@example.com")
+                              .Set("nonce", nonce_)
+                              .Set("exp", (base::Time::Now() + base::Hours(1))
+                                              .InSecondsFSinceUnixEpoch()))
+              .value_or("");
+      std::string encoded;
+      base::Base64UrlEncode(payload, base::Base64UrlEncodePolicy::OMIT_PADDING,
+                            &encoded);
+      response->set_content_type("application/json");
+      response->set_content(
+          base::WriteJson(
+              base::DictValue()
+                  .Set("access_token", "at-" + base::NumberToString(n))
+                  .Set("refresh_token", "rt-" + base::NumberToString(n))
+                  .Set("id_token", "e30." + encoded + ".sig")
+                  .Set("expires_in", 3600)
+                  .Set("token_type", "Bearer")
+                  .Set("scope", answer_ == Answer::kNoPlan
+                                    ? "openid email offline_access"
+                                    : "openid email offline_access "
+                                      "resource.invoke "
+                                      "chatgpt.tokens.use.direct"))
+              .value_or(""));
+      return response;
+    }
+    if (url.path() == "/auth/.well-known/openid-configuration") {
+      response->set_content_type("application/json");
+      response->set_content(base::StrCat(
+          {R"({"revocation_endpoint":")", issuer, R"(/oauth/revoke"})"}));
+      return response;
+    }
+    if (url.path() == "/auth/oauth/revoke") {
+      revocations_.push_back(request.content);
+      return response;
+    }
+    return nullptr;
+  }
+
+  base::Lock lock_;
+  Answer answer_ GUARDED_BY(lock_) = Answer::kAllow;
+  std::string nonce_ GUARDED_BY(lock_);
+  std::vector<std::string> authorizations_ GUARDED_BY(lock_);
+  std::vector<std::string> token_forms_ GUARDED_BY(lock_);
+  std::vector<std::string> revocations_ GUARDED_BY(lock_);
+};
+
 // Drives the real uw://ai page against a local server that plays the
 // providers.
 class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
@@ -166,6 +303,8 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
     ASSERT_TRUE(embedded_test_server()->Start());
     CatalogStore::SetSourceForTesting(
         embedded_test_server()->GetURL("/v1/catalog.json"));
+    PlanAddresses::SetForTesting(
+        {embedded_test_server()->GetURL("/auth"), Address()});
     // The test's own folder stands in for ~/.agents/skills.
     base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(home_.CreateUniqueTempDir());
@@ -175,6 +314,7 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   void TearDownOnMainThread() override {
+    PlanAddresses::SetForTesting({GURL(chatgpt::kIssuer), chatgpt::kApi});
     SetAgentsSkillsFolderForTesting(base::FilePath());
     Connectors::SetUpForTesting(base::FilePath(), base::FilePath());
     HeadlessModeBrowserTest::TearDownOnMainThread();
@@ -286,8 +426,28 @@ class UwProvidersBrowserTest : public headless::HeadlessModeBrowserTest {
     return found;
   }
 
+  // A Codex provider at the test server, signed in with `session`.
+  std::string AddCodex(const chatgpt::Session& session) {
+    const std::string id = AddPreset(ProviderPreset::kCodex, Address());
+    EXPECT_TRUE(SavePlanSession(KeyAccountFor(id), session));
+    return id;
+  }
+
+  // A session for ada@example.com whose access token has `left` to run.
+  static chatgpt::Session Signed(base::TimeDelta left) {
+    chatgpt::Session session;
+    session.client_id = "oaiapp_test";
+    session.email = "ada@example.com";
+    session.subject = "user-1";
+    session.access = "at-old";
+    session.refresh = "rt-old";
+    session.expires = base::Time::Now() + left;
+    return session;
+  }
+
   ScopedMemoryKeychain keychain_;
   ModelTestServer models_{embedded_test_server()};
+  FakeOpenAiSignIn openai_{embedded_test_server()};
 };
 
 IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
@@ -1466,6 +1626,175 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, TheMemoryPagePausesAndListens) {
                                 "    document.querySelector('.memory-text')"
                                 "        ?.textContent);"));
   SaveWindowScreenshot(browser(), "memory-paused");
+}
+
+// Continue with ChatGPT signs in on OpenAI's page in a tab, registers uw
+// for the account, and adds Codex with the plan's models under their
+// ChatGPT names. Its requests are streamed, with the plan's rules.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, ContinueWithChatGptAddsCodex) {
+  models_.Answer("/v1/models", kPlanModels);
+  models_.Answer("/v1/responses", kPlanAnswer);
+  Open();
+  const int tabs = browser()->tab_strip_model()->count();
+  ASSERT_EQ(true, Run("withText('button', 'Add provider').click();"
+                      "await until(dialog);"
+                      "withText('button', 'Codex', dialog()).click();"
+                      "await until(() => dialog().textContent.includes("
+                      "    'Your ChatGPT Plus or Pro plan'));"
+                      "return true;"));
+  SaveWindowScreenshot(browser(), "add-codex");
+  ASSERT_EQ(true,
+            Run("withText('button', 'Continue with ChatGPT', dialog()).click();"
+                "await until(() => !dialog());"
+                "return true;"));
+  // The sign-in tab closed itself.
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return browser()->tab_strip_model()->count() == tabs; }));
+  EXPECT_THAT(openai_.Authorizations(),
+              ElementsAre(AllOf(HasSubstr("client_id=dynamic_agent_client"),
+                                HasSubstr("agent_name_hint=uw"),
+                                HasSubstr("chatgpt.tokens.use.direct"))));
+  const std::optional<Provider> codex = FindProvider(prefs(), "codex");
+  ASSERT_TRUE(codex);
+  EXPECT_EQ(codex->preset, ProviderPreset::kCodex);
+  const std::optional<chatgpt::Session> session =
+      ReadPlanSession(codex->key_account);
+  ASSERT_TRUE(session);
+  EXPECT_EQ(session->client_id, "oaiapp_test");
+  EXPECT_EQ(session->email, "ada@example.com");
+  EXPECT_EQ(session->access, "at-1");
+  EXPECT_THAT(Run("return await until(() => all('a').find((row) =>"
+                  "    row.textContent.includes('ada@example.com'))"
+                  "    ?.textContent);")
+                  .ExtractString(),
+              HasSubstr("Signed in"));
+
+  Open(codex->id);
+  EXPECT_THAT(
+      Run("return await until(() => modelRow('gpt-6.1-sol'));").ExtractString(),
+      HasSubstr("GPT-6.1 Sol"));
+  EXPECT_EQ(false, Run("return !!modelRow('codex-auto-review');"));
+  SaveWindowScreenshot(browser(), "codex");
+
+  Open();
+  ASSERT_EQ(true, Run("const menu = await openMenu('Names tasks');"
+                      "(await until(() => item('GPT-6.1 Sol', menu))).click();"
+                      "await until(() =>"
+                      "    chip('Names tasks').textContent.includes("
+                      "        'GPT-6.1 Sol'));"
+                      "return true;"));
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("answered in"));
+  std::vector<std::string> sent;
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.path != "/v1/responses") {
+      continue;
+    }
+    EXPECT_EQ(request.authorization, "Bearer at-1");
+    const std::optional<base::DictValue> body =
+        base::JSONReader::ReadDict(request.body, base::JSON_PARSE_RFC);
+    ASSERT_TRUE(body);
+    EXPECT_EQ(body->FindBool("stream"), true);
+    EXPECT_EQ(body->FindBool("store"), false);
+    EXPECT_FALSE(body->Find("max_output_tokens"));
+    sent.push_back(*body->FindString("model"));
+  }
+  EXPECT_THAT(sent, ElementsAre("gpt-6.1-sol"));
+}
+
+// A token about to run out is refreshed before the request goes, and the
+// new refresh token replaces the old.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, CodexRefreshesItsTokenFirst) {
+  models_.Answer("/v1/models", kPlanModels);
+  models_.Answer("/v1/responses", kPlanAnswer);
+  const std::string id = AddCodex(Signed(base::Seconds(20)));
+  SetChoice(prefs(), ModelSlot::kLanguage, id, "gpt-6.1-sol");
+  Open();
+  EXPECT_THAT(Test("Names tasks"), HasSubstr("answered in"));
+  EXPECT_THAT(openai_.TokenForms(),
+              ElementsAre(AllOf(HasSubstr("grant_type=refresh_token"),
+                                HasSubstr("refresh_token=rt-old"),
+                                HasSubstr("client_id=oaiapp_test"))));
+  EXPECT_EQ(ReadPlanSession(KeyAccountFor(id))->refresh, "rt-1");
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.path == "/v1/responses") {
+      EXPECT_EQ(request.authorization, "Bearer at-1");
+    }
+  }
+}
+
+// Sign out drops the tokens at once, keeps the account for the next
+// sign-in, and asks OpenAI to revoke the refresh token.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, SigningOutOfCodexRevokesIt) {
+  models_.Answer("/v1/models", kPlanModels);
+  const std::string id = AddCodex(Signed(base::Hours(1)));
+  Open(id);
+  ASSERT_EQ(true, Run("(await until(() => withText('button', 'Sign out')))"
+                      "    .click();"
+                      "await until(() =>"
+                      "    withText('button', 'Continue with ChatGPT'));"
+                      "return true;"));
+  const std::optional<chatgpt::Session> session =
+      ReadPlanSession(KeyAccountFor(id));
+  ASSERT_TRUE(session);
+  EXPECT_FALSE(session->HasTokens());
+  EXPECT_EQ(session->email, "ada@example.com");
+  EXPECT_EQ(session->client_id, "oaiapp_test");
+  EXPECT_TRUE(
+      base::test::RunUntil([&] { return !openai_.Revocations().empty(); }));
+  EXPECT_THAT(openai_.Revocations(),
+              ElementsAre(AllOf(HasSubstr("token=rt-old"),
+                                HasSubstr("token_type_hint=refresh_token"))));
+  SaveWindowScreenshot(browser(), "codex-signed-out");
+}
+
+// Saying no on OpenAI's page, or an account without a plan, adds nothing
+// and says why.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, ASignInCanEndWithoutCodex) {
+  // Returns the dialog's error once it holds `expected`.
+  const auto sign_in = [&](const std::string& expected) {
+    return Run(content::JsReplace(
+                   "if (!dialog()) {"
+                   "  withText('button', 'Add provider').click();"
+                   "  await until(dialog);"
+                   "  withText('button', 'Codex', dialog()).click();"
+                   "}"
+                   "(await until(() =>"
+                   "    withText('button', 'Continue with ChatGPT', dialog())))"
+                   "    .click();"
+                   "return await until(() => {"
+                   "  const text = dialog().querySelector('[role=\"alert\"]')"
+                   "      ?.textContent ?? '';"
+                   "  return text.includes($1) && text;"
+                   "});",
+                   expected))
+        .ExtractString();
+  };
+  Open();
+  openai_.SetAnswer(FakeOpenAiSignIn::Answer::kDeny);
+  EXPECT_EQ(sign_in("didn't let uw"),
+            "You didn't let uw use your ChatGPT plan, so Codex wasn't added.");
+  openai_.SetAnswer(FakeOpenAiSignIn::Answer::kNoPlan);
+  EXPECT_EQ(sign_in("no plan"),
+            "This ChatGPT account has no plan uw can use. Codex needs ChatGPT "
+            "Plus or Pro.");
+  EXPECT_FALSE(FindProvider(prefs(), "codex"));
+}
+
+// A usage limit ends the stream with OpenAI's words, which the test line
+// shows with where to see the plan's usage.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest, CodexShowsAUsageLimit) {
+  models_.Answer("/v1/models", kPlanModels);
+  models_.Answer(
+      "/v1/responses",
+      "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":"
+      "\"subscription_sharing_usage_limit_exceeded\",\"message\":\"You've "
+      "reached this week's limit for apps.\"}}}\n\n");
+  const std::string id = AddCodex(Signed(base::Hours(1)));
+  SetChoice(prefs(), ModelSlot::kLanguage, id, "gpt-6.1-sol");
+  Open();
+  EXPECT_THAT(Test("Names tasks"),
+              AllOf(HasSubstr("You've reached this week's limit for apps."),
+                    HasSubstr("chatgpt.com/settings/usage")));
 }
 
 }  // namespace

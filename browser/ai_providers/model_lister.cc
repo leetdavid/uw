@@ -24,6 +24,7 @@
 #include "uw/browser/ai_providers/catalog_store.h"
 #include "uw/browser/ai_providers/decision_probes.h"
 #include "uw/browser/ai_providers/models.h"
+#include "uw/components/ai_providers/chatgpt_plan.h"
 #include "uw/components/tab_organization/ai_protocol.h"
 
 namespace uw {
@@ -86,11 +87,15 @@ void ModelLister::List(const Provider& provider,
   listing->provider = provider;
   listing->key = key;
   listing->done = std::move(done);
-  Send(std::make_unique<RemoteModelClient>(
-           profile_->GetDefaultStoragePartition()
-               ->GetURLLoaderFactoryForBrowserProcess(),
-           ModelsUrl(provider.address), std::move(key), std::string(),
-           kProviderTimeout, KeyHeaderFor(provider)),
+  auto client = std::make_unique<RemoteModelClient>(
+      profile_->GetDefaultStoragePartition()
+          ->GetURLLoaderFactoryForBrowserProcess(),
+      ModelsUrl(provider.address), std::move(key), std::string(),
+      kProviderTimeout, KeyHeaderFor(provider));
+  if (provider.preset == ProviderPreset::kCodex) {
+    client->UsePlan(provider.key_account);
+  }
+  Send(std::move(client),
        /*post=*/false,
        base::BindOnce(&ModelLister::OnList, weak_factory_.GetWeakPtr(),
                       std::move(listing)));
@@ -122,8 +127,18 @@ void ModelLister::OnAnswered(int request,
 
 void ModelLister::OnList(std::unique_ptr<Listing> listing,
                          RemoteModelClient::Outcome outcome) {
-  const std::optional<std::vector<std::u16string>> names =
-      outcome.ok ? ParseModelList(outcome.body) : std::nullopt;
+  std::optional<std::vector<chatgpt::PlanModel>> names;
+  if (outcome.ok && listing->provider.preset == ProviderPreset::kCodex) {
+    names = chatgpt::ReadModels(outcome.body);
+  } else if (outcome.ok) {
+    if (std::optional<std::vector<std::u16string>> ids =
+            ParseModelList(outcome.body)) {
+      names.emplace();
+      for (const std::u16string& id : *ids) {
+        names->push_back({base::UTF16ToUTF8(id), std::string()});
+      }
+    }
+  }
   if (!names) {
     std::string error =
         outcome.net_error != net::OK
@@ -141,12 +156,12 @@ void ModelLister::OnList(std::unique_ptr<Listing> listing,
       provider.preset == ProviderPreset::kVercelAiGateway
           ? DecisionModelsIn(outcome.body)
           : std::set<std::string>();
-  for (const std::u16string& name : *names) {
-    std::string model = base::UTF16ToUTF8(name);
+  for (const chatgpt::PlanModel& name : *names) {
+    const std::string& model = name.slug;
     if (!ForChat(model)) {
       continue;
     }
-    ListedModel listed{model, UnknownModelAbilities(provider),
+    ListedModel listed{model, name.name, UnknownModelAbilities(provider),
                        FormatOfModel(provider, model, nullptr)};
     if (deciding.contains(model)) {
       listed.writes_text = false;
@@ -189,7 +204,8 @@ void ModelLister::OnDecisionList(Listing* listing,
     std::string model = base::UTF16ToUTF8(name);
     auto listed = std::ranges::find(models, model, &ListedModel::name);
     if (listed == models.end()) {
-      models.push_back({model, UnknownModelAbilities(listing->provider),
+      models.push_back({model, std::string(),
+                        UnknownModelAbilities(listing->provider),
                         FormatOfModel(listing->provider, model, nullptr),
                         /*writes_text=*/false});
       listed = std::prev(models.end());

@@ -21,6 +21,7 @@
 #include "base/task/thread_pool.h"
 #include "base/values.h"
 #include "build/build_config.h"
+#include "chrome/browser/browser_process.h"  // nogncheck
 #include "chrome/browser/platform_util.h"  // nogncheck
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -111,7 +112,14 @@ mojom::ProviderPtr PageProvider(const Provider& provider) {
   page->name = provider.name;
   page->address = provider.address;
   page->format = static_cast<mojom::ProviderFormat>(provider.format);
-  page->has_key = !StoredKey(provider).empty();
+  if (provider.preset == ProviderPreset::kCodex) {
+    const std::optional<chatgpt::Session> session =
+        ReadPlanSession(provider.key_account);
+    page->has_key = session && session->HasTokens();
+    page->account = session ? session->email : std::string();
+  } else {
+    page->has_key = !StoredKey(provider).empty();
+  }
   page->serves_language = LanguageFormatOf(provider).has_value();
   page->serves_decisions = DecisionFormatOf(provider).has_value();
   return page;
@@ -162,7 +170,7 @@ mojom::ModelListPtr PageList(ModelListing listing) {
         model.abilities.sees_images, model.abilities.reads_pdfs,
         std::move(model.abilities.efforts),
         static_cast<mojom::ProviderFormat>(model.format), model.writes_text,
-        static_cast<mojom::Decides>(model.decides)));
+        static_cast<mojom::Decides>(model.decides), std::move(model.label)));
   }
   list->checking = listing.checking;
   return list;
@@ -347,7 +355,8 @@ void UwProvidersHandler::ReplaceKey(const std::string& provider_id,
                                     ReplaceKeyCallback callback) {
   PrefService& prefs = *profile_->GetPrefs();
   std::optional<Provider> provider = FindProvider(prefs, provider_id);
-  if (provider && !api_key.empty() &&
+  if (provider && provider->preset != ProviderPreset::kCodex &&
+      !api_key.empty() &&
       ApiKeyStore().SetKey(KeyAccountFor(provider_id), api_key)) {
     provider->key_account = KeyAccountFor(provider_id);
     UpdateProvider(prefs, *provider);
@@ -364,6 +373,13 @@ void UwProvidersHandler::ChangeAddress(const std::string& provider_id,
   std::optional<Provider> provider =
       FindProvider(*profile_->GetPrefs(), provider_id);
   if (!provider || profile_->IsOffTheRecord()) {
+    return;
+  }
+  // OpenAI's sign-in serves one address only.
+  if (provider->preset == ProviderPreset::kCodex) {
+    auto refused = mojom::ModelList::New();
+    refused->error = "Codex's address is set by OpenAI.";
+    std::move(callback).Run(std::move(refused));
     return;
   }
   const std::string key = StoredKey(*provider);
@@ -385,6 +401,11 @@ void UwProvidersHandler::OnAddressListed(Provider moved,
 
 void UwProvidersHandler::RemoveProvider(const std::string& provider_id,
                                         RemoveProviderCallback callback) {
+  if (const std::optional<Provider> provider =
+          FindProvider(*profile_->GetPrefs(), provider_id);
+      provider && provider->preset == ProviderPreset::kCodex) {
+    PlanTokens::Get().SignOut(provider->key_account, LoaderFactory());
+  }
   ApiKeyStore().DeleteKey(KeyAccountFor(provider_id));
   uw::RemoveProvider(*profile_->GetPrefs(), provider_id);
   DecisionProbes::For(profile_)->Forget(provider_id);
@@ -1005,6 +1026,106 @@ void UwProvidersHandler::CancelSignIn(const std::string& name) {
 
 void UwProvidersHandler::SignOutConnector(const std::string& name) {
   Connectors::Get().SignOut(name);
+}
+
+void UwProvidersHandler::SignInWithChatGpt(const std::string& provider_id,
+                                           SignInWithChatGptCallback callback) {
+  CancelPlanSignIn();
+  std::optional<chatgpt::Session> previous;
+  if (!provider_id.empty()) {
+    const std::optional<Provider> provider =
+        FindProvider(*profile_->GetPrefs(), provider_id);
+    if (!provider || provider->preset != ProviderPreset::kCodex) {
+      std::move(callback).Run(mojom::PlanSignInOutcome::kFailed, provider_id,
+                              "That provider isn't Codex.");
+      return;
+    }
+    previous = ReadPlanSession(provider->key_account);
+  }
+  if (profile_->IsOffTheRecord()) {
+    std::move(callback).Run(mojom::PlanSignInOutcome::kFailed, provider_id,
+                            "Providers can't be added in a private window.");
+    return;
+  }
+  plan_done_ = std::move(callback);
+  plan_sign_in_ = std::make_unique<PlanSignIn>(
+      std::move(previous), g_browser_process->local_state(), LoaderFactory(),
+      base::BindOnce(
+          [](base::WeakPtr<UwProvidersHandler> self,
+             const GURL& url) -> content::WebContents* {
+            tabs::TabInterface* tab =
+                self && self->contents_
+                    ? tabs::TabInterface::MaybeGetFromContents(self->contents_)
+                    : nullptr;
+            if (!tab) {
+              return nullptr;
+            }
+            NavigateParams params(tab->GetBrowserWindowInterface(), url,
+                                  ui::PAGE_TRANSITION_LINK);
+            params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+            Navigate(&params);
+            return params.navigated_or_inserted_contents.get();
+          },
+          weak_factory_.GetWeakPtr()),
+      base::BindOnce(&UwProvidersHandler::OnPlanSignedIn,
+                     weak_factory_.GetWeakPtr(), provider_id));
+}
+
+void UwProvidersHandler::OnPlanSignedIn(
+    std::string provider_id,
+    base::expected<chatgpt::Session, PlanSignInError> result) {
+  // The sign-in is still on the stack.
+  base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+      FROM_HERE, std::move(plan_sign_in_));
+  SignInWithChatGptCallback done = std::move(plan_done_);
+  if (!done) {
+    return;
+  }
+  if (!result.has_value()) {
+    const PlanSignInError& error = result.error();
+    std::move(done).Run(error.kind == PlanSignInError::Kind::kDeclined
+                            ? mojom::PlanSignInOutcome::kDeclined
+                        : error.kind == PlanSignInError::Kind::kNoPlan
+                            ? mojom::PlanSignInOutcome::kNoPlan
+                            : mojom::PlanSignInOutcome::kFailed,
+                        provider_id, error.message);
+    return;
+  }
+  PrefService& prefs = *profile_->GetPrefs();
+  std::optional<Provider> provider =
+      provider_id.empty() ? std::nullopt : FindProvider(prefs, provider_id);
+  if (!provider) {
+    provider = PresetProvider(ProviderPreset::kCodex);
+    provider->address = PlanAddresses::Get().api;
+    provider->id = uw::AddProvider(prefs, *provider);
+  }
+  provider->key_account = KeyAccountFor(provider->id);
+  if (!SavePlanSession(provider->key_account, *result)) {
+    std::move(done).Run(mojom::PlanSignInOutcome::kFailed, provider->id,
+                        "uw couldn't save the sign-in in Keychain.");
+    return;
+  }
+  UpdateProvider(prefs, *provider);
+  std::move(done).Run(mojom::PlanSignInOutcome::kSignedIn, provider->id, "");
+}
+
+void UwProvidersHandler::CancelPlanSignIn() {
+  plan_sign_in_.reset();
+  if (plan_done_) {
+    std::move(plan_done_)
+        .Run(mojom::PlanSignInOutcome::kCancelled, std::string(),
+             std::string());
+  }
+}
+
+void UwProvidersHandler::SignOutProvider(const std::string& provider_id,
+                                         SignOutProviderCallback callback) {
+  if (const std::optional<Provider> provider =
+          FindProvider(*profile_->GetPrefs(), provider_id);
+      provider && provider->preset == ProviderPreset::kCodex) {
+    PlanTokens::Get().SignOut(provider->key_account, LoaderFactory());
+  }
+  std::move(callback).Run();
 }
 
 void UwProvidersHandler::OpenConnectorInTerminal(const std::string& name) {

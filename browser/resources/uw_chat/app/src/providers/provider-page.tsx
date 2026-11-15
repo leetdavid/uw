@@ -6,17 +6,20 @@ import { Check, ChevronLeft, Loader2, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InputField, InputGroup } from "@/components/ui/input-group";
 import { isMac } from "//resources/js/platform.js";
-import { ADDRESS_RULE } from "./add-provider";
+import { ADDRESS_RULE, NO_PLAN } from "./add-provider";
 import {
   Decides,
   ModelSlot,
+  PlanSignInOutcome,
   ProviderFormat,
   ProviderPreset,
   providersHandler,
   type Provider,
 } from "./providers-api";
 import {
+  CHATGPT_BUTTON,
   FORMAT_NAMES,
+  OpenAiMark,
   ProviderTile,
   SLOT_NAMES,
   type PageData,
@@ -43,6 +46,9 @@ function listed(parts: string[]) {
 function abilitiesSource(provider: Provider) {
   if (provider.preset === ProviderPreset.kOllama) {
     return "Tool calls and thinking come from Ollama's own model details.";
+  }
+  if (provider.preset === ProviderPreset.kCodex) {
+    return "The models your plan offers, under their names in ChatGPT. Tool calls and effort levels come from the models.dev catalog. Every request counts against your plan's limits.";
   }
   if (
     provider.format === ProviderFormat.kEachModel &&
@@ -102,8 +108,32 @@ export function ProviderPage({
     usedBy.filter((slot) => data.choices[slot]?.model === model);
   const needle = query.trim().toLowerCase();
   const models = (list?.models ?? []).filter((model) =>
-    model.name.toLowerCase().includes(needle),
+    `${model.name} ${model.label}`.toLowerCase().includes(needle),
   );
+  const codex = provider.preset === ProviderPreset.kCodex;
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState("");
+
+  const signIn = async () => {
+    setSigningIn(true);
+    setSignInError("");
+    const { outcome, message } = await providersHandler.signInWithChatGpt(
+      provider.id,
+    );
+    setSigningIn(false);
+    if (outcome === PlanSignInOutcome.kSignedIn) {
+      onChanged(provider.id);
+    } else if (outcome === PlanSignInOutcome.kNoPlan) {
+      setSignInError(NO_PLAN);
+    } else if (outcome !== PlanSignInOutcome.kCancelled) {
+      setSignInError(message);
+    }
+  };
+
+  const signOut = async () => {
+    await providersHandler.signOutProvider(provider.id);
+    onChanged(provider.id);
+  };
   const shown = all || needle ? models : models.slice(0, FIRST_MODELS);
 
   const saveKey = async () => {
@@ -171,6 +201,59 @@ export function ProviderPage({
         Connection
       </h2>
       <div className="overflow-hidden rounded-xl border border-border">
+        {codex && (
+          <>
+            <Row label="Account">
+              <span className="flex items-center gap-2">
+                <span
+                  className={`flex h-8 min-w-0 flex-1 items-center rounded-lg bg-muted px-2.5 ${provider.hasKey ? "" : "text-muted-foreground"}`}
+                >
+                  <span className="truncate">{provider.account}</span>
+                </span>
+                {provider.hasKey ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-success">
+                      <Check aria-hidden className="size-3.5" />
+                      Signed in
+                    </span>
+                    <Button size="sm" variant="secondary" onClick={signOut}>
+                      Sign out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12.5px] text-muted-foreground">
+                      <span aria-hidden className="size-[7px] rounded-full bg-destructive" />
+                      {signingIn ? "Finish signing in in the tab that opened" : "Signed out"}
+                    </span>
+                    <Button
+                      size="sm"
+                      disabled={signingIn}
+                      leadingIcon={OpenAiMark}
+                      className={CHATGPT_BUTTON}
+                      onClick={signIn}
+                    >
+                      Continue with ChatGPT
+                    </Button>
+                  </>
+                )}
+              </span>
+              {signInError && (
+                <span role="alert" className="col-start-2 text-[12.5px] text-destructive">
+                  {signInError}
+                </span>
+              )}
+            </Row>
+            <Row label="Address">
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate">{provider.address}</span>
+                <small className="text-[12px] text-muted-foreground">Set by OpenAI</small>
+              </span>
+            </Row>
+          </>
+        )}
+        {!codex && (
+          <>
         <Row label="Address">
           {moving ? (
             <span className="flex flex-col gap-1.5">
@@ -267,6 +350,8 @@ export function ProviderPage({
             </span>
           )}
         </Row>
+          </>
+        )}
         <Row label="Format">
           <span className="text-muted-foreground">
             {FORMAT_NAMES[provider.format]}
@@ -295,7 +380,14 @@ export function ProviderPage({
       </div>
       <div className="overflow-hidden rounded-xl border border-border">
         {!list && <p className="px-4 py-3 text-muted-foreground">Listing models…</p>}
-        {list && !list.ok && <p className="px-4 py-3 text-destructive">{list.error}</p>}
+        {list && !list.ok && codex && !provider.hasKey && (
+          <p className="px-4 py-3 text-muted-foreground">
+            Continue with ChatGPT to list your plan's models.
+          </p>
+        )}
+        {list && !list.ok && !(codex && !provider.hasKey) && (
+          <p className="px-4 py-3 text-destructive">{list.error}</p>
+        )}
         {list?.ok && !models.length && (
           <p className="px-4 py-3 text-muted-foreground">
             {needle ? "No model matches." : "This provider lists no models."}
@@ -307,7 +399,12 @@ export function ProviderPage({
             className="grid min-h-[46px] grid-cols-[minmax(0,1fr)_140px_292px] items-center gap-3 border-border py-1.5 pl-4 pr-3 [&+&]:border-t"
           >
             <span className="flex min-w-0 items-center gap-2 font-medium">
-              <span className="truncate">{model.name}</span>
+              <span className="truncate">{model.label || model.name}</span>
+              {model.label && (
+                <span className="shrink-0 font-mono text-[12px] font-normal text-muted-foreground">
+                  {model.name}
+                </span>
+              )}
               {provider.format === ProviderFormat.kEachModel && (
                 <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[11.5px] font-medium text-muted-foreground">
                   {FORMAT_NAMES[model.format]}

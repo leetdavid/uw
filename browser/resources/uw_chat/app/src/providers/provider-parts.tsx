@@ -21,6 +21,7 @@ const ICON_FILES: Partial<Record<ProviderPreset, string>> = {
   [ProviderPreset.kVercelAiGateway]: "vercel",
   [ProviderPreset.kOllama]: "ollama",
   [ProviderPreset.kOpenCodeGo]: "opencode",
+  [ProviderPreset.kCodex]: "openai",
 };
 
 // uw://ai's sections, each at its own address, in the order its sidebar
@@ -40,6 +41,7 @@ export const PRESET_NAMES: Record<ProviderPreset, string> = {
   [ProviderPreset.kOllama]: "Ollama",
   [ProviderPreset.kJev]: "Jev",
   [ProviderPreset.kOpenCodeGo]: "OpenCode Go",
+  [ProviderPreset.kCodex]: "Codex",
   [ProviderPreset.kCustom]: "Custom",
 };
 
@@ -89,6 +91,28 @@ export function ProviderIcon({
     />
   );
 }
+
+// OpenAI's mark as a button's leading icon, for "Continue with ChatGPT".
+export function OpenAiMark({ size = 16 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block shrink-0 bg-current"
+      style={{
+        width: size,
+        height: size,
+        maskImage: "url(/icons/openai.svg)",
+        maskSize: "contain",
+        maskRepeat: "no-repeat",
+        maskPosition: "center",
+      }}
+    />
+  );
+}
+
+// "Continue with ChatGPT" is black with white text, as OpenAI's branding
+// asks, in light and dark mode alike.
+export const CHATGPT_BUTTON = "[--background:#fff] [--foreground:#000]";
 
 export function ProviderTile({
   preset,
