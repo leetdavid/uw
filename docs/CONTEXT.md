@@ -205,7 +205,7 @@ One LLM request about where a tab belongs. It says which task the tab belongs to
 The `New task` title a task has until the language model returns a valid name for it. The organizer does not offer such a task to a model as an answer.
 
 **Provider**:
-A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key, for every profile. One provider can serve both language models and decision models.
+A company or address that serves models, such as OpenAI, Anthropic, Jev, or a local Ollama, saved once in settings with its key, or with its sign-in for a subscription, for every profile. One provider can serve both language models and decision models.
 _Avoid_: Connection, endpoint, backend
 
 **Proxy**:

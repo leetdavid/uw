@@ -60,6 +60,8 @@ Proposed on 2026-11-15; being worked out, not agreed. The owner asked for monthl
 | ChatGPT Plus and Pro | Proposed | 5/10: OpenAI's sign-in, answers read as a stream, and request rules only a live account can check |
 | Claude Pro and Max | Not planned | Decided on 2026-11-15. [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance) do not let other apps sign in with a Claude plan or send requests through one. A Claude plan works in Claude Code, which can run in a terminal tab with uw's tools through `uw mcp serve`. |
 
+- **Each subscription is a provider preset.** Agreed on 2026-11-15. It sits in the Add provider menu beside the others, apart from the same company's pay-as-you-go preset, so each model menu shows which one a model bills. A preset that signs in shows Sign in where others take a key.
+
 ## Design
 
 The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, and the `uw-arc-style` guide has their rules under "AI providers".
