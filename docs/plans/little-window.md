@@ -105,6 +105,7 @@ Drawn on 2026-11-07 as T357, on the "Little windows" page of the Doop canvas nam
   - `WindowFeatureController` gives a little window the toolbar and location bar, and no title bar. The toolbar takes its normal mode, so the address can change.
   - On the Mac, the window takes a browser window's style with its title hidden. Its title bar is as tall as the card's margin and toolbar together, so macOS's buttons sit centered on the toolbar, and the toolbar starts after them.
   - The pop-up layout insets the toolbar and the page by the card's margin and rounds the card. The frame paints the theme around it, as in a regular window.
+  - `BrowserView::NonClientHitTest` treats the toolbar's empty space as the title bar, as a regular window's is, so the window moves by it.
   - The navigator sends a little window's new-tab links to the window used last on its workspace, and places them with `TabOrganizationController::LinksFromAnotherApp`.
   - Cmd+Shift+T: `UnloadController` records a little window that showed a page, and `BrowserLiveTabContext` saves its workspace under `uw.little_window` and brings it back as one.
   - `IDC_OPEN_FILE` in a little window runs Move to Workspace. On Windows, `IDC_SHOW_BOOKMARK_MANAGER` there opens the workspace menu.

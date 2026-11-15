@@ -25,6 +25,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
@@ -40,8 +41,11 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/common/input/web_mouse_event.h"
+#include "ui/base/hit_test.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 #include "uw/browser/little_window/little_window_key.h"
@@ -156,6 +160,32 @@ IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
             little->GetFeatures().location_bar_model()->GetURLForDisplay());
   SaveWindowScreenshot(little->GetBrowserForMigrationOnly(),
                        "little-window-page");
+}
+
+// The toolbar's empty space moves the window, as a regular window's does. Its
+// buttons and the address still take clicks.
+IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
+                       ItMovesByItsToolbarsEmptySpace) {
+  BrowserWindowInterface* little = OpenWithPage(Page("/title1.html"));
+  ASSERT_TRUE(little);
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(little);
+  views::Widget* widget = view->GetWidget();
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return view->GetLocationBarView()->width() > 0; }));
+  const auto in_widget = [](const views::View* v) {
+    return v->ConvertRectToWidget(v->GetLocalBounds());
+  };
+  const gfx::Rect address = in_widget(view->GetLocationBarView());
+  const gfx::Point above_address(address.CenterPoint().x(),
+                                 in_widget(view->toolbar()).y() + 1);
+  ASSERT_LT(above_address.y(), address.y());
+
+  EXPECT_EQ(HTCAPTION, widget->GetNonClientComponent(above_address));
+  EXPECT_EQ(HTCLIENT, widget->GetNonClientComponent(address.CenterPoint()));
+  EXPECT_EQ(
+      HTCLIENT,
+      widget->GetNonClientComponent(
+          in_widget(view->GetViewByID(VIEW_ID_RELOAD_BUTTON)).CenterPoint()));
 }
 
 IN_PROC_BROWSER_TEST_F(LittleWindowBrowserTest,
