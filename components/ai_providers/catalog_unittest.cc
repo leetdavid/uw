@@ -57,6 +57,17 @@ constexpr char kApiJson[] = R"({
   "zai-coding-plan": {"api": "https://api.z.ai/api/coding/paas/v4", "models": {
     "glm-5": {"tool_call": false}
   }},
+  "opencode-go": {"api": "https://opencode.ai/inference/go/openai/v1",
+                  "npm": "@ai-sdk/openai-compatible", "models": {
+    "kimi-k3": {"tool_call": true, "reasoning_options":
+                    [{"type": "effort", "values": ["low", "high", "max"]}]},
+    "minimax-m3": {"tool_call": true,
+                   "provider": {"npm": "@ai-sdk/anthropic"}},
+    "gpt-6-luna": {"tool_call": true,
+                   "provider": {"npm": "@ai-sdk/openai"}},
+    "gemini-4-argon": {"tool_call": true,
+                       "provider": {"npm": "@ai-sdk/google"}}
+  }},
   "groq": {"models": {"llama-4": {"tool_call": true}}}
 })";
 
@@ -210,6 +221,39 @@ TEST(CatalogTest, AProxyModelGoesOverItsMakersFormat) {
   EXPECT_EQ(FormatOfModel(Preset(ProviderPreset::kOpenAi), "claude-opus-5-5",
                           &*catalog),
             ProviderFormat::kOpenAiResponses);
+}
+
+// OpenCode Go serves some models in their maker's format, which its own entry
+// names for each model, and the rest over chat completions.
+TEST(CatalogTest, APresetsEntryNamesEachModelsFormat) {
+  const std::optional<ModelCatalog> catalog =
+      ModelCatalog::FromModelsDev(kApiJson);
+  ASSERT_TRUE(catalog);
+  const Provider go = Preset(ProviderPreset::kOpenCodeGo);
+
+  EXPECT_EQ(FormatOfModel(go, "minimax-m3", &*catalog),
+            ProviderFormat::kAnthropicMessages);
+  EXPECT_EQ(FormatOfModel(go, "gpt-6-luna", &*catalog),
+            ProviderFormat::kOpenAiResponses);
+  EXPECT_EQ(FormatOfModel(go, "kimi-k3", &*catalog),
+            ProviderFormat::kChatCompletions);
+  EXPECT_THAT(catalog->For(go, "kimi-k3").efforts,
+              ElementsAre("low", "high", "max"));
+  // uw speaks no Google format, and OpenCode translates chat completions.
+  EXPECT_EQ(FormatOfModel(go, "gemini-4-argon", &*catalog),
+            ProviderFormat::kChatCompletions);
+  // A model the entry does not list goes over chat completions, whoever made
+  // it.
+  EXPECT_EQ(FormatOfModel(go, "claude-opus-5-5", &*catalog),
+            ProviderFormat::kChatCompletions);
+  EXPECT_EQ(FormatOfModel(go, "minimax-m3", nullptr),
+            ProviderFormat::kChatCompletions);
+
+  const std::optional<ModelCatalog> saved =
+      ModelCatalog::FromSaved(catalog->ToSaved());
+  ASSERT_TRUE(saved);
+  EXPECT_EQ(FormatOfModel(go, "minimax-m3", &*saved),
+            ProviderFormat::kAnthropicMessages);
 }
 
 // The catalog says which models take images. One it does not know, or that

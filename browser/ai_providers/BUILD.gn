@@ -48,6 +48,7 @@ source_set("ai_providers") {
     "//net",
     "//services/network/public/cpp",
     "//services/network/public/mojom",
+    "//uw/browser/branding:release_version",
     "//uw/components/agent",
   ]
   if (is_win) {

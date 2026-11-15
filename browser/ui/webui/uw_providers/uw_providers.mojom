@@ -21,6 +21,7 @@ enum ProviderPreset {
   kVercelAiGateway,
   kOllama,
   kJev,
+  kOpenCodeGo,
 };
 
 // Matches uw::ModelSlot.

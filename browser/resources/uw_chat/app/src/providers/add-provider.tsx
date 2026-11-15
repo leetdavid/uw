@@ -28,6 +28,7 @@ const PRESETS = [
   ProviderPreset.kVercelAiGateway,
   ProviderPreset.kOllama,
   ProviderPreset.kJev,
+  ProviderPreset.kOpenCodeGo,
   ProviderPreset.kCustom,
 ];
 

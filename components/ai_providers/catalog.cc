@@ -13,7 +13,7 @@
 namespace uw {
 namespace {
 
-constexpr int kSavedVersion = 4;
+constexpr int kSavedVersion = 5;
 // What an answer may need of a model's context, at most, when the catalog
 // gives no input limit of its own.
 constexpr int64_t kAnswerRoom = 16000;
@@ -37,6 +37,23 @@ std::string Trimmed(const GURL& address) {
     spec.pop_back();
   }
   return spec;
+}
+
+// The format a provider serves one model in, when its entry names one for
+// that model, as OpenCode Go's does for MiniMax over Anthropic Messages. The
+// entry names it by the AI SDK package that speaks it.
+std::optional<ProviderFormat> OwnFormat(const base::DictValue& model) {
+  const std::string* package = model.FindStringByDottedPath("provider.npm");
+  if (!package) {
+    return std::nullopt;
+  }
+  if (*package == "@ai-sdk/anthropic") {
+    return ProviderFormat::kAnthropicMessages;
+  }
+  if (*package == "@ai-sdk/openai") {
+    return ProviderFormat::kOpenAiResponses;
+  }
+  return std::nullopt;
 }
 
 // One model of api.json as uw keeps it. Only named effort levels and the
@@ -70,6 +87,9 @@ base::DictValue Abilities(const base::DictValue& model) {
                inputs && std::ranges::contains(*inputs, base::Value("pdf")))
           .Set("efforts", std::move(efforts))
           .Set("toggle", toggle);
+  if (const std::optional<ProviderFormat> format = OwnFormat(model)) {
+    kept.Set("format", static_cast<int>(*format));
+  }
   // Prices above a context size, as some models have, are left out: uw's
   // requests stay well below them.
   const base::DictValue* cost = model.FindDict("cost");
@@ -197,10 +217,11 @@ std::optional<std::string> ModelCatalog::KeyAt(std::string_view address) const {
 }
 
 std::optional<std::string> ModelCatalog::KeyOf(const Provider& provider) const {
-  if (provider.format == ProviderFormat::kEachModel) {
-    return std::nullopt;
-  }
   if (provider.preset == ProviderPreset::kCustom) {
+    // A proxy reads each model at its maker's entry instead.
+    if (provider.format == ProviderFormat::kEachModel) {
+      return std::nullopt;
+    }
     return KeyAt(provider.address);
   }
   if (const std::optional<std::string_view> preset_key =
@@ -219,8 +240,9 @@ ModelAbilities ModelCatalog::For(const Provider& provider,
                                  const std::optional<std::string>& provider_key,
                                  std::string_view model) const {
   const std::optional<std::string> key =
-      provider.format == ProviderFormat::kEachModel ? MakerKeyOf(model)
-                                                    : provider_key;
+      provider_key || provider.format != ProviderFormat::kEachModel
+          ? provider_key
+          : MakerKeyOf(model);
   const base::DictValue* models = key ? models_.FindDict(*key) : nullptr;
   const base::DictValue* known = models ? models->FindDict(model) : nullptr;
   if (!known) {
@@ -261,7 +283,14 @@ std::optional<std::string> ModelCatalog::MakerKeyOf(
   return std::nullopt;
 }
 
-ProviderFormat ModelCatalog::MakerFormatOf(std::string_view model) const {
+ProviderFormat ModelCatalog::OwnFormatOf(const Provider& provider,
+                                         std::string_view model) const {
+  if (const std::optional<std::string> key = KeyOf(provider)) {
+    const base::DictValue* models = models_.FindDict(*key);
+    const base::DictValue* known = models ? models->FindDict(model) : nullptr;
+    return FormatFrom(known ? known->FindInt("format") : std::nullopt)
+        .value_or(ProviderFormat::kChatCompletions);
+  }
   const std::optional<std::string> maker = MakerKeyOf(model);
   if (!maker) {
     return ProviderFormat::kChatCompletions;
@@ -276,7 +305,7 @@ ProviderFormat FormatOfModel(const Provider& provider,
   if (provider.format != ProviderFormat::kEachModel) {
     return LanguageFormatOf(provider).value_or(provider.format);
   }
-  return catalog ? catalog->MakerFormatOf(model)
+  return catalog ? catalog->OwnFormatOf(provider, model)
                  : ProviderFormat::kChatCompletions;
 }
 

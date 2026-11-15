@@ -177,7 +177,8 @@ std::unique_ptr<net::test_server::HttpResponse> ModelTestServer::Serve(
     return found == request.headers.end() ? std::string() : found->second;
   };
   requests_.push_back({path, request.method_string, request.content,
-                       header("Authorization"), header("x-api-key")});
+                       header("Authorization"), header("x-api-key"),
+                       header("User-Agent"), header("x-opencode-session")});
   auto response = std::make_unique<net::test_server::BasicHttpResponse>();
   const Reply* about = nullptr;
   for (const auto& [key, candidate] : answers_about_) {

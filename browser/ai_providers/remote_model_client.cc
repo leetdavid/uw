@@ -4,7 +4,9 @@
 
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/uuid.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_request_headers.h"
 #include "net/traffic_annotation/network_traffic_annotation.h"
@@ -15,6 +17,7 @@
 #include "url/gurl.h"
 #include "uw/browser/ai_providers/models.h"
 #include "uw/browser/ai_providers/rejected_keys.h"
+#include "uw/browser/branding/release_version.h"
 #include "uw/components/ai_providers/formats.h"
 
 namespace uw {
@@ -53,6 +56,14 @@ constexpr net::NetworkTrafficAnnotationTag kTrafficAnnotation =
         setting: "Automatic organization is off unless the user enables it."
         policy_exception_justification: "Not implemented."
       })");
+
+// What uw calls itself to providers, in place of the browser's own agent,
+// as OpenCode Go asks of the clients it serves.
+const std::string& UserAgent() {
+  static const base::NoDestructor<std::string> agent(
+      "uw/" + ReleaseVersion().value_or("dev"));
+  return *agent;
+}
 
 }  // namespace
 
@@ -104,6 +115,11 @@ std::unique_ptr<RemoteModelClient> RemoteModelClient::ForLanguageModel(
     client->address_ = endpoint;
     client->model_ = model.model;
   }
+  if (model.preset == ProviderPreset::kOpenCodeGo) {
+    client->session_ = model.session.empty()
+                           ? base::Uuid::GenerateRandomV4().AsLowercaseString()
+                           : model.session;
+  }
   return client;
 }
 
@@ -121,6 +137,10 @@ void RemoteModelClient::StartRequest(bool post, ResultCallback callback) {
   resource->url = endpoint_;
   resource->method = post ? "POST" : "GET";
   resource->credentials_mode = network::mojom::CredentialsMode::kOmit;
+  resource->headers.SetHeader(net::HttpRequestHeaders::kUserAgent, UserAgent());
+  if (!session_.empty()) {
+    resource->headers.SetHeader("x-opencode-session", session_);
+  }
   if (post) {
     resource->headers.SetHeader(net::HttpRequestHeaders::kContentType,
                                 "application/json");

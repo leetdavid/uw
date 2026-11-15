@@ -20,6 +20,7 @@ const ICON_FILES: Partial<Record<ProviderPreset, string>> = {
   [ProviderPreset.kOpenRouter]: "openrouter",
   [ProviderPreset.kVercelAiGateway]: "vercel",
   [ProviderPreset.kOllama]: "ollama",
+  [ProviderPreset.kOpenCodeGo]: "opencode",
 };
 
 // uw://ai's sections, each at its own address, in the order its sidebar
@@ -38,6 +39,7 @@ export const PRESET_NAMES: Record<ProviderPreset, string> = {
   [ProviderPreset.kVercelAiGateway]: "Vercel AI Gateway",
   [ProviderPreset.kOllama]: "Ollama",
   [ProviderPreset.kJev]: "Jev",
+  [ProviderPreset.kOpenCodeGo]: "OpenCode Go",
   [ProviderPreset.kCustom]: "Custom",
 };
 

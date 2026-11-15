@@ -107,7 +107,7 @@ Click `Organize` at the foot of the sidebar. A card opens above it.
 
 ### AI providers
 
-Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, and Custom. uw lists the provider's models before it adds it, and the key goes to the Keychain. Then pick a language model, a decision model, or both, and an agent model for chats. Click a provider to see its address, key, format, and models, or to remove it.
+Open `uw://providers`. `Add provider` offers OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, OpenCode Go, and Custom. uw lists the provider's models before it adds it, and the key goes to the Keychain. Then pick a language model, a decision model, or both, and an agent model for chats. Click a provider to see its address, key, format, and models, or to remove it.
 
 Expected result: `Test` beside the language or decision model sends it one small request and says `✓ <model> answered in <seconds> s`, or why it failed; `Details` shows what uw sent and what came back. The first time this build starts, the models saved in the old settings become providers, and the page says so once.
 
@@ -118,6 +118,8 @@ A provider's page shows whether each model calls tools and which effort levels i
 Every provider's address can change: the Add dialog shows a preset's address filled in, and `Change` on a provider's page takes a new one. Expected result: uw saves it once it lists the models there; otherwise it says why, and the old address stays. An address is https, or plain http on this Mac or your own network, such as `http://192.168.1.20:8317/v1`.
 
 To use [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), add a Custom provider at `http://localhost:8317/v1` with the format `Each model's own`, and the key from its `api-keys` if you set any. Expected result: its page lists each model with the format it goes over: Claude models over Anthropic Messages, GPT models over OpenAI Responses, and the rest over chat completions, with their own effort levels. A Custom provider sends its key as `Authorization: Bearer`, and over Anthropic Messages also as `x-api-key`.
+
+To use an [OpenCode Go](https://opencode.ai/docs/go/) plan, pick `OpenCode Go` under `Add provider` and paste the key from the OpenCode console. Expected result: its page lists each model with the format it goes over, such as `minimax-m3` over Anthropic Messages, `gpt-6-luna` over OpenAI Responses, and `kimi-k3` over chat completions, and a chat on each of them answers.
 
 ### Automatic organization
 

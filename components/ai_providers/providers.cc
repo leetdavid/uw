@@ -43,7 +43,7 @@ const char* ChoicePref(ModelSlot slot) {
 
 std::optional<ProviderPreset> PresetFrom(std::optional<int> value) {
   if (!value || *value < static_cast<int>(ProviderPreset::kCustom) ||
-      *value > static_cast<int>(ProviderPreset::kJev)) {
+      *value >= static_cast<int>(kPresetFacts.size())) {
     return std::nullopt;
   }
   return static_cast<ProviderPreset>(*value);

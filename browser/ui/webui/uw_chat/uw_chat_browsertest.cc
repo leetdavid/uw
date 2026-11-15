@@ -749,6 +749,29 @@ IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, FillsAFormInATabUnderTheChat) {
             *tree->IdFor(tabs::TabInterface::GetFromContents(chat)));
 }
 
+// OpenCode Go routes a conversation by the id each request carries, so every
+// request of one chat carries that chat's, and another chat its own.
+IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, AChatSendsOpenCodeGoOneSessionId) {
+  PrefService& prefs = *browser()->GetProfile()->GetPrefs();
+  Provider go = PresetProvider(ProviderPreset::kOpenCodeGo);
+  go.address = embedded_test_server()->GetURL("/v1").spec();
+  SetChoice(prefs, ModelSlot::kAgent, AddProvider(prefs, go), "test-agent");
+  model_.Script(
+      {ScriptedModel::Answer("Hello."), ScriptedModel::Answer("Hello again.")});
+  content::WebContents* chat = OpenChat();
+  EXPECT_EQ(Ask(chat, "Hi"), "Hello.");
+  EXPECT_EQ(Ask(chat, "Hi again"), "Hello again.");
+  content::WebContents* other = OpenChat();
+  EXPECT_EQ(Ask(other, "Hi"), "Hello again.");
+
+  const std::vector<std::string> sessions = model_.Sessions();
+  ASSERT_EQ(sessions.size(), 3u);
+  EXPECT_FALSE(sessions[0].empty());
+  EXPECT_EQ(sessions[1], sessions[0]);
+  EXPECT_FALSE(sessions[2].empty());
+  EXPECT_NE(sessions[2], sessions[0]);
+}
+
 // Chromium's task icon brings Gemini's button with it, and Gemini is not
 // available in uw: clicking that button aborted the browser.
 IN_PROC_BROWSER_TEST_F(UwChatBrowserTest, ARunningChatShowsNoGeminiButton) {

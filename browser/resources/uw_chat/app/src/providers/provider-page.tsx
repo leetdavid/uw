@@ -44,6 +44,12 @@ function abilitiesSource(provider: Provider) {
   if (provider.preset === ProviderPreset.kOllama) {
     return "Tool calls and thinking come from Ollama's own model details.";
   }
+  if (
+    provider.format === ProviderFormat.kEachModel &&
+    provider.preset !== ProviderPreset.kCustom
+  ) {
+    return "The models.dev catalog's entry for this provider names each model's format and effort levels. A model it does not list goes over chat completions, with low, medium, and high.";
+  }
   if (provider.format === ProviderFormat.kEachModel) {
     return "The models.dev catalog names each model's maker, whose format and effort levels it gets. A model it does not list goes over chat completions, with low, medium, and high.";
   }

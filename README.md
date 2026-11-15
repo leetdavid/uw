@@ -30,7 +30,7 @@ Open tabs the way you always do. uw files each one into the task it belongs to.
 
 uw has no account and no AI service of its own. Add the providers you already use, and uw talks to them directly.
 
-- OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, or any other address with a compatible API.
+- OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, an OpenCode Go plan, or any other address with a compatible API.
 - Keys stay in the macOS Keychain.
 - Pick a model for each job: one makes quick choices such as where a tab goes, one names tasks, and one starts chats. Each sends its requests only to its own provider.
 - Use Ollama to keep everything on your Mac.

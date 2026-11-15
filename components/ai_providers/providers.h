@@ -31,8 +31,9 @@ enum class ProviderFormat {
   // These two serve decision models only.
   kOpenAiDecisions = 3,
   kSystemOne = 4,
-  // For a proxy: each model goes over its maker's format, which the model
-  // catalog names. See ADR 0007.
+  // Each model goes over its own format, which the model catalog names: the
+  // preset's entry for each model, or for a Custom proxy, the model's maker.
+  // See ADR 0007.
   kEachModel = 5,
 };
 
@@ -46,6 +47,7 @@ enum class ProviderPreset {
   kVercelAiGateway = 4,
   kOllama = 5,
   kJev = 6,
+  kOpenCodeGo = 7,
 };
 
 // What uw knows of a preset.
@@ -75,9 +77,11 @@ inline constexpr auto kPresetFacts = std::to_array<PresetFacts>({
      ProviderFormat::kChatCompletions, ProviderFormat::kOpenAiDecisions, true},
     {"ollama", "Ollama", "http://localhost:11434/v1"},
     {"jev", "Jev", "https://api.typesafe.ai/v1", ProviderFormat::kSystemOne},
+    {"opencode-go", "OpenCode Go", "https://opencode.ai/inference/go/v1",
+     ProviderFormat::kEachModel, std::nullopt, true},
 });
 static_assert(kPresetFacts.size() ==
-              static_cast<size_t>(ProviderPreset::kJev) + 1);
+              static_cast<size_t>(ProviderPreset::kOpenCodeGo) + 1);
 
 constexpr const PresetFacts& FactsOf(ProviderPreset preset) {
   return kPresetFacts[static_cast<size_t>(preset)];

@@ -1409,7 +1409,11 @@ std::optional<AgentModel> UwChatHandler::AgentModelNow() const {
   if (!model_) {
     return std::nullopt;
   }
-  return AgentModelFor(*profile(), *model_);
+  std::optional<AgentModel> model = AgentModelFor(*profile(), *model_);
+  if (model) {
+    model->connection.session = id_;
+  }
+  return model;
 }
 
 void UwChatHandler::SetModel(const std::string& provider_id,

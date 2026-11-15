@@ -137,7 +137,7 @@ for (const file of [
 // The providers' icons, and Exa's for the connect dialog, from
 // @lobehub/icons-static-svg.
 mkdirSync(join(out, "icons"), { recursive: true });
-for (const icon of ["openai", "anthropic", "openrouter", "vercel", "ollama", "exa"]) {
+for (const icon of ["openai", "anthropic", "openrouter", "vercel", "ollama", "opencode", "exa"]) {
   copyFileSync(
     join(modules, "@lobehub/icons-static-svg/icons", `${icon}.svg`),
     join(out, "icons", `${icon}.svg`),

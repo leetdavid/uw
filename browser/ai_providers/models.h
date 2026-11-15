@@ -66,6 +66,10 @@ struct AiConnectionConfig {
   std::string effort;
   // Keychain account id holding the API key; empty when there is none.
   std::string key_account;
+  // The conversation a request belongs to, such as a chat's id, for a
+  // provider that routes by it. Empty for a request on its own, which gets
+  // an id of its own.
+  std::string session;
 };
 
 // The decision model as a request needs it.

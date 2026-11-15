@@ -6,12 +6,20 @@ description: Connect uw to the models you already use, such as OpenAI, Anthropic
 ## Add *a provider*
 
 1. Open `uw://ai/providers`.
-2. Click **Add provider** and pick OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, or Custom.
+2. Click **Add provider** and pick OpenAI, Anthropic, OpenRouter, Vercel AI Gateway, Ollama, Jev, OpenCode Go, or Custom.
 3. Paste the provider's key. uw lists the provider's models before it adds it.
 
 The key goes to the macOS Keychain. Every profile shares your providers, so you add each one once. For a provider that isn't in the list, use OpenRouter, Vercel AI Gateway, or **Custom**.
 
 Click a provider to see its address, key, format, and models, or to remove it. Each model shows whether it calls tools, which effort levels it takes, and whether it makes decisions.
+
+## Use *a subscription*
+
+[OpenCode Go](https://opencode.ai/docs/go/) is a monthly plan for coding models such as Kimi, GLM, and DeepSeek. Pick **OpenCode Go** under **Add provider** and paste the API key from your OpenCode console. Each model goes over the format OpenCode serves it in.
+
+Every request uw sends counts against your plan's limits. That includes the organizer's: with an OpenCode Go model making quick choices, each new tab is one small request.
+
+A Claude Pro or Max plan works only in Claude Code. To use it with uw, run Claude Code in a [terminal tab](./terminal-tabs.mdx) and [add uw to it](./claude-code-and-other-agents.mdx).
 
 ## Pick *your models*
 

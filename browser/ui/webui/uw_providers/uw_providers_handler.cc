@@ -278,7 +278,8 @@ void UwProvidersHandler::GetState(GetStateCallback callback) {
   for (ProviderPreset preset :
        {ProviderPreset::kOpenAi, ProviderPreset::kAnthropic,
         ProviderPreset::kOpenRouter, ProviderPreset::kVercelAiGateway,
-        ProviderPreset::kOllama, ProviderPreset::kJev}) {
+        ProviderPreset::kOllama, ProviderPreset::kJev,
+        ProviderPreset::kOpenCodeGo}) {
     state->preset_addresses.push_back(
         mojom::PresetAddress::New(static_cast<mojom::ProviderPreset>(preset),
                                   PresetProvider(preset).address));

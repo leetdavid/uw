@@ -6,6 +6,7 @@
 
 #include "base/functional/bind.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/uuid.h"
 #include "uw/browser/agent/run_window.h"
 
 namespace uw {
@@ -41,6 +42,8 @@ ChatRun::ChatRun(Profile* profile,
     return;
   }
   run_tab_ = run_tab->GetHandle();
+  // A run is a conversation of its own, apart from its chat's.
+  model.connection.session = base::Uuid::GenerateRandomV4().AsLowercaseString();
   loop_ = std::make_unique<AgentLoop>(
       *run_tab, std::move(model),
       base::BindRepeating(&ChatRun::OnStep, weak_factory_.GetWeakPtr()));

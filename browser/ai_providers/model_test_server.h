@@ -27,6 +27,9 @@ struct ModelRequest {
   std::string authorization;
   // Anthropic takes its key in this header instead.
   std::string anthropic_key;
+  std::string user_agent;
+  // x-opencode-session, the conversation an OpenCode Go request belongs to.
+  std::string session;
 };
 
 // A decision model's answer that the tab belongs to the task `choice` or, for

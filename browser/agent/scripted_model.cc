@@ -44,6 +44,11 @@ std::vector<std::string> ScriptedModel::Requests() {
   return requests_;
 }
 
+std::vector<std::string> ScriptedModel::Sessions() {
+  base::AutoLock lock(lock_);
+  return sessions_;
+}
+
 void ScriptedModel::ListModels(std::vector<std::string> names) {
   base::AutoLock lock(lock_);
   models_ = std::move(names);
@@ -121,6 +126,9 @@ std::unique_ptr<net::test_server::HttpResponse> ScriptedModel::Serve(
   }
   base::AutoLock lock(lock_);
   requests_.push_back(request.content);
+  const auto session = request.headers.find("x-opencode-session");
+  sessions_.push_back(session == request.headers.end() ? std::string()
+                                                       : session->second);
   if (!replies_.empty() && replies_.front() == kHang) {
     return std::make_unique<net::test_server::HungResponse>();
   }

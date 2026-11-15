@@ -69,10 +69,13 @@ class ModelCatalog {
                      const std::optional<std::string>& provider_key,
                      std::string_view model) const;
 
-  // The format of `model`'s maker: Anthropic's models go over Anthropic
-  // Messages, OpenAI's over OpenAI Responses, and any other over chat
-  // completions.
-  ProviderFormat MakerFormatOf(std::string_view model) const;
+  // The format of `model` at `provider`, which leaves it to each model: the
+  // one the preset's entry names for the model, else chat completions. At a
+  // Custom proxy, the format of the model's maker: Anthropic's models go over
+  // Anthropic Messages, OpenAI's over OpenAI Responses, and any other over
+  // chat completions.
+  ProviderFormat OwnFormatOf(const Provider& provider,
+                             std::string_view model) const;
 
  private:
   // The catalog provider at `address`: the one with the same address, else
@@ -91,9 +94,9 @@ class ModelCatalog {
 // catalog. A Custom provider is looked up by its address.
 bool CatalogCovers(ProviderPreset preset);
 
-// The format `model` goes over at `provider`: its maker's when the provider
-// leaves it to each model, from `catalog` while there is one; the provider's
-// own otherwise.
+// The format `model` goes over at `provider`: per OwnFormatOf when the
+// provider leaves it to each model, from `catalog` while there is one; the
+// provider's own otherwise.
 ProviderFormat FormatOfModel(const Provider& provider,
                              std::string_view model,
                              const ModelCatalog* catalog);

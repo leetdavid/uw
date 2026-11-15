@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,7 @@ namespace {
 using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::IsEmpty;
+using ::testing::StartsWith;
 
 constexpr char kHelpers[] = R"(
   const until = (probe) => new Promise((resolve) => {
@@ -884,6 +886,87 @@ IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
   }
   EXPECT_THAT(sent, ElementsAre("/v1/messages Bearer sk-test / sk-test",
                                 "/v1/responses Bearer sk-test / "));
+}
+
+// OpenCode Go serves every model at one address, each in the format its
+// entry in the catalog names. It refuses a request without a session id, and
+// each Test is a conversation of its own. Every request says it is uw's.
+IN_PROC_BROWSER_TEST_F(UwProvidersBrowserTest,
+                       OpenCodeGoSendsEachModelInItsOwnFormat) {
+  models_.Answer("/v1/catalog.json", R"({
+    "opencode-go": {"api": "https://opencode.ai/inference/go/openai/v1",
+                    "models": {
+      "kimi-k3": {"tool_call": true},
+      "minimax-m3": {"tool_call": true,
+                     "provider": {"npm": "@ai-sdk/anthropic"}},
+      "gpt-6-luna": {"tool_call": true, "provider": {"npm": "@ai-sdk/openai"}}
+    }}})");
+  models_.Answer(
+      "/v1/models",
+      R"({"data":[{"id":"kimi-k3"},{"id":"minimax-m3"},{"id":"gpt-6-luna"}]})");
+  models_.Answer("/v1/chat/completions", ChatAnswer("Hello"));
+  models_.Answer("/v1/messages", R"({"stop_reason":"end_turn","content":[)"
+                                 R"({"type":"text","text":"Hello"}]})");
+  models_.Answer("/v1/responses",
+                 R"({"status":"completed","output":[{"type":"message",)"
+                 R"("role":"assistant","content":[{"type":"output_text",)"
+                 R"("text":"Hello"}]}]})");
+  Open();
+  EXPECT_EQ("https://opencode.ai/inference/go/v1",
+            Run("withText('button', 'Add provider').click();"
+                "await until(dialog);"
+                "withText('button', 'OpenCode Go', dialog()).click();"
+                "return (await until(() => field('Address'))).value;"));
+  SaveWindowScreenshot(browser(), "add-opencode-go");
+  ASSERT_EQ(true, Run(content::JsReplace(
+                      "type('Address', $1);"
+                      "type('Key', 'sk-test');"
+                      "withText('button', 'Add provider', dialog()).click();"
+                      "await until(() => !dialog());"
+                      "return true;",
+                      Address())));
+  const std::optional<Provider> go = FindProvider(prefs(), "opencode-go");
+  ASSERT_TRUE(go);
+  EXPECT_EQ(go->format, ProviderFormat::kEachModel);
+
+  Open(go->id);
+  EXPECT_THAT(
+      Run("return await until(() => modelRow('kimi-k3'));").ExtractString(),
+      HasSubstr("Chat completions"));
+  EXPECT_THAT(
+      Run("return await until(() => modelRow('minimax-m3'));").ExtractString(),
+      HasSubstr("Anthropic Messages"));
+  EXPECT_THAT(
+      Run("return await until(() => modelRow('gpt-6-luna'));").ExtractString(),
+      HasSubstr("OpenAI Responses"));
+  EXPECT_EQ(true, Run("return document.body.textContent.includes("
+                      "'entry for this provider names each model');"));
+  SaveWindowScreenshot(browser(), "opencode-go");
+
+  Open();
+  for (const char* model : {"kimi-k3", "minimax-m3", "gpt-6-luna"}) {
+    Pick("Names tasks", model);
+    EXPECT_THAT(Test("Names tasks"), HasSubstr(" answered in"));
+  }
+
+  std::vector<std::string> sent;
+  std::set<std::string> sessions;
+  for (const ModelRequest& request : models_.Requests()) {
+    if (request.path == "/v1/catalog.json") {
+      continue;
+    }
+    EXPECT_THAT(request.user_agent, StartsWith("uw/")) << request.path;
+    if (request.method == "POST") {
+      sent.push_back(request.path + " " + request.authorization + " / " +
+                     request.anthropic_key);
+      EXPECT_FALSE(request.session.empty()) << request.path;
+      sessions.insert(request.session);
+    }
+  }
+  EXPECT_THAT(sent, ElementsAre("/v1/chat/completions Bearer sk-test / ",
+                                "/v1/messages Bearer sk-test / sk-test",
+                                "/v1/responses Bearer sk-test / "));
+  EXPECT_EQ(sessions.size(), 3u);
 }
 
 // A preset fills in its own address, which the user can change, say to a

@@ -89,6 +89,9 @@ class RemoteModelClient {
   std::string request_body_;
   base::TimeDelta timeout_;
   KeyHeader key_header_;
+  // Sent as x-opencode-session to OpenCode Go, which refuses a request
+  // without one.
+  std::string session_;
   // Set for a language model that does not speak chat completions: its
   // answers are read back into that shape.
   std::optional<ProviderFormat> answer_format_;
