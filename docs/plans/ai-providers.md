@@ -80,6 +80,7 @@ The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the 
 - "Providers page: add a provider (Fluid)": the preset tiles and a Custom provider. uw lists the address's models before it adds the provider.
 - "Chat: model and effort chips (Fluid)": the composer's chips and the model menu.
 - "AI providers: every state (Fluid)": effort levels, no effort levels, a model the catalog does not know, a model without tool calls, a missing model, a switch in the middle of a chat, the upgrade notice, provider problems, and the link from uw's settings section.
+- "Codex: Continue with ChatGPT (Fluid)", "Codex: the provider page (Fluid)", and "Codex: every state (Fluid)" (T388, drawn on 2026-11-15, not signed off yet): the Add provider tiles three by three with Codex, its account row with Sign out, its fixed address, and the sign-in's waiting, declined, no-plan, signed-out, and usage-limit states.
 
 Effort levels show in lower case, as each provider names them. A thin line in the chat marks where the model or effort changed; it is open to review.
 
