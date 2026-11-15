@@ -50,6 +50,16 @@ Agreed on 2026-10-29; not built yet (T264 to T266). Found when the user added Ve
 - **Test** passes when a decision model answers with a choice, or a language model with a placement uw can read.
 - **Upgrade.** Saved choices stay. A saved decision model choice that is a language model runs as one, with its tag.
 
+## Subscriptions
+
+Proposed on 2026-11-15; being worked out, not agreed. The owner asked for monthly plans that pay for model requests, such as OpenCode Go and ChatGPT Plus, as a way to reach models.
+
+| Plan | Status | Implementability |
+| --- | --- | --- |
+| OpenCode Go | Proposed | 8/10: an API key, formats uw already speaks, and each model's format and address in the model catalog |
+| ChatGPT Plus and Pro | Proposed | 5/10: OpenAI's sign-in, answers read as a stream, and request rules only a live account can check |
+| Claude Pro and Max | Not planned | Decided on 2026-11-15. [Anthropic's terms](https://code.claude.com/docs/en/legal-and-compliance) do not let other apps sign in with a Claude plan or send requests through one. A Claude plan works in Claude Code, which can run in a terminal tab with uw's tools through `uw mcp serve`. |
+
 ## Design
 
 The "AI providers" page on the [Doop canvas](../../AGENTS.md#designs) holds the designs, and the `uw-arc-style` guide has their rules under "AI providers".
