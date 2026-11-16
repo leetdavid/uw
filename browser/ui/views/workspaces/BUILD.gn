@@ -11,6 +11,8 @@ source_set("workspaces") {
     "move_to_workspace_menu.h",
     "workspace_cards.cc",
     "workspace_cards.h",
+    "workspace_drop.cc",
+    "workspace_drop.h",
     "workspace_swipe.cc",
     "workspace_swipe.h",
     "workspace_switcher.cc",

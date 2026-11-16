@@ -8,6 +8,7 @@
 
 #include "base/functional/bind.h"
 #include "base/run_loop.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
@@ -908,11 +909,14 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   Browser* other = nullptr;
   ASSERT_TRUE(base::test::RunUntil([&] {
     other = PartnerOn(first, personal);
-    return other && TabAt(other, kIssue) && !TabAt(first, kNotes) &&
-           !TabAt(second, kNotes) && Layout(other).size() == 3u;
-  }));
-  EXPECT_EQ(Layout(other)[0], std::string(kIssue) + " Trip 0");
-  EXPECT_EQ(Layout(other)[1], std::string(kNotes) + " Trip 1");
+    if (!other || TabAt(first, kNotes) || TabAt(second, kNotes)) {
+      return false;
+    }
+    const std::vector<std::string> rows = Layout(other);
+    return rows.size() == 3u &&
+           rows[0] == std::string(kIssue) + " Trip 0" &&
+           rows[1] == std::string(kNotes) + " Trip 1";
+  })) << (other ? base::JoinString(Layout(other), ", ") : "no window");
   EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(other, kNotes)));
   EXPECT_EQ(content::EvalJs(TabAt(other, kNotes)->GetContents(), kNotesInput),
             "half-typed");
@@ -923,6 +927,39 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   EXPECT_TRUE(WorkspaceWindow::From(other)->hidden());
   EXPECT_TRUE(TabAt(first, kMail));
   EXPECT_TRUE(InStep(first, second));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       DroppedTabsGoToTheEndOfTheOtherScratchpad) {
+  Browser* first = browser();
+  Open(first, kMail);
+  tabs::TabInterface* notes = Open(first, kNotes);
+  Open(first, kIssue);
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(), kTypeIntoNotes));
+  TabOrganizationController* controller = ControllerOf(first);
+  const PageId notes_id = *controller->IdFor(notes);
+  ASSERT_TRUE(controller->MoveToNewTask(
+      {notes_id, *controller->IdFor(TabAt(first, kIssue))}, u"Trip"));
+  ASSERT_TRUE(controller->Nest(notes_id));
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal =
+      list.Add("Personal", std::string(list.UnusedIcon()),
+               first->GetProfile()->GetBaseName());
+
+  TabOrganizationController::MoveTabsToWorkspace(
+      first, {notes->GetHandle(), TabAt(first, kIssue)->GetHandle()}, personal);
+  Browser* other = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    other = PartnerOn(first, personal);
+    return other && TabAt(other, kIssue) && !TabAt(first, kNotes) &&
+           Layout(other).size() == 3u;
+  }));
+  EXPECT_EQ(Layout(other)[1], std::string(kIssue) + " - 0");
+  EXPECT_EQ(Layout(other)[2], std::string(kNotes) + " - 1");
+  EXPECT_EQ(ControllerOf(other)->IdFor(TabAt(other, kNotes)), notes_id);
+  EXPECT_EQ(content::EvalJs(TabAt(other, kNotes)->GetContents(), kNotesInput),
+            "half-typed");
+  EXPECT_TRUE(TabAt(first, kMail));
 }
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,

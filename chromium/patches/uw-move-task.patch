@@ -50,3 +50,68 @@ index 7bf11d9a085ea3fc7915aacc1b263a21bdbec2ef..5d0371af2f33bed28be685f81e406a7a
  }
  
  NSMenuItem* BuildHelpMenu(NSApplication* nsapp,
+diff --git a/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc
+index f7c6c5c098c6b954c0d68eccf95a448e939c203c..356cfa076872c9c6005179b2ff5b478a286e39db 100644
+--- a/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/base_tab_strip_region_view.cc
+@@ -35,6 +35,7 @@
+ #include "ui/display/screen.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
++#include "uw/browser/ui/views/workspaces/workspace_drop.h"
+ 
+ BaseTabStripRegionView::BaseTabStripRegionView(
+     BrowserView* browser_view,
+@@ -413,6 +414,14 @@ TabDragTarget* BaseTabStripRegionView::GetTabDragTarget(
+   if (!drag_handler_) {
+     return nullptr;
+   }
++  // uw: a workspace's icon at the sidebar's foot takes a drop of the tabs
++  // dragged in this window.
++  if (drag_handler_->IsDragging()) {
++    if (TabDragTarget* workspace = uw::WorkspaceDropTargetAt(
++            this, drag_handler_->GetDragContext(), point_in_screen)) {
++      return workspace;
++    }
++  }
+   gfx::Rect tab_strip_draggable_bounds = GetTabStripDraggableBounds();
+   if (!tab_strip_draggable_bounds.Contains(point_in_screen)) {
+     return nullptr;
+diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
+index b96f50aef40fa5e74f85ffa8be48d378722a5cf3..dbfcc387da68b7f1ac9d77902ec9ff02472555a3 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
+@@ -11,6 +11,7 @@
+ #include "base/check_deref.h"
+ #include "base/functional/bind.h"
+ #include "base/notreached.h"
++#include "base/task/sequenced_task_runner.h"
+ #include "base/types/to_address.h"
+ #include "chrome/browser/ui/tabs/tab_group_model.h"
+ #include "chrome/browser/ui/ui_features.h"
+@@ -48,6 +49,7 @@
+ #include "ui/views/view_utils.h"
+ #include "ui/views/widget/widget.h"
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
++#include "uw/browser/ui/views/workspaces/workspace_drop.h"
+ 
+ DEFINE_UI_CLASS_PROPERTY_TYPE(gfx::Vector2d*)
+ 
+@@ -387,6 +389,17 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+ }
+ 
+ void TabDragHandlerImpl::EndDrag(EndDragReason reason) {
++  // uw: a drop on a workspace's icon at the sidebar's foot puts the tabs back,
++  // as Escape does, and then moves them to that workspace.
++  if (reason == EndDragReason::kComplete && drag_controller_) {
++    if (base::OnceClosure move =
++            uw::TakeWorkspaceDrop(drag_controller_->GetSessionData())) {
++      drag_controller_->EndDrag(EndDragReason::kCancel);
++      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(FROM_HERE,
++                                                               std::move(move));
++      return;
++    }
++  }
+   // uw: capture lost during a drag may only mean a dragged tab detached into
+   // a window of its own, which takes the capture. TabDragController decides
+   // then, and tells the tab tree once the drag ends.

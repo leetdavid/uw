@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review. [Moving a task to another workspace](#moving-a-task-to-another-workspace), T390 to T392, was agreed on 2026-11-17. T390, the task card and the Tasks menu, and T391, the command bar, were built the same day and are in review.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review. [Moving a task to another workspace](#moving-a-task-to-another-workspace), T390 to T392, was agreed on 2026-11-17. T390, the task card and the Tasks menu, T391, the command bar, and T392, dropping on a workspace's icon, were built the same day and are in review.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -109,6 +109,8 @@ Built for T390 on 2026-11-17.
 - On another profile, each web page opens there unloaded, from its address and title, as a restored tab does.
 - The list of workspaces is `WorkspaceMoveMenu` in `browser/workspaces`. The tab menu, the task card, the Tasks menu, and the command bar share it. The Tasks menu's submenu fills itself each time it opens (`browser/ui/views/workspaces/move_task_menu_mac.mm`), and `uw-move-task.patch` adds it to the menu bar.
 - The command bar opens to move the task as it does for Move to Task…, and `uw_command_bar.mojom` hands its page the workspaces. With the command bar off, the list opens beside the selected tab's row, as Move to Task…'s does. Built for T391.
+- A drop on a workspace's icon, built for T392: `uw-move-task.patch` has the sidebar's tab strip ask `WorkspaceDropTargetAt` (`browser/ui/views/workspaces/workspace_drop.h`) first while it drags. Over another workspace's icon, its target keeps the drag in this window, so nothing tears off into a new window, and fills the icon. A release there ends the drag as Escape does, putting the tabs back, and then moves the dragged task, or the dragged tabs, with `MoveTabsToWorkspace`. Dropped tabs go to the end of the Scratchpad together, each keeping its page and its parent among them.
+- The name does not show during a drag, though the agreed scope says it does: a tooltip cannot show while the drag holds the pointer. Showing it would need something new drawn, so it waits for the user.
 
 ## Design
 

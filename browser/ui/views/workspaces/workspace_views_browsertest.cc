@@ -704,6 +704,29 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       AnIconUnderADragTakesItsHoverFill) {
+  const std::string reading = AddWorkspace("Reading", profile());
+  Settle();
+  WorkspaceSwitcher* switcher = SwitcherOf(browser());
+  switcher->GetWidget()->LayoutRootViewIfNecessary();
+  views::Button* icon = switcher->IconFor(reading);
+  ASSERT_TRUE(icon);
+  ASSERT_FALSE(icon->GetBoundsInScreen().IsEmpty());
+  EXPECT_EQ(switcher->WorkspaceAt(icon->GetBoundsInScreen().CenterPoint()),
+            reading);
+  // The window's own workspace takes no drop.
+  views::Button* own =
+      switcher->IconFor(WorkspaceWindow::From(browser())->workspace());
+  ASSERT_TRUE(own);
+  EXPECT_EQ(switcher->WorkspaceAt(own->GetBoundsInScreen().CenterPoint()), "");
+
+  switcher->SetDropTarget(reading);
+  EXPECT_EQ(icon->GetState(), views::Button::STATE_HOVERED);
+  switcher->SetDropTarget(std::string());
+  EXPECT_EQ(icon->GetState(), views::Button::STATE_NORMAL);
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
                        MoveTaskToWorkspaceReopensItsPagesInAnotherProfile) {
   Profile& other = MakeProfile();
   const std::string work = AddWorkspace("Work", &other);

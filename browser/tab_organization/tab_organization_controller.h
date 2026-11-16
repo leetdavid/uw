@@ -145,6 +145,12 @@ class TabOrganizationController : public TabStripModelObserver,
   static void MoveTaskToWorkspace(BrowserWindowInterface* window,
                                   const tab_groups::TabGroupId& group,
                                   const std::string& workspace);
+  // Moves `tabs` of `window` to the end of the Scratchpad of `workspace`, as
+  // a drop on its icon does, by the same rules. A kept tab is let go, and
+  // terminals and chats on their own stay where they are.
+  static void MoveTabsToWorkspace(BrowserWindowInterface* window,
+                                  const std::vector<tabs::TabHandle>& tabs,
+                                  const std::string& workspace);
 
   const PageTree& tree() const;
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;
@@ -464,18 +470,27 @@ class TabOrganizationController : public TabStripModelObserver,
   void RevealSelected();
   // Opens a selected blank tab after `anchor` in the strip and returns it.
   std::optional<PageId> OpenBlankTab(const PageId& anchor);
-  // Opens a blank tab when `task` holds every tab, so the window keeps one.
-  void LeaveATabBesides(const tab_groups::TabGroupId& task);
+  // Opens a blank tab when `leaving` tabs are all of the window's tabs but
+  // its pins, so the window keeps one.
+  void KeepATab(size_t leaving);
   // The index after the last task in the strip.
   int EndOfTasks() const;
-  // Moves the task `group` shows here to `to`, a window on another
-  // workspace of the profile, with its live pages.
-  void TakeTaskTo(const tab_groups::TabGroupId& group,
-                  TabOrganizationController* to);
-  // Opens the task `group` shows here in `to`, a window on another
-  // profile, and closes it here.
-  void ReopenTaskIn(const tab_groups::TabGroupId& group,
-                    TabOrganizationController* to);
+  std::vector<PageId> PagesOfTask(const std::string& task) const;
+  // Moves `pages` to `workspace`: as the task `group` shows here, after its
+  // tasks, or else to the end of its Scratchpad.
+  void MoveToWorkspace(const std::vector<PageId>& pages,
+                       const std::optional<tab_groups::TabGroupId>& group,
+                       const std::string& workspace);
+  // To `to`, a window on another workspace of the profile, with their live
+  // pages.
+  void TakeTo(const std::vector<PageId>& pages,
+              const std::optional<tab_groups::TabGroupId>& group,
+              TabOrganizationController* to);
+  // To `to`, a window on another profile: opens them there and closes them
+  // here.
+  void ReopenIn(const std::vector<PageId>& pages,
+                const std::optional<tab_groups::TabGroupId>& group,
+                TabOrganizationController* to);
   // Takes each of `staying` out of the branches of `roots`.
   void LeaveBehind(const std::vector<PageId>& roots,
                    const std::vector<PageId>& staying);

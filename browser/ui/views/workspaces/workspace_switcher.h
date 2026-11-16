@@ -66,6 +66,12 @@ class WorkspaceSwitcher : public views::View,
   void SetSlide(const std::string& to, float amount);
 
   views::Button* IconFor(std::string_view id);
+  // The workspace whose icon is at `point_in_screen`, unless it is the one
+  // this window shows, or empty.
+  std::string WorkspaceAt(const gfx::Point& point_in_screen);
+  // While a dragged task or tab is over the icon of workspace `id`, the icon
+  // has its hover fill. An empty `id` takes it off.
+  void SetDropTarget(const std::string& id);
   // The card or menu that is open, if any.
   views::Widget* card() { return card_.get(); }
   BrowserWindowInterface* window() { return window_; }
@@ -93,6 +99,7 @@ class WorkspaceSwitcher : public views::View,
 
   const raw_ptr<BrowserWindowInterface> window_;
   std::string ringed_;
+  std::string drop_target_;
   std::unique_ptr<views::Widget> card_;
   std::unique_ptr<ExpandOnHoverLock> hover_lock_;
   std::unique_ptr<WorkspaceSwipe> swipe_;

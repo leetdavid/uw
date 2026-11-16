@@ -339,6 +339,32 @@ views::Button* WorkspaceSwitcher::IconFor(std::string_view id) {
   return nullptr;
 }
 
+std::string WorkspaceSwitcher::WorkspaceAt(const gfx::Point& point_in_screen) {
+  const WorkspaceWindow* shown = WorkspaceWindow::From(window_);
+  for (views::View* child : children()) {
+    if (auto* icon = views::AsViewClass<WorkspaceIcon>(child);
+        icon && icon->GetVisible() &&
+        icon->GetBoundsInScreen().Contains(point_in_screen) &&
+        (!shown || icon->id() != shown->workspace())) {
+      return icon->id();
+    }
+  }
+  return std::string();
+}
+
+void WorkspaceSwitcher::SetDropTarget(const std::string& id) {
+  if (id == drop_target_) {
+    return;
+  }
+  if (views::Button* icon = IconFor(drop_target_)) {
+    icon->SetState(views::Button::STATE_NORMAL);
+  }
+  drop_target_ = id;
+  if (views::Button* icon = IconFor(drop_target_)) {
+    icon->SetState(views::Button::STATE_HOVERED);
+  }
+}
+
 void WorkspaceSwitcher::ShowContextMenuForViewImpl(
     views::View* source,
     const gfx::Point& point,
