@@ -10,7 +10,6 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/weak_ptr.h"
-#include "base/no_destructor.h"
 #include "base/scoped_observation.h"
 #include "base/task/sequenced_task_runner.h"
 #include "cc/paint/paint_flags.h"
@@ -30,14 +29,12 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
-#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/canvas.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/image_view.h"
-#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
@@ -48,6 +45,7 @@
 #include "uw/browser/ui/look/menu_card.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/menu_card_row.h"
+#include "uw/browser/ui/views/tab_organization/move_to_task_menu.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/workspaces/workspace_move_menu.h"
 
@@ -143,57 +141,6 @@ class ColorDot : public views::Button {
 
 BEGIN_METADATA(ColorDot)
 END_METADATA
-
-// The workspaces beside the card's row. The card may close as the menu
-// opens, so the menu lives apart from it until it closes.
-class WorkspacesBeside {
- public:
-  WorkspacesBeside(BrowserWindowInterface* window,
-                   const tab_groups::TabGroupId& group,
-                   base::WeakPtr<views::Widget> card)
-      : window_(window->GetWeakPtr()),
-        group_(group),
-        card_(std::move(card)),
-        menu_(window,
-              base::BindRepeating(&WorkspacesBeside::Move,
-                                  base::Unretained(this))) {}
-
-  void RunBeside(views::View* row, base::RepeatingClosure closed) {
-    runner_ = std::make_unique<views::MenuRunner>(
-        &menu_, views::MenuRunner::HAS_MNEMONICS, std::move(closed));
-    runner_->RunMenuAt(row->GetWidget(), nullptr, row->GetBoundsInScreen(),
-                       views::MenuAnchorPosition::kBubbleRight,
-                       ui::mojom::MenuSourceType::kMouse);
-  }
-
- private:
-  void Move(const std::string& workspace) {
-    if (window_) {
-      TabOrganizationController::MoveTaskToWorkspace(window_.get(), group_,
-                                                     workspace);
-    }
-    if (card_) {
-      card_->Close();
-    }
-  }
-
-  const base::WeakPtr<BrowserWindowInterface> window_;
-  const tab_groups::TabGroupId group_;
-  const base::WeakPtr<views::Widget> card_;
-  WorkspaceMoveMenu menu_;
-  std::unique_ptr<views::MenuRunner> runner_;
-};
-
-std::unique_ptr<WorkspacesBeside>& ShownWorkspaces() {
-  static base::NoDestructor<std::unique_ptr<WorkspacesBeside>> menu;
-  return *menu;
-}
-
-// The menu closes from inside itself, so it is deleted afterwards.
-void OnWorkspacesClosed() {
-  base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
-      FROM_HERE, std::move(ShownWorkspaces()));
-}
 
 }  // namespace
 
@@ -349,13 +296,11 @@ void TaskCard::MoveToNewWindow() {
 
 // The menu opens beside the row, and picking a workspace closes the card.
 void TaskCard::ShowWorkspaces() {
-  views::View* row = GetViewByID(kWorkspaceId);
-  if (ShownWorkspaces() || !row) {
-    return;
+  if (views::View* row = GetViewByID(kWorkspaceId)) {
+    ShowMoveTaskMenuBeside(
+        window_, group_, row,
+        base::BindOnce(&views::Widget::Close, GetWidget()->GetWeakPtr()));
   }
-  ShownWorkspaces() = std::make_unique<WorkspacesBeside>(
-      window_, group_, GetWidget()->GetWeakPtr());
-  ShownWorkspaces()->RunBeside(row, base::BindRepeating(&OnWorkspacesClosed));
 }
 
 // One undoable move of every branch in the task.

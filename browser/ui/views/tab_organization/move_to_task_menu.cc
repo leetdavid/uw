@@ -3,9 +3,12 @@
 #include "uw/browser/ui/views/tab_organization/move_to_task_menu.h"
 
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/task/sequenced_task_runner.h"
@@ -21,6 +24,8 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
+#include "uw/browser/workspaces/workspace_move_menu.h"
 
 namespace uw {
 namespace {
@@ -82,6 +87,56 @@ void OnClosed() {
       FROM_HERE, std::move(Shown()));
 }
 
+// The workspaces a task can move to. A card the row is in may close as the
+// menu opens, so the menu lives apart from it until it closes.
+class MoveTaskMenu {
+ public:
+  MoveTaskMenu(BrowserWindowInterface* window,
+               const tab_groups::TabGroupId& group,
+               base::OnceClosure picked)
+      : window_(window->GetWeakPtr()),
+        group_(group),
+        picked_(std::move(picked)),
+        menu_(
+            window,
+            base::BindRepeating(&MoveTaskMenu::Move, base::Unretained(this))) {}
+
+  void RunBeside(views::View* row, base::RepeatingClosure closed) {
+    runner_ = std::make_unique<views::MenuRunner>(
+        &menu_, views::MenuRunner::HAS_MNEMONICS, std::move(closed));
+    runner_->RunMenuAt(row->GetWidget(), nullptr, row->GetBoundsInScreen(),
+                       views::MenuAnchorPosition::kBubbleRight,
+                       ui::mojom::MenuSourceType::kMouse);
+  }
+
+ private:
+  void Move(const std::string& workspace) {
+    if (window_) {
+      TabOrganizationController::MoveTaskToWorkspace(window_.get(), group_,
+                                                     workspace);
+    }
+    if (picked_) {
+      std::move(picked_).Run();
+    }
+  }
+
+  const base::WeakPtr<BrowserWindowInterface> window_;
+  const tab_groups::TabGroupId group_;
+  base::OnceClosure picked_;
+  WorkspaceMoveMenu menu_;
+  std::unique_ptr<views::MenuRunner> runner_;
+};
+
+std::unique_ptr<MoveTaskMenu>& ShownTaskMenu() {
+  static base::NoDestructor<std::unique_ptr<MoveTaskMenu>> menu;
+  return *menu;
+}
+
+void OnTaskMenuClosed() {
+  base::SequencedTaskRunner::GetCurrentDefault()->DeleteSoon(
+      FROM_HERE, std::move(ShownTaskMenu()));
+}
+
 }  // namespace
 
 void ShowMoveToTaskMenu(BrowserWindowInterface* window) {
@@ -94,6 +149,30 @@ void ShowMoveToTaskMenu(BrowserWindowInterface* window) {
   }
   Shown() = std::make_unique<MoveToTaskMenu>(window, model->active_index());
   Shown()->RunBeside(row, base::BindRepeating(&OnClosed));
+}
+
+void ShowMoveTaskMenuBeside(BrowserWindowInterface* window,
+                            const tab_groups::TabGroupId& group,
+                            views::View* row,
+                            base::OnceClosure picked) {
+  if (ShownTaskMenu()) {
+    return;
+  }
+  ShownTaskMenu() =
+      std::make_unique<MoveTaskMenu>(window, group, std::move(picked));
+  ShownTaskMenu()->RunBeside(row, base::BindRepeating(&OnTaskMenuClosed));
+}
+
+void ShowMoveTaskMenu(BrowserWindowInterface* window) {
+  const tabs::TabInterface* tab = window->GetTabStripModel()->GetActiveTab();
+  const std::optional<tab_groups::TabGroupId> group =
+      tab ? tab->GetGroup() : std::nullopt;
+  TabView* row =
+      tab ? RowOf(BrowserView::GetBrowserViewForBrowser(window), tab) : nullptr;
+  if (!group || !row || !row->IsDrawn()) {
+    return;
+  }
+  ShowMoveTaskMenuBeside(window, *group, row, base::DoNothing());
 }
 
 }  // namespace uw

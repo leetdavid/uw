@@ -32,8 +32,8 @@
 #include "components/prefs/pref_service.h"
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tab_groups/tab_group_visual_data.h"
-#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/split_tab_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/focused_node_details.h"
 #include "content/public/browser/keyboard_event_processing_result.h"
@@ -64,6 +64,7 @@
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/glass/glass.h"
 #include "uw/browser/ui/webui/uw_command_bar/uw_command_bar_ui.h"
+#include "uw/browser/workspaces/workspace_move_menu.h"
 
 namespace uw {
 namespace {
@@ -98,10 +99,21 @@ CommandBar::CommandSource& Source() {
 }
 
 // The workspace's tasks in sidebar order, then the Scratchpad, each with the
-// addresses its tabs in `window` show.
-mojom::BarTasksPtr ListTasks(BrowserWindowInterface* window, bool moving) {
+// addresses its tabs in `window` show. While moving a task, the workspaces
+// it can move to.
+mojom::BarTasksPtr ListTasks(BrowserWindowInterface* window,
+                             bool moving,
+                             bool moving_task) {
   auto list = mojom::BarTasks::New();
   list->moving = moving;
+  list->moving_task = moving_task;
+  if (moving_task) {
+    for (const WorkspaceMoveMenu::Target& target :
+         WorkspaceMoveMenu::TargetsFor(window)) {
+      list->workspaces.push_back(mojom::BarWorkspace::New(
+          target.id, target.icon, target.name, target.reopens));
+    }
+  }
   const TabOrganizationController* controller =
       TabOrganizationController::From(window);
   const TabGroupModel* groups = window->GetTabStripModel()->group_model();
@@ -233,7 +245,8 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
     return listed;
   }
   mojom::BarTasksPtr Tasks() override {
-    return ListTasks(bar_->window_, bar_->moving_);
+    return ListTasks(bar_->window_, bar_->move_ == Move::kTabs,
+                     bar_->move_ == Move::kTask);
   }
   void RunCommand(int command) override { bar_->RunCommand(command); }
   void GoToTask(const std::string& task) override { bar_->GoToTask(task); }
@@ -243,6 +256,9 @@ class CommandBar::Page : public WebUIContentsWrapperT<UwCommandBarUI>,
   void MoveToNewTask() override {
     bar_->CloseForPick();
     chrome::ExecuteCommand(bar_->window_, TabOrganizationController::kNewTask);
+  }
+  void MoveTaskToWorkspace(const std::string& workspace) override {
+    bar_->MoveTaskToWorkspace(workspace);
   }
   void OnFocusChangedInPage(
       const content::FocusedNodeDetails& details) override {
@@ -344,37 +360,42 @@ CommandBar* CommandBar::From(BrowserWindowInterface* window) {
 }
 
 bool CommandBar::Open(BrowserWindowInterface* window) {
-  return OpenWith(window, std::nullopt, nullptr, /*moving=*/false,
+  return OpenWith(window, std::nullopt, nullptr, Move::kNothing,
                   /*reset_shell=*/std::nullopt);
 }
 
 bool CommandBar::OpenForShellCommand(BrowserWindowInterface* window) {
-  return OpenWith(window, std::nullopt, nullptr, /*moving=*/false,
+  return OpenWith(window, std::nullopt, nullptr, Move::kNothing,
                   /*reset_shell=*/true);
 }
 
 bool CommandBar::OpenForTask(BrowserWindowInterface* window,
                              const tab_groups::TabGroupId& task) {
-  return OpenWith(window, task, nullptr, /*moving=*/false,
+  return OpenWith(window, task, nullptr, Move::kNothing,
                   /*reset_shell=*/std::nullopt);
 }
 
 bool CommandBar::OpenForPane(BrowserWindowInterface* window,
                              tabs::TabInterface* pane) {
-  return OpenWith(window, std::nullopt, pane, /*moving=*/false,
+  return OpenWith(window, std::nullopt, pane, Move::kNothing,
                   /*reset_shell=*/std::nullopt);
 }
 
 bool CommandBar::OpenToMoveTabs(BrowserWindowInterface* window) {
   // The page asks for the tasks as it empties.
-  return OpenWith(window, std::nullopt, nullptr, /*moving=*/true,
+  return OpenWith(window, std::nullopt, nullptr, Move::kTabs,
+                  /*reset_shell=*/false);
+}
+
+bool CommandBar::OpenToMoveTask(BrowserWindowInterface* window) {
+  return OpenWith(window, std::nullopt, nullptr, Move::kTask,
                   /*reset_shell=*/false);
 }
 
 bool CommandBar::OpenWith(BrowserWindowInterface* window,
                           std::optional<tab_groups::TabGroupId> task,
                           tabs::TabInterface* pane,
-                          bool moving,
+                          Move move,
                           std::optional<bool> reset_shell) {
   CommandBar* bar = From(window);
   if (!bar || !bar->contents_) {
@@ -382,7 +403,7 @@ bool CommandBar::OpenWith(BrowserWindowInterface* window,
   }
   bar->task_ = task;
   bar->pane_ = pane ? pane->GetHandle() : tabs::TabHandle();
-  bar->moving_ = moving;
+  bar->move_ = move;
   if (reset_shell) {
     ResetCommandBar(bar->page(), *reset_shell);
   }
@@ -466,7 +487,7 @@ void CommandBar::Show() {
 void CommandBar::OnWidgetClosing(views::Widget* widget) {
   panel_.Reset();
   if (widget->closed_reason() != views::Widget::ClosedReason::kLostFocus) {
-    moving_ = false;
+    move_ = Move::kNothing;
     ResetCommandBar(page(), /*shell=*/false);
     // Esc before anything was picked closes an empty little window.
     if (!opening_) {
@@ -580,6 +601,15 @@ void CommandBar::MoveToTask(const std::string& task) {
   } else if (const std::optional<tab_groups::TabGroupId> group =
                  controller->GroupFor(task)) {
     controller->MoveToTask(controller->SelectionFor(), *group);
+  }
+}
+
+void CommandBar::MoveTaskToWorkspace(const std::string& workspace) {
+  CloseForPick();
+  const tabs::TabInterface* tab = window_->GetTabStripModel()->GetActiveTab();
+  if (const std::optional<tab_groups::TabGroupId> group =
+          tab ? tab->GetGroup() : std::nullopt) {
+    TabOrganizationController::MoveTaskToWorkspace(window_, *group, workspace);
   }
 }
 

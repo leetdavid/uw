@@ -20,34 +20,41 @@ constexpr int kFirstWorkspace = 56300;
 
 }  // namespace
 
-WorkspaceMoveMenu::WorkspaceMoveMenu(BrowserWindowInterface* window, MoveCallback move)
-    : ui::SimpleMenuModel(this), move_(std::move(move)) {
+// static
+std::vector<WorkspaceMoveMenu::Target> WorkspaceMoveMenu::TargetsFor(
+    BrowserWindowInterface* window) {
+  std::vector<Target> targets;
   const WorkspaceWindow* shown = WorkspaceWindow::From(window);
   if (!shown) {
-    return;
+    return targets;
   }
   const base::FilePath profile = window->GetProfile()->GetBaseName();
-  std::vector<const WorkspaceList::Workspace*> elsewhere;
+  std::vector<Target> elsewhere;
   for (const WorkspaceList::Workspace& workspace :
        WorkspaceList::Get().workspaces()) {
     if (workspace.id == shown->workspace()) {
       continue;
     }
-    if (workspace.profile == profile) {
-      Add(workspace.id, workspace.icon, workspace.name);
-    } else {
-      elsewhere.push_back(&workspace);
+    const bool reopens = workspace.profile != profile;
+    (reopens ? elsewhere : targets)
+        .push_back({workspace.id, workspace.icon, workspace.name, reopens});
+  }
+  targets.insert(targets.end(), elsewhere.begin(), elsewhere.end());
+  return targets;
+}
+
+WorkspaceMoveMenu::WorkspaceMoveMenu(BrowserWindowInterface* window, MoveCallback move)
+    : ui::SimpleMenuModel(this), move_(std::move(move)) {
+  bool reopening = false;
+  for (const Target& target : TargetsFor(window)) {
+    if (target.reopens && !reopening) {
+      if (GetItemCount()) {
+        AddSeparator(ui::NORMAL_SEPARATOR);
+      }
+      AddTitle(l10n_util::GetStringUTF16(IDS_UW_REOPENS_IN_ANOTHER_PROFILE));
+      reopening = true;
     }
-  }
-  if (elsewhere.empty()) {
-    return;
-  }
-  if (GetItemCount()) {
-    AddSeparator(ui::NORMAL_SEPARATOR);
-  }
-  AddTitle(l10n_util::GetStringUTF16(IDS_UW_REOPENS_IN_ANOTHER_PROFILE));
-  for (const WorkspaceList::Workspace* workspace : elsewhere) {
-    Add(workspace->id, workspace->icon, workspace->name);
+    Add(target);
   }
 }
 
@@ -60,12 +67,10 @@ void WorkspaceMoveMenu::ExecuteCommand(int command_id, int event_flags) {
   }
 }
 
-void WorkspaceMoveMenu::Add(const std::string& id,
-                        const std::string& icon,
-                        const std::string& name) {
+void WorkspaceMoveMenu::Add(const Target& target) {
   AddItem(kFirstWorkspace + static_cast<int>(ids_.size()),
-          base::UTF8ToUTF16(icon + "  " + name));
-  ids_.push_back(id);
+          base::UTF8ToUTF16(target.icon + "  " + target.name));
+  ids_.push_back(target.id);
 }
 
 }  // namespace uw

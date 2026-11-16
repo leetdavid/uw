@@ -42,6 +42,7 @@ constexpr UwCommand kUwCommands[] = {
     {kClearScratchpad, IDS_UW_CLEAR_SCRATCHPAD_MAC},
     {kRenameTask, IDS_UW_RENAME_TASK_MAC},
     {kNameTask, IDS_UW_NAME_TASK_MAC},
+    {kMoveTaskToWorkspace, IDS_UW_MOVE_TASK_TO_WORKSPACE},
     {IDC_CLOSE_TAB_GROUP, IDS_UW_CLOSE_TASK_MAC},
     {kConfirmSuggestion, IDS_UW_CONFIRM_SUGGESTION_MAC},
     {TabOrganizationController::kUndo, IDS_UW_UNDO_ORGANIZATION_MAC},

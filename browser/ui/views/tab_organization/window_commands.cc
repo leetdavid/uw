@@ -208,6 +208,11 @@ void RunWindowCommand(BrowserWindowInterface* window, int command) {
         ShowMoveToTaskMenu(window);
       }
       break;
+    case kMoveTaskToWorkspace:
+      if (!CommandBar::OpenToMoveTask(window)) {
+        ShowMoveTaskMenu(window);
+      }
+      break;
     case kGoToScratchpad:
       controller->SelectTask(std::string());
       break;

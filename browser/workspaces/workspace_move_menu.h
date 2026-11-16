@@ -21,6 +21,17 @@ class WorkspaceMoveMenu : public ui::SimpleMenuModel,
  public:
   using MoveCallback = base::RepeatingCallback<void(const std::string&)>;
 
+  // A workspace something can move to. `reopens` is true for one on another
+  // profile, where pages reopen from their addresses.
+  struct Target {
+    std::string id;
+    std::string icon;
+    std::string name;
+    bool reopens = false;
+  };
+  // The menu's workspaces, in its order.
+  static std::vector<Target> TargetsFor(BrowserWindowInterface* window);
+
   WorkspaceMoveMenu(BrowserWindowInterface* window, MoveCallback move);
   WorkspaceMoveMenu(const WorkspaceMoveMenu&) = delete;
   WorkspaceMoveMenu& operator=(const WorkspaceMoveMenu&) = delete;
@@ -32,9 +43,7 @@ class WorkspaceMoveMenu : public ui::SimpleMenuModel,
   void ExecuteCommand(int command_id, int event_flags) override;
 
  private:
-  void Add(const std::string& id,
-           const std::string& icon,
-           const std::string& name);
+  void Add(const Target& target);
 
   MoveCallback move_;
   std::vector<std::string> ids_;

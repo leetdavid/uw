@@ -49,6 +49,7 @@ class CommandBarActions {
   virtual void GoToTask(const std::string& task) = 0;
   virtual void MoveToTask(const std::string& task) = 0;
   virtual void MoveToNewTask() = 0;
+  virtual void MoveTaskToWorkspace(const std::string& workspace) = 0;
 
  protected:
   virtual ~CommandBarActions() = default;
@@ -123,6 +124,7 @@ class UwCommandBarUI : public TopChromeWebUIController,
   void GoToTask(const std::string& id) override;
   void MoveToTask(const std::string& id) override;
   void MoveToNewTask() override;
+  void MoveTaskToWorkspace(const std::string& id) override;
 
   std::unique_ptr<UwCommandBarHandler> handler_;
   std::unique_ptr<ProblemReporter> problem_reporter_;

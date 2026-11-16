@@ -10,7 +10,7 @@ import {Calculator} from './calculator.js';
 import type {Calculation, Ink, MathJsLibrary} from './calculator.js';
 import {TimeMath} from './time.js';
 import {CalculatorHandler} from './uw_command_bar.mojom-webui.js';
-import type {BarCommand, BarTask, SelectedPage} from './uw_command_bar.mojom-webui.js';
+import type {BarCommand, BarTask, BarWorkspace, SelectedPage} from './uw_command_bar.mojom-webui.js';
 
 // mathjs, which command_bar.html loads first.
 declare const math: MathJsLibrary;
@@ -74,7 +74,8 @@ let completion = '';
 // A row of Chromium's, with the line Chromium knows it by, or one of uw's.
 type MatchRow = {kind: 'match', match: AutocompleteMatch, line: number};
 type Row = MatchRow|{kind: 'command', command: BarCommand}|
-    {kind: 'task', task: BarTask}|{kind: 'newTask'};
+    {kind: 'task', task: BarTask}|{kind: 'newTask'}|
+    {kind: 'workspace', workspace: BarWorkspace};
 let rows: Row[] = [];
 // The typed text the shown rows are for.
 let shownFor = '';
@@ -90,6 +91,10 @@ let shell = false;
 let page: SelectedPage|null = null;
 // After Option+Cmd+M, the rows are the tasks the selected tabs can move to.
 let moving = false;
+// After Move Task to Workspace, they are the workspaces the selected tab's
+// task can move to.
+let movingTask = false;
+let workspaces: BarWorkspace[] = [];
 // The commands that can run and the tasks, as of the bar showing, and the
 // selected tab's task, empty for the Scratchpad.
 let commands: BarCommand[] = [];
@@ -120,11 +125,13 @@ function showChip() {
     chip.replaceChildren(favicon(page.url), text('', page.title));
   } else {
     chip.textContent = shell ? '>' :
+        movingTask           ? 'Move task to workspace' :
         moving               ? 'Move to task' :
                                (keywords.inputKeywordModel?.displayText ?? '');
   }
   field.placeholder = shell ? 'Type a shell command' :
       page                  ? 'Ask about this page' :
+      movingTask            ? 'Type a workspace\'s name' :
       moving                ? 'Type a task\'s name' :
                               PLACEHOLDER;
   keys.classList.toggle('shell', shell);
@@ -243,6 +250,14 @@ function cells(row: Row): HTMLElement[] {
         text('title', MOVE_TO_NEW_TASK),
         text('detail', ''),
       ];
+    case 'workspace':
+      return [
+        icon(text('emoji', row.workspace.icon)),
+        text('title', row.workspace.name),
+        text(
+            'detail',
+            row.workspace.reopens ? 'Reopens in another profile' : ''),
+      ];
   }
 }
 
@@ -254,6 +269,8 @@ function nameOf(row: Exclude<Row, MatchRow>): string {
       return row.task.name;
     case 'newTask':
       return MOVE_TO_NEW_TASK;
+    case 'workspace':
+      return row.workspace.name;
   }
 }
 
@@ -315,14 +332,17 @@ function drawRows() {
   }));
 }
 
-// After Option+Cmd+M: Move to New Task, the other tasks, then the Scratchpad,
-// those whose names match the typed text.
+// After Option+Cmd+M: Move to New Task, the other tasks, then the Scratchpad.
+// After Move Task to Workspace: the workspaces. Those whose names match the
+// typed text.
 function showMoveRows() {
-  const all: Row[] = [
-    {kind: 'newTask'},
-    ...tasks.filter(task => task.id !== selectedTask)
-        .map(task => ({kind: 'task', task}) as Row),
-  ];
+  const all: Row[] = movingTask ?
+      workspaces.map(workspace => ({kind: 'workspace', workspace}) as Row) :
+      [
+        {kind: 'newTask'},
+        ...tasks.filter(task => task.id !== selectedTask)
+            .map(task => ({kind: 'task', task}) as Row),
+      ];
   rows = typed.trim() ?
       all.filter(row => row.kind !== 'match' && nameMatch(nameOf(row))) :
       all;
@@ -338,6 +358,7 @@ function actionName(row: Row|undefined): string {
     case 'task':
       return moving ? 'Move here' : 'Go to task';
     case 'newTask':
+    case 'workspace':
       return 'Move here';
     case 'match':
       return row.match.type === 'tab' ? 'Switch to tab' : 'Open';
@@ -540,6 +561,10 @@ function open(index: number, viaKeyboard: boolean) {
     calculatorHandler.moveToNewTask();
     return;
   }
+  if (row?.kind === 'workspace') {
+    calculatorHandler.moveTaskToWorkspace(row.workspace.id);
+    return;
+  }
   if (!row && !field.value) {
     return;
   }
@@ -685,8 +710,10 @@ async function fetchLists() {
   commands = listed;
   tasks = list.tasks;
   selectedTask = list.selected;
-  if (list.moving) {
+  if (list.moving || list.movingTask) {
     moving = true;
+    movingTask = list.movingTask;
+    workspaces = list.workspaces;
     leaveRows();
     showChip();
     showMoveRows();
@@ -697,6 +724,7 @@ async function fetchLists() {
 
 function clear() {
   moving = false;
+  movingTask = false;
   field.value = '';
   typed = '';
   completion = '';

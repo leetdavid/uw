@@ -64,6 +64,7 @@
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/webui/uw_command_bar/exchange_rates.h"
+#include "uw/browser/workspaces/workspace_list.h"
 
 namespace uw {
 namespace {
@@ -674,6 +675,28 @@ IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
   EXPECT_TRUE(Eventually([&] {
     return tabs()->GetActiveTab()->GetGroup() == task_ &&
            tabs()->active_index() == 1 && !bar()->IsShowing();
+  }));
+}
+
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
+                       MoveTaskToWorkspaceListsWorkspacesAndMovesThere) {
+  MakeATask();
+  WorkspaceList& list = WorkspaceList::Get();
+  list.Add("Reading", std::string(list.UnusedIcon()),
+           browser()->GetProfile()->GetBaseName());
+  tabs()->ActivateTabAt(0);
+  chrome::ExecuteCommand(browser(), kMoveTaskToWorkspace);
+
+  ASSERT_TRUE(Eventually([&] {
+    return bar()->IsShowing() && Chip() == "Move task to workspace" &&
+           Each(".title") == "Reading";
+  })) << Chip()
+      << " " << Each(".title");
+  PressInField("Enter");
+
+  EXPECT_TRUE(Eventually([&] {
+    return !tabs()->group_model()->ContainsTabGroup(*task_) &&
+           !bar()->IsShowing();
   }));
 }
 

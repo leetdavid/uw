@@ -36,6 +36,17 @@ struct BarTask {
   array<string> urls;
 };
 
+// A workspace the selected tab's task can move to.
+struct BarWorkspace {
+  string id;
+  // Its emoji.
+  string icon;
+  string name;
+  // True for a workspace on another profile, where the task's pages reopen
+  // from their addresses.
+  bool reopens;
+};
+
 struct BarTasks {
   // The tasks in sidebar order, then the Scratchpad.
   array<BarTask> tasks;
@@ -44,6 +55,10 @@ struct BarTasks {
   // True when the command bar opened to move the selected tabs, as
   // Option+Cmd+M does.
   bool moving;
+  // True when it opened to move the selected tab's task to another
+  // workspace, with the workspaces it can move to.
+  bool moving_task;
+  array<BarWorkspace> workspaces;
 };
 
 // What the command bar's page asks of its window.
@@ -78,4 +93,6 @@ interface CalculatorHandler {
   // `id`, or of the Scratchpad, or to a new task.
   MoveToTask(string id);
   MoveToNewTask();
+  // Moves the selected tab's task to workspace `id`.
+  MoveTaskToWorkspace(string id);
 };

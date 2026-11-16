@@ -240,6 +240,13 @@ void UwCommandBarUI::MoveToNewTask() {
   }
 }
 
+void UwCommandBarUI::MoveTaskToWorkspace(const std::string& id) {
+  if (CommandBarActions* actions =
+          GetCommandBarActions(web_ui()->GetWebContents())) {
+    actions->MoveTaskToWorkspace(id);
+  }
+}
+
 void UwCommandBarUI::CreatePageHandler(
     mojo::PendingRemote<searchbox::mojom::Page> page,
     mojo::PendingReceiver<searchbox::mojom::PageHandler> handler) {

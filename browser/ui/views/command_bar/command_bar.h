@@ -76,6 +76,8 @@ class CommandBar : public views::WidgetObserver {
   // Shows it with only the tasks the selected tabs can move to, as
   // Option+Cmd+M does.
   static bool OpenToMoveTabs(BrowserWindowInterface* window);
+  // Shows it with only the workspaces the selected tab's task can move to.
+  static bool OpenToMoveTask(BrowserWindowInterface* window);
 
   bool IsShowing() const;
   // Null while the setting is off.
@@ -83,18 +85,20 @@ class CommandBar : public views::WidgetObserver {
 
  private:
   class Page;
+  // What the command bar lists to move something to, if anything.
+  enum class Move { kNothing, kTabs, kTask };
 
   // views::WidgetObserver:
   void OnWidgetClosing(views::Widget* widget) override;
   void OnWidgetDestroying(views::Widget* widget) override;
 
   // Shows the command bar of `window` for `task`, over `pane`, or to move
-  // tabs, each if given. With `reset_shell`, empties its page first, ready
-  // for a shell command when true.
+  // tabs or a task, each if given. With `reset_shell`, empties its page first,
+  // ready for a shell command when true.
   static bool OpenWith(BrowserWindowInterface* window,
                        std::optional<tab_groups::TabGroupId> task,
                        tabs::TabInterface* pane,
-                       bool moving,
+                       Move move,
                        std::optional<bool> reset_shell);
   void OnSettingChanged();
   void Show();
@@ -117,6 +121,9 @@ class CommandBar : public views::WidgetObserver {
   // Closes the command bar, then moves the selected tabs, each with the tabs
   // under it, to the end of `task`, or of the Scratchpad when it is empty.
   void MoveToTask(const std::string& task);
+  // Closes the command bar, then moves the selected tab's task to
+  // `workspace`.
+  void MoveTaskToWorkspace(const std::string& workspace);
   // Closes the command bar for a pick, an ask, or a command, so an empty
   // little window stays for what it opens.
   void CloseForPick();
@@ -135,8 +142,8 @@ class CommandBar : public views::WidgetObserver {
   base::ScopedObservation<views::Widget, views::WidgetObserver> panel_{this};
   // True while a pick, an ask, or a terminal command closes the command bar.
   bool opening_ = false;
-  // True while it lists the tasks the selected tabs can move to.
-  bool moving_ = false;
+  // What it lists the selected tabs, or their task, can move to.
+  Move move_ = Move::kNothing;
   std::optional<tab_groups::TabGroupId> task_;
   tabs::TabHandle pane_;
   ui::ScopedUnownedUserData<CommandBar> user_data_;
