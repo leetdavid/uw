@@ -133,6 +133,10 @@ bool CanRunWindowCommand(BrowserWindowInterface* window, int command) {
                                  });
     case kRenameTask:
       return SelectedTask(window).has_value();
+    case kMoveTaskToWorkspace:
+      return SelectedTask(window).has_value() &&
+             WorkspaceWindow::From(window) &&
+             WorkspaceList::Get().workspaces().size() > 1;
     case kNameTask:
       return organizer && organizer->CanAskForName() &&
              SelectedTask(window).has_value();

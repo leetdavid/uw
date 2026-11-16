@@ -21,7 +21,8 @@ class Widget;
 namespace uw {
 
 // The task menu: a card under a task's row in the sidebar that renames and
-// names the task, sets its color, and moves or closes its tabs. It takes the
+// names the task, sets its color, moves it to another window or workspace,
+// and moves or closes its tabs. It takes the
 // place of Chromium's task editor there. See the sidebar menus plan.
 class TaskCard : public views::View {
   METADATA_HEADER(TaskCard, views::View)
@@ -36,6 +37,7 @@ class TaskCard : public views::View {
     kNewWindowId,
     kScratchpadId,
     kCloseId,
+    kWorkspaceId,
   };
 
   // Shows the card of `group` under `row`, the task's row. The caller keeps
@@ -57,6 +59,7 @@ class TaskCard : public views::View {
   void SetColor(tab_groups::TabGroupColorId color);
   void NewTab();
   void MoveToNewWindow();
+  void ShowWorkspaces();
   void MoveToScratchpad();
   void CloseTask();
   static void CloseCard(base::WeakPtr<views::Widget> widget);

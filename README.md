@@ -42,7 +42,7 @@ uw has no account and no AI service of its own. Add the providers you already us
 uw looks and works like Arc, built on Chromium.
 
 - Tabs are always vertical, in a sidebar tinted with a theme you pick.
-- Workspaces keep work and personal browsing apart. Switch from the foot of the sidebar, or swipe.
+- Workspaces keep work and personal browsing apart. Switch from the foot of the sidebar, or swipe, and move a task from one to another.
 - Pinned tabs sit as tiles at the top of the sidebar, shared by every window.
 - Every window on a workspace shows its tabs. A page runs in one window at a time, and closing a window closes none of its tabs.
 - Dark mode is true black.

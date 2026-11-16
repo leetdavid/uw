@@ -135,6 +135,16 @@ class TabOrganizationController : public TabStripModelObserver,
   // Closes the selected tab's task, as CloseTask does. Returns false when
   // `window` has no tab tree, in which case nothing closed.
   static bool CloseSelectedTask(BrowserWindowInterface* window);
+  // Moves the task `group` shows in `window` to `workspace`, after its
+  // tasks. To a workspace on the profile, the task moves as it is: its live
+  // pages, name, color, nesting, folded branches, and kept and held tabs. To
+  // one on another profile, its web pages reopen there as one task with the
+  // same name, color, and nesting, and close here; its terminals and chats
+  // stay, at the end of the Scratchpad. A task that holds every tab leaves a
+  // blank tab behind, so the window stays.
+  static void MoveTaskToWorkspace(BrowserWindowInterface* window,
+                                  const tab_groups::TabGroupId& group,
+                                  const std::string& workspace);
 
   const PageTree& tree() const;
   std::optional<PageId> IdFor(const tabs::TabInterface* tab) const;
@@ -454,6 +464,18 @@ class TabOrganizationController : public TabStripModelObserver,
   void RevealSelected();
   // Opens a selected blank tab after `anchor` in the strip and returns it.
   std::optional<PageId> OpenBlankTab(const PageId& anchor);
+  // Opens a blank tab when `task` holds every tab, so the window keeps one.
+  void LeaveATabBesides(const tab_groups::TabGroupId& task);
+  // The index after the last task in the strip.
+  int EndOfTasks() const;
+  // Moves the task `group` shows here to `to`, a window on another
+  // workspace of the profile, with its live pages.
+  void TakeTaskTo(const tab_groups::TabGroupId& group,
+                  TabOrganizationController* to);
+  // Opens the task `group` shows here in `to`, a window on another
+  // profile, and closes it here.
+  void ReopenTaskIn(const tab_groups::TabGroupId& group,
+                    TabOrganizationController* to);
   // Takes each of `staying` out of the branches of `roots`.
   void LeaveBehind(const std::vector<PageId>& roots,
                    const std::vector<PageId>& staying);
@@ -504,6 +526,9 @@ class TabOrganizationController : public TabStripModelObserver,
   std::set<PageId> opened_for_;
   // The tree the window's first tabs left, which puts them back in place.
   std::optional<PageTree> opened_from_;
+  // The tree a task coming from another workspace left, which keeps its
+  // pages nested as they were.
+  std::optional<PageTree> arriving_;
   // The blank tab the window opened with beside its workspace's tabs, while
   // it may be unused.
   std::optional<PageId> unused_blank_;

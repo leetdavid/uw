@@ -47,7 +47,9 @@ enum WindowCommand {
   kMoveToTask,
   // Runs Retry on every failed scheduled chat the user hasn't paused.
   kRetryFailedScheduledChats,
-  kLastWindowCommand = kRetryFailedScheduledChats,
+  // Moves the selected tab's task to another workspace.
+  kMoveTaskToWorkspace,
+  kLastWindowCommand = kMoveTaskToWorkspace,
 };
 
 bool IsWindowCommand(int command);

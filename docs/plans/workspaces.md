@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review. [Moving a task to another workspace](#moving-a-task-to-another-workspace), T390 to T392, was agreed on 2026-11-17 and is being built.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review. [Moving a task to another workspace](#moving-a-task-to-another-workspace), T390 to T392, was agreed on 2026-11-17. T390, the task card and the Tasks menu, was built the same day and is in review.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -99,6 +99,15 @@ Chosen by uw for T130 on 2026-10-21.
 - Each workspace keeps its theme, Light, Dark, or Auto included, in `uw.workspaces`. Built for T131 on 2026-10-24. A workspace without one takes its profile's when its first window starts, and a new workspace starts on the first suggested theme no workspace uses, in the mode of the window it was made from. `BrowserWidget::GetColorProviderKey` asks `ApplyThemeOfWindow` (`browser/workspaces/workspace_theme.h`) for the window's color and mode, so the window and the pages in it, which take their mode from it, show the workspace's theme. The tint and the grain come from the same theme, and the swipe blends toward the other workspace's. The theme picker changes the theme of the window it opened in. A change made outside the picker, such as a color picked in the "Customize Chromium" panel or the mode in Chromium's settings, goes to the workspace of the profile's front window.
 - Chromium's profile button, its row in the app menu, Cmd+Shift+M, the Profiles menu in the menu bar, and the profiles in the Dock menu are gone. Launching never shows the profile picker, unless a policy forces it.
 - Built differently from the design: a workspace's tooltip writes its key as the menus do, "⌃2", not "Ctrl+2". The new button's menu and the profile list are Chromium's menus, so their rows have no icons, and a profile's emoji sit where a key would. The new workspace and delete cards use Chromium's dialog title and buttons in the shape of a uw card. The new profile step's button reads "Done", and Delete Profile Too sits at the card's left. Change Icon, which the design does not draw, opens a card with the emoji, the name, and the suggestions.
+
+## How moving a task works
+
+Built for T390 on 2026-11-17.
+
+- `TabOrganizationController::MoveTaskToWorkspace` finds the window for the other workspace in the window's group with `WorkspaceWindow::WithPartner`, which opens it hidden when there is none.
+- On the profile, each live page of the task comes into this window first, so no window closes one. Chromium's `DetachTabGroupForInsertion` and `InsertDetachedTabGroupAt` then move the group, as Chromium's Move Group to New Window does, but the window stays hidden. The receiving window adopts the pages with the tree they left, so they keep their nesting. The task keeps its key, so its kept and held tabs, folded branches, and name lock go with it.
+- On another profile, each web page opens there unloaded, from its address and title, as a restored tab does.
+- The list of workspaces is `WorkspaceMoveMenu` in `browser/workspaces`. The tab menu, the task card, and the Tasks menu share it. The Tasks menu's submenu fills itself each time it opens (`browser/ui/views/workspaces/move_task_menu_mac.mm`), and `uw-move-task.patch` adds it to the menu bar.
 
 ## Design
 

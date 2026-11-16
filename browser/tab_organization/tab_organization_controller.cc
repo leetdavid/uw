@@ -53,6 +53,7 @@
 #include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/terminal/busy_terminals.h"
 #include "uw/browser/terminal/close_guard.h"
+#include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/workspaces/workspace_window.h"
 
 #if BUILDFLAG(IS_WIN)
@@ -1229,11 +1230,205 @@ void TabOrganizationController::CloseTaskNow(
   if (!tabs_->group_model()->ContainsTabGroup(task)) {
     return;
   }
+  LeaveATabBesides(task);
+  tabs_->CloseAllTabsInGroup(task);
+}
+
+void TabOrganizationController::LeaveATabBesides(
+    const tab_groups::TabGroupId& task) {
   if (tabs_->count() - tabs_->IndexOfFirstNonPinnedTab() ==
       static_cast<int>(tabs_->group_model()->GetTabGroup(task)->tab_count())) {
     chrome::AddTabAt(window_, GURL(), -1, /*foreground=*/true);
   }
-  tabs_->CloseAllTabsInGroup(task);
+}
+
+int TabOrganizationController::EndOfTasks() const {
+  int end = tabs_->IndexOfFirstNonPinnedTab();
+  for (int i = end; i < tabs_->count(); ++i) {
+    if (tabs_->GetTabAtIndex(i)->GetGroup()) {
+      end = i + 1;
+    }
+  }
+  return end;
+}
+
+// static
+void TabOrganizationController::MoveTaskToWorkspace(
+    BrowserWindowInterface* window,
+    const tab_groups::TabGroupId& group,
+    const std::string& workspace) {
+  TabOrganizationController* self = From(window);
+  WorkspaceWindow* shown = WorkspaceWindow::From(window);
+  if (!self || !shown || workspace == shown->workspace() ||
+      !self->tabs_->SupportsTabGroups() ||
+      !self->tabs_->group_model()->ContainsTabGroup(group)) {
+    return;
+  }
+  shown->WithPartner(
+      workspace,
+      base::BindOnce(
+          [](base::WeakPtr<TabOrganizationController> self,
+             const tab_groups::TabGroupId& group, BrowserWindowInterface* to) {
+            TabOrganizationController* target = From(to);
+            if (!self || !target || target == self.get() ||
+                !self->tabs_->group_model()->ContainsTabGroup(group)) {
+              return;
+            }
+            if (to->GetProfile() == self->window_->GetProfile()) {
+              self->TakeTaskTo(group, target);
+            } else {
+              self->ReopenTaskIn(group, target);
+            }
+          },
+          self->weak_factory_.GetWeakPtr(), group));
+}
+
+void TabOrganizationController::TakeTaskTo(const tab_groups::TabGroupId& group,
+                                           TabOrganizationController* to) {
+  const std::string task = KeyOf(group);
+  std::vector<PageId> pages;
+  for (const Page& page : shared_->tree().pages()) {
+    if (page.task == task) {
+      pages.push_back(page.id);
+    }
+  }
+  // The task takes each live page along, so no window closes one.
+  for (const PageId& id : pages) {
+    if (shared_->HolderOf(id, this)) {
+      shared_->BringLivePage(this, id);
+    }
+  }
+  LeaveATabBesides(group);
+  SharedTree& from = *shared_;
+  SharedTree& into = *to->shared_;
+  for (const PageId& id : pages) {
+    if (auto kept = from.kept().extract(id)) {
+      into.kept().insert(std::move(kept));
+    }
+    if (auto held = from.held().extract(id)) {
+      into.held().insert(std::move(held));
+    }
+    if (from.collapsed().erase(id)) {
+      into.collapsed().insert(id);
+    }
+  }
+  if (auto name = from.generated_names().extract(task)) {
+    into.generated_names().insert(std::move(name));
+  }
+  to->arriving_ = from.tree();
+  to->keys_[group] = task;
+  tab_groups::TabGroupSyncService* saved =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          window_->GetProfile());
+  std::unique_ptr<tab_groups::ScopedLocalObservationPauser> pause;
+  if (saved && saved->GetGroup(group)) {
+    pause = saved->CreateScopedLocalObserverPauser();
+  }
+  to->tabs_->InsertDetachedTabGroupAt(tabs_->DetachTabGroupForInsertion(group),
+                                      to->EndOfTasks());
+  to->Mirror({});
+  to->arriving_.reset();
+  to->NotifyManualMove(to->Roots(pages));
+  to->ScheduleApply();
+  to->ScheduleUpdate();
+}
+
+void TabOrganizationController::ReopenTaskIn(
+    const tab_groups::TabGroupId& group,
+    TabOrganizationController* to) {
+  const std::string task = KeyOf(group);
+  const PageTree before = shared_->tree();
+  std::vector<PageId> moving;
+  std::vector<PageId> staying;
+  for (const Page& page : before.pages()) {
+    if (page.task != task) {
+      continue;
+    }
+    content::WebContents* contents = PageContents(page.id);
+    const GURL url = contents ? contents->GetVisibleURL() : GURL();
+    const bool chat =
+        url.SchemeIs(content::kChromeUIScheme) && url.host() == kChatHost;
+    (chat || IsTerminalUrl(url) ? staying : moving).push_back(page.id);
+  }
+  // Each page opens there without loading, as a restored tab does, and
+  // loads once it shows.
+  const tab_groups::TabGroupVisualData visuals =
+      *tabs_->group_model()->GetTabGroup(group)->visual_data();
+  std::map<PageId, PageId> reopened;
+  std::optional<tab_groups::TabGroupId> there;
+  int index = to->EndOfTasks();
+  for (const PageId& id : moving) {
+    content::WebContents* contents = PageContents(id);
+    GURL url = contents->GetLastCommittedURL();
+    if (url.is_empty()) {
+      url = contents->GetVisibleURL();
+    }
+    to->tabs_->InsertWebContentsAt(
+        index, PageAt(to->window_->GetProfile(), url, contents->GetTitle()),
+        AddTabTypes::ADD_NONE, there);
+    if (!there) {
+      there = to->tabs_->AddToNewGroup({index});
+      to->tabs_->ChangeTabGroupVisuals(*there, visuals);
+    }
+    if (const std::optional<PageId> opened =
+            to->IdFor(to->tabs_->GetTabAtIndex(index))) {
+      reopened[id] = *opened;
+    }
+    ++index;
+  }
+  if (!there) {
+    return;
+  }
+  const std::string key = to->KeyOf(*there);
+  SharedTree& into = *to->shared_;
+  std::vector<PageId> pages;
+  for (const PageId& id : moving) {
+    if (!reopened.contains(id)) {
+      continue;
+    }
+    const PageId& page = reopened[id];
+    pages.push_back(page);
+    for (const Page* parent = before.Find(before.Find(id)->parent); parent;
+         parent = before.Find(parent->parent)) {
+      if (reopened.contains(parent->id)) {
+        into.tree().SetParent(page, reopened[parent->id]);
+        if (shared_->held().contains(id)) {
+          into.held()[page] = reopened[parent->id];
+        }
+        break;
+      }
+    }
+    if (shared_->kept().contains(id)) {
+      into.kept()[page] = key;
+    }
+    if (shared_->collapsed().contains(id)) {
+      into.collapsed().insert(page);
+    }
+  }
+  if (const auto name = shared_->generated_names().find(task);
+      name != shared_->generated_names().end()) {
+    into.generated_names()[key] = name->second;
+  }
+  to->NotifyManualMove(to->Roots(pages));
+  to->ScheduleApply();
+  to->ScheduleUpdate();
+  if (staying.empty()) {
+    LeaveATabBesides(group);
+  }
+  std::vector<int> closing;
+  for (const PageId& id : moving) {
+    if (const tabs::TabInterface* tab = TabFor(id)) {
+      closing.push_back(tabs_->GetIndexOfTab(tab));
+    }
+  }
+  std::ranges::sort(closing, std::greater<>());
+  for (int at : closing) {
+    tabs_->CloseWebContentsAt(at, TabCloseTypes::CLOSE_USER_GESTURE);
+  }
+  for (const PageId& root : Roots(staying)) {
+    shared_->tree().MoveToTask(root, std::string());
+  }
+  Apply();
 }
 
 void TabOrganizationController::OpenInTask(const tab_groups::TabGroupId& task) {
@@ -2030,6 +2225,8 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   if (dragging_ && !drag_carried_.empty()) {
     drop.levels = drag_levels_;
     drop.before = &drag_before_;
+  } else if (arriving_) {
+    drop.before = &*arriving_;
   }
   shared_->tree().Adopt(strip, moved, drop);
   std::erase_if(shared_->opened(),

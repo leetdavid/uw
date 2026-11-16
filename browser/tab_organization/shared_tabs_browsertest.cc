@@ -865,6 +865,95 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(other, kMail)));
 }
 
+// The window that shows `workspace` behind `window`, once there is one.
+Browser* PartnerOn(Browser* window, const std::string& workspace) {
+  for (WorkspaceWindow* partner : WorkspaceWindow::From(window)->Partners()) {
+    if (partner->workspace() == workspace) {
+      return partner->window()->GetBrowserForMigrationOnly();
+    }
+  }
+  return nullptr;
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ATaskMovedToAnotherWorkspaceKeepsItsShapeAndPages) {
+  Browser* first = browser();
+  Open(first, kMail);
+  tabs::TabInterface* notes = Open(first, kNotes);
+  Open(first, kIssue);
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(), kTypeIntoNotes));
+  TabOrganizationController* controller = ControllerOf(first);
+  const PageId notes_id = *controller->IdFor(notes);
+  const PageId issue_id = *controller->IdFor(TabAt(first, kIssue));
+  ASSERT_TRUE(controller->MoveToNewTask({notes_id, issue_id}, u"Trip"));
+  // A tab opened in the background goes right under the selected tab, so
+  // Issue is above Notes.
+  ASSERT_TRUE(controller->Nest(notes_id));
+  const tab_groups::TabGroupId task = *TabAt(first, kNotes)->GetGroup();
+  const bool typed = controller->HasManualName(controller->KeyOf(task));
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(second, kIssue) && InStep(first, second); }));
+  // The second window takes the live page of Notes, so the move fetches it.
+  SelectByClick(second, TabAt(second, kNotes));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(TabAt(second, kNotes));
+  }));
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal =
+      list.Add("Personal", std::string(list.UnusedIcon()),
+               first->GetProfile()->GetBaseName());
+
+  TabOrganizationController::MoveTaskToWorkspace(first, task, personal);
+  Browser* other = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    other = PartnerOn(first, personal);
+    return other && TabAt(other, kIssue) && !TabAt(first, kNotes) &&
+           !TabAt(second, kNotes) && Layout(other).size() == 3u;
+  }));
+  EXPECT_EQ(Layout(other)[0], std::string(kIssue) + " Trip 0");
+  EXPECT_EQ(Layout(other)[1], std::string(kNotes) + " Trip 1");
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(other, kNotes)));
+  EXPECT_EQ(content::EvalJs(TabAt(other, kNotes)->GetContents(), kNotesInput),
+            "half-typed");
+  TabOrganizationController* there = ControllerOf(other);
+  EXPECT_EQ(
+      there->HasManualName(there->KeyOf(*TabAt(other, kNotes)->GetGroup())),
+      typed);
+  EXPECT_TRUE(WorkspaceWindow::From(other)->hidden());
+  EXPECT_TRUE(TabAt(first, kMail));
+  EXPECT_TRUE(InStep(first, second));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       MovingAWorkspacesLastTaskLeavesABlankTab) {
+  Browser* first = browser();
+  tabs::TabInterface* mail = Open(first, kMail, /*select=*/true);
+  TabStripModel* tabs = first->tab_strip_model();
+  std::vector<PageId> every;
+  for (int i = 0; i < tabs->count(); ++i) {
+    every.push_back(*ControllerOf(first)->IdFor(tabs->GetTabAtIndex(i)));
+  }
+  ASSERT_TRUE(ControllerOf(first)->MoveToNewTask(every, u"Mail"));
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return mail->GetGroup().has_value(); }));
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string personal =
+      list.Add("Personal", std::string(list.UnusedIcon()),
+               first->GetProfile()->GetBaseName());
+
+  TabOrganizationController::MoveTaskToWorkspace(first, *mail->GetGroup(),
+                                                 personal);
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    Browser* other = PartnerOn(first, personal);
+    return other && TabAt(other, kMail) && !TabAt(first, kMail);
+  }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(IsOpen(first));
+  EXPECT_EQ(BlankTabs(first), 1);
+  EXPECT_FALSE(tabs->GetActiveTab()->GetGroup());
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        CmdNOpensTheCommandBarOverABlankTabThatGoesUnused) {
   Browser* first = browser();

@@ -1,0 +1,52 @@
+diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
+index ddd4344576fa8c020f063edfbd712e9e397fc702..c3c37dff7160f710633fd13f1d53b783544a412b 100644
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -551,6 +551,7 @@ are declared in tools/grit/grit_args.gni.
+       <message name="IDS_UW_TRANSLATE_WITH_ENGINE" desc="Button in the translate bubble that translates the page with another engine this one time.">Translate with <ph name="ENGINE">$1<ex>Google Cloud</ex></ph></message>
+       <message name="IDS_UW_TRANSLATE_SET_UP_ANOTHER" desc="Button in the translate bubble that opens the translation settings to set up another translation engine.">Set up another engine…</message>
+       <message name="IDS_UW_REOPENS_IN_ANOTHER_PROFILE" desc="Heading over the workspaces of other profiles in the Move to Workspace list. Their tab reopens there from its address.">Reopens in another profile</message>
++      <message name="IDS_UW_MOVE_TASK_TO_WORKSPACE" desc="In Title Case: Item in a task's menu and in the Tasks menu that opens a list of workspaces to move the whole task to. A task is a group of tabs for one piece of work; a workspace is a separate set of tabs, such as Work or Personal.">Move Task to Workspace</message>
+       <!-- Access Code Cast specific strings -->
+       <part file="access_code_cast_strings.grdp" />
+ 
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index 7bf11d9a085ea3fc7915aacc1b263a21bdbec2ef..5d0371af2f33bed28be685f81e406a7aa8721173 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -33,6 +33,7 @@
+ #include "uw/browser/tab_organization/tab_organization_controller.h"
+ #include "uw/browser/agent/chat_tab.h"
+ #include "uw/browser/terminal/terminal_tab.h"
++#include "uw/browser/ui/views/workspaces/move_task_menu_mac.h"
+ #include "uw/browser/workspaces/workspace_commands.h"
+ #include "uw/browser/little_window/little_window_commands.h"  // nogncheck
+ 
+@@ -644,7 +645,7 @@ NSMenuItem* BuildTasksMenu(NSApplication* nsapp,
+       Item(IDS_UW_SCRATCHPAD).command_id(uw::kGoToScratchpad));
+ 
+   // clang-format off
+-  return Item(IDS_UW_TASKS_MENU_MAC)
++  NSMenuItem* tasks = Item(IDS_UW_TASKS_MENU_MAC)
+       .submenu({
+           Item(IDS_UW_NEW_TASK_MAC)
+               .command_id(IDC_CREATE_NEW_TAB_GROUP)
+@@ -667,6 +668,9 @@ NSMenuItem* BuildTasksMenu(NSApplication* nsapp,
+           Item(IDS_UW_GO_TO_TASK_MAC).submenu(std::move(go_to_task)),
+           Item(IDS_UW_RENAME_TASK_MAC).command_id(uw::kRenameTask),
+           Item(IDS_UW_NAME_TASK_MAC).command_id(uw::kNameTask),
++          Item(IDS_UW_MOVE_TASK_TO_WORKSPACE)
++              .tag(uw::kMoveTaskToWorkspace)
++              .submenu({}),
+           Item(IDS_UW_CLOSE_TASK_MAC)
+               .command_id(IDC_CLOSE_TAB_GROUP)
+               .key_equivalent(@"w", NSEventModifierFlagCommand |
+@@ -693,6 +697,8 @@ NSMenuItem* BuildTasksMenu(NSApplication* nsapp,
+       })
+       .Build();
+   // clang-format on
++  uw::SetUpMoveTaskMenu([tasks.submenu itemWithTag:uw::kMoveTaskToWorkspace]);
++  return tasks;
+ }
+ 
+ NSMenuItem* BuildHelpMenu(NSApplication* nsapp,

@@ -52,11 +52,12 @@ Click **⋮** on the task's row, or right-click the row. The menu has:
 - **Rename Task**, and **Name Task** when a language model is set.
 - A row of color dots. The task's color is ringed; click another to change it.
 - **New Tab in Task** and **Move Task to New Window**.
+- **Move Task to Workspace**, when you have more than one workspace. See below.
 - **Move Tabs to Scratchpad**, which ends the task and keeps its tabs open.
 - **Close Task**, which closes the task and its tabs.
 
 <Figure caption="A task's menu, opened from ⋮ on its row.">
-  <Window height={380} cut>
+  <Window height={410} cut>
     <Sidebar>
       <Task name="Plan Lisbon trip" color="blue" menu>
         <TabRow>Flights from SFO to Lisbon</TabRow>
@@ -71,6 +72,7 @@ Click **⋮** on the task's row, or right-click the row. The menu has:
       <MenuLine />
       <MenuItem icon="new-tab">New Tab in Task</MenuItem>
       <MenuItem icon="new-window">Move Task to New Window</MenuItem>
+      <MenuItem icon="folder-input" keys="▸">Move Task to Workspace</MenuItem>
       <MenuLine />
       <MenuItem icon="scratchpad">Move Tabs to Scratchpad</MenuItem>
       <MenuItem icon="close" keys="Ctrl+Cmd+W">Close Task</MenuItem>
@@ -81,6 +83,15 @@ Click **⋮** on the task's row, or right-click the row. The menu has:
 The arrow keys move between rows, <kbd>Return</kbd> runs one, and <kbd>Esc</kbd> closes the menu.
 
 Point at a task's row and its folder icon turns into a chevron. Click it to collapse or open the task. Drag the row to move the whole task.
+
+## Move *a task* to another workspace
+
+In the task's menu, point at **Move Task to Workspace** and pick a workspace. **Tasks** → **Move Task to Workspace** in the menu bar does the same for the selected tab's task.
+
+- To a workspace on the same profile, the task moves as it is. Its pages keep what you scrolled to and typed, and the task keeps its name, color, and tabs under tabs. It goes after that workspace's other tasks.
+- Workspaces under **Reopens in another profile** have their own logins. There, each page opens again from its address, in a task with the same name and color. Terminals and chats stay here, in the Scratchpad.
+
+You stay in this workspace. If the task held all of its tabs, a new tab is left behind. The organizer leaves the moved tabs where they are, as it does after any move you make.
 
 ## Close *a task*
 

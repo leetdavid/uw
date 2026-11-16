@@ -4,14 +4,17 @@
 #define UW_BROWSER_TAB_ORGANIZATION_PAGE_COPY_H_
 
 #include <memory>
+#include <string>
 
 #include "base/functional/callback_forward.h"
 
+class GURL;
 class TabStripModel;
 
 namespace content {
+class BrowserContext;
 class WebContents;
-}
+}  // namespace content
 
 namespace gfx {
 class ImageSkia;
@@ -24,6 +27,12 @@ namespace uw {
 // another window are both one.
 std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
                                                   bool needs_reload);
+
+// A page at `url` in `context`, with `title` and no renderer. It loads once
+// it shows, as a restored tab does.
+std::unique_ptr<content::WebContents> PageAt(content::BrowserContext* context,
+                                             const GURL& url,
+                                             const std::u16string& title);
 
 // Puts `page` in the tab of `old` and returns `old`. The tab's row shows
 // `page`'s title and icon at once: Chromium reads them only as a page changes

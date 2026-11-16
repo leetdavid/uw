@@ -2,7 +2,10 @@
 
 #include "uw/browser/tab_organization/page_copy.h"
 
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -15,13 +18,18 @@
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/restore_type.h"
 #include "content/public/browser/visibility.h"
 #include "content/public/browser/web_contents.h"
+#include "content/public/common/referrer.h"
+#include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/base/page_transition_types.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/image/image_skia.h"
+#include "url/gurl.h"
 
 namespace uw {
 
@@ -35,6 +43,26 @@ std::unique_ptr<content::WebContents> CopyHistory(content::WebContents* page,
       content::WebContents::Create(params);
   copy->GetController().CopyStateFrom(&page->GetController(), needs_reload);
   return copy;
+}
+
+std::unique_ptr<content::WebContents> PageAt(content::BrowserContext* context,
+                                             const GURL& url,
+                                             const std::u16string& title) {
+  content::WebContents::CreateParams params(context);
+  params.initially_hidden = true;
+  params.desired_renderer_state =
+      content::WebContents::CreateParams::kNoRendererProcess;
+  std::unique_ptr<content::WebContents> page =
+      content::WebContents::Create(params);
+  std::vector<std::unique_ptr<content::NavigationEntry>> entries;
+  entries.push_back(content::NavigationController::CreateNavigationEntry(
+      url, content::Referrer(), /*initiator_origin=*/std::nullopt,
+      /*initiator_base_url=*/std::nullopt, ui::PAGE_TRANSITION_RELOAD,
+      /*is_renderer_initiated=*/false, /*extra_headers=*/std::string(), context,
+      /*blob_url_loader_factory=*/nullptr));
+  entries.back()->SetTitle(title);
+  page->GetController().Restore(0, content::RestoreType::kRestored, &entries);
+  return page;
 }
 
 std::unique_ptr<content::WebContents> SwapPage(

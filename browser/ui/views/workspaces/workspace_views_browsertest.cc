@@ -1,6 +1,7 @@
 // Copyright 2026 The uw Authors. All rights reserved.
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/profiles/profile_picker.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
@@ -30,6 +32,10 @@
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/core/tab_restore_types.h"
+#include "components/tab_groups/tab_group_color.h"
+#include "components/tab_groups/tab_group_id.h"
+#include "components/tab_groups/tab_group_visual_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -54,8 +60,10 @@
 #include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/ui/views/tab_organization/new_button.h"
+#include "uw/browser/ui/views/tab_organization/task_card.h"
 #include "uw/browser/ui/views/tab_organization/window_commands.h"
 #include "uw/browser/ui/views/theme_picker/theme_picker.h"
 #include "uw/browser/ui/views/workspaces/icon_picker.h"
@@ -74,6 +82,7 @@ namespace {
 
 constexpr char kForm[] = "data:text/html,<input id=field>";
 constexpr char kNotes[] = "chrome://version/?notes";
+constexpr char kChat[] = "chrome://chat/";
 
 class WorkspaceViewsBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -669,6 +678,75 @@ IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
     }
     return false;
   }));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       TheTaskCardOffersOtherWorkspaces) {
+  content::WebContents* page =
+      chrome::AddAndReturnTabAt(browser(), GURL(kForm), -1, true);
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const tab_groups::TabGroupId task =
+      tabs->AddToNewGroup({tabs->GetIndexOfWebContents(page)});
+  EXPECT_FALSE(TaskCard(browser(), task).GetViewByID(TaskCard::kWorkspaceId));
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kMoveTaskToWorkspace));
+
+  AddWorkspace("Reading", profile());
+  EXPECT_TRUE(TaskCard(browser(), task).GetViewByID(TaskCard::kWorkspaceId));
+  EXPECT_TRUE(CanRunWindowCommand(browser(), kMoveTaskToWorkspace));
+  // A Scratchpad tab has no task to move.
+  for (int i = 0; i < tabs->count(); ++i) {
+    if (!tabs->GetTabAtIndex(i)->GetGroup()) {
+      tabs->ActivateTabAt(i);
+      break;
+    }
+  }
+  EXPECT_FALSE(CanRunWindowCommand(browser(), kMoveTaskToWorkspace));
+}
+
+IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
+                       MoveTaskToWorkspaceReopensItsPagesInAnotherProfile) {
+  Profile& other = MakeProfile();
+  const std::string work = AddWorkspace("Work", &other);
+  content::WebContents* notes =
+      chrome::AddAndReturnTabAt(browser(), GURL(kNotes), -1, true);
+  content::WebContents* chat =
+      chrome::AddAndReturnTabAt(browser(), GURL(kChat), -1, false);
+  ASSERT_TRUE(content::WaitForLoadStop(notes));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const tab_groups::TabGroupId task = tabs->AddToNewGroup(
+      {tabs->GetIndexOfWebContents(notes), tabs->GetIndexOfWebContents(chat)});
+  tabs->ChangeTabGroupVisuals(
+      task, tab_groups::TabGroupVisualData(
+                u"Trip", tab_groups::TabGroupColorId::kGreen));
+  Settle();
+
+  TabOrganizationController::MoveTaskToWorkspace(browser(), task, work);
+  BrowserWindowInterface* moved_to = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (WorkspaceWindow* partner :
+         WorkspaceWindow::From(browser())->Partners()) {
+      if (partner->workspace() == work &&
+          HasTab(partner->window(), GURL(kNotes))) {
+        moved_to = partner->window();
+      }
+    }
+    return moved_to && !HasTab(browser(), GURL(kNotes)) &&
+           !tabs->GetTabForWebContents(chat)->GetGroup();
+  }));
+  TabStripModel* there = moved_to->GetTabStripModel();
+  std::optional<tab_groups::TabGroupId> reopened;
+  for (int i = 0; i < there->count(); ++i) {
+    if (there->GetWebContentsAt(i)->GetVisibleURL() == GURL(kNotes)) {
+      reopened = there->GetTabAtIndex(i)->GetGroup();
+    }
+  }
+  ASSERT_TRUE(reopened);
+  const tab_groups::TabGroupVisualData* visuals =
+      there->group_model()->GetTabGroup(*reopened)->visual_data();
+  EXPECT_EQ(visuals->title(), u"Trip");
+  EXPECT_EQ(visuals->color(), tab_groups::TabGroupColorId::kGreen);
+  EXPECT_FALSE(HasTab(moved_to, GURL(kChat)));
+  EXPECT_TRUE(HasTab(browser(), GURL(kChat)));
 }
 
 IN_PROC_BROWSER_TEST_F(WorkspaceViewsBrowserTest,
