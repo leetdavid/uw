@@ -1,6 +1,6 @@
 # Workspaces and shared pins
 
-Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review.
+Status: scope agreed with the user between 2026-10-16 and 2026-10-21. The designs, T128, were signed off on 2026-10-21. T129, pins shared by a profile's windows, is built and in review. T130, workspaces themselves, was built on 2026-10-21 and is in review. T133, the live pin page, was built on 2026-10-22 and is in review. T132, the swipe, was built on 2026-10-22 and is in review. T367, every workspace ready behind each window, was agreed and built on 2026-11-07 and is in review. [Moving a task to another workspace](#moving-a-task-to-another-workspace), T390 to T392, was agreed on 2026-11-17 and is being built.
 
 Implementability: **4/10** for the whole plan, using the [roadmap convention](roadmap.md#implementability-estimates). Each stage has its own score on the [board](roadmap.md#board). Shared pins and the window swap reuse Chromium's profiles and windows. The swipe that follows the fingers and the live pin page are the risky parts, so they come last.
 
@@ -23,10 +23,29 @@ Implementability: **4/10** for the whole plan, using the [roadmap convention](ro
 - Each existing profile becomes a workspace, with the profile's name and theme.
 - Chromium's profile button and menu are removed, and its profile picker never shows. Chromium's settings pages stay.
 - Each workspace has its own [theme](../CONTEXT.md#language): everything the theme picker sets. That includes Light, Dark, and Auto, and web pages in the workspace's windows follow it, so a dark workspace shows sites in their dark style. Agreed on 2026-10-24.
-- The organizer works inside one workspace and never moves a tab to another. Right-click → Move to workspace ▸ moves a tab by hand. To a workspace on the same profile, the live page moves. To one on another profile, the address opens there and the tab closes here.
+- The organizer works inside one workspace and never moves a tab to another. Right-click → Move to workspace ▸ moves a tab by hand, and [Move Task to Workspace](#moving-a-task-to-another-workspace) a whole task. To a workspace on the same profile, the live page moves. To one on another profile, the address opens there and the tab closes here.
 - The command bar finds open tabs in every workspace of the current profile, and picking one switches to its workspace. It never lists another profile's tabs. Each workspace is a "Go to …" command, and "New workspace" is one too.
 - Private windows have no workspaces and no switcher.
 - [Providers](../CONTEXT.md#language) are shared by every profile. Each profile picks its own language, decision, and agent models. Chats, organizer settings, and what the command bar learns stay per profile.
+
+### Moving a task to another workspace
+
+Agreed on 2026-11-17, in a grilling, when the user asked to move whole tasks between workspaces. No design: the rows and lists reuse what the tab menu, the task card, and the command bar already draw.
+
+- Move Task to Workspace moves a whole [task](../CONTEXT.md#language) to another workspace. It is in four places:
+  - the task card, under Move Task to New Window. Its ▸ opens a menu beside the row, with the same list as the tab menu's Move to Workspace.
+  - Tasks → Move Task to Workspace ▸ in the menu bar, for the selected tab's task. It is dimmed for a Scratchpad tab.
+  - the [command bar](command-bar.md): the command puts a "Move task to workspace" chip in the field, as [Move to Task…](keyboard-and-mouse.md#move-to-task) does, and lists the other workspaces. Typing filters, Return moves the selected tab's task, and Esc moves nothing. It is hidden for a Scratchpad tab.
+  - dragging the task's row onto a workspace's icon in the switcher.
+- The list shows this profile's other workspaces first, then the rest under "Reopens in another profile". With no other workspace, the task card and the Tasks menu have no row, and the command bar no command.
+- It has no key.
+- To a workspace on the same profile, the task moves as it is: its live pages, name, color, nesting, folded branches, splits, kept tabs, and name lock. It goes after that workspace's tasks, just above its Scratchpad, as a new task does. Every window on either workspace follows.
+- To a workspace on another profile, each web page reopens by its address in a new task there, with the same name, color, and nesting, and closes here. A split reopens as separate tabs. Terminals and chats belong to this profile, so they stay behind, at the end of this workspace's Scratchpad.
+- The window stays on its workspace. When the task held the workspace's last tabs besides pins, a blank tab is left, as Close Task does.
+- The move counts as a [move by hand](automatic-organization.md#agreed-scope): the organizer holds each of its tabs until the tab goes to another site or the user starts something new in it. Undo Move does not undo it.
+- Dragging a tab, with the tabs it carries, onto a workspace's icon moves those tabs to the end of that workspace's Scratchpad, by the same rules.
+- While a dragged task or tab is over an icon, the icon takes its hover fill and the workspace's name shows. Dropping moves it, and the window stays. Holding over an icon does not switch.
+- The agent's tab tools and the [`uw` command](uw-command.md) still move tabs only within a workspace.
 
 ### Shared pins
 
@@ -105,6 +124,9 @@ Each stage is a ticket on the [board](roadmap.md#board).
 4. T131: a theme per workspace.
 5. T132: the swipe that follows the fingers.
 6. T133: the live pin page that moves between windows. A prototype first, then the build.
+7. T390: Move Task to Workspace in the task card and the Tasks menu, to this profile's workspaces and to others.
+8. T391: Move Task to Workspace in the command bar.
+9. T392: dropping a task or tabs on a workspace's icon.
 
 ## Acceptance checks
 
@@ -123,6 +145,10 @@ Each stage is a ticket on the [board](roadmap.md#board).
 13. A half swipe on the sidebar snaps back, and a full one follows the fingers to the next workspace.
 14. A live pin page moves between windows as [Product](../product.md#pinned-tabs) describes.
 15. `pnpm run check` and the focused test suites pass. Browser tests stay headless.
+16. Move Task to Workspace from the task card and from the Tasks menu moves a task with nested tabs and a typed name to another workspace on the profile. Every window on that workspace shows it after its other tasks, with the same name, color, nesting, and live pages, and no window on this one shows it. The window stays on its workspace, and a task that held the last tabs leaves a blank tab.
+17. Moved to a workspace on another profile, the task's web pages open there as one task with the same name, color, and nesting, and close here. Its terminal and chat stay at the end of this Scratchpad.
+18. The command bar's Move task to workspace chip lists the other workspaces, filters by typing, and moves the selected tab's task on Return.
+19. Dropping a task's row on a workspace's icon moves the task there, and dropping a tab moves it and the tabs it carries to the end of that workspace's Scratchpad. The icon fills while the drag is over it.
 
 ## Not in this plan
 
