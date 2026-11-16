@@ -42,6 +42,7 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
 #include "uw/browser/agent/chat_tab.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/vector_icons/vector_icons.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/workspaces/workspace_list.h"
@@ -172,9 +173,10 @@ bool CloseWarning::HoldTask(const tab_groups::TabGroupId& task,
 }
 
 bool CloseWarning::HoldWindow() {
-  if (std::exchange(window_agreed_, false) || !CanAsk() ||
-      browser_shutdown::IsTryingToQuit() ||
-      WorkspaceWindow::IsHidden(window_)) {
+  // With shared tabs, a closed window's tabs stay open, so nothing stops.
+  if (window_agreed_ || !CanAsk() || browser_shutdown::IsTryingToQuit() ||
+      WorkspaceWindow::IsHidden(window_) ||
+      TabOrganizationController::ClosesNoTabs(window_)) {
     return false;
   }
   // The hidden windows of the window's other workspaces close with it.
@@ -194,9 +196,13 @@ bool CloseWarning::HoldWindow() {
   Ask(Closing::kWindow, pages.size(), pages, std::nullopt,
       base::BindOnce(
           [](base::WeakPtr<CloseWarning> self, bool agreed) {
-            if (self && agreed) {
-              self->window_agreed_ = true;
-              chrome::CloseWindow(self->window_);
+            if (!self || !agreed) {
+              return;
+            }
+            self->window_agreed_ = true;
+            chrome::CloseWindow(self->window_);
+            if (self && self->window_->GetWindow()->IsVisible()) {
+              self->window_agreed_ = false;
             }
           },
           weak_factory_.GetWeakPtr()));

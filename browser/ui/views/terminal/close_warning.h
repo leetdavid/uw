@@ -84,7 +84,9 @@ class CloseWarning : public CloseGuard {
   raw_ptr<views::Widget> dialog_ = nullptr;
   // While a close the user agreed to runs, its pages are not held again.
   bool releasing_ = false;
-  // The next close of this window is the one the user agreed to.
+  // The user agreed to close this window. Chromium checks one close more than
+  // once, so the answer holds until the window is gone, or still shows once
+  // something else stopped the close.
   bool window_agreed_ = false;
   base::WeakPtrFactory<CloseWarning> weak_factory_{this};
 };

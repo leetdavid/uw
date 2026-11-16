@@ -41,6 +41,7 @@ How it is built:
 
 - Each window has a `CloseWarning` (`browser/ui/views/terminal`), registered as the window's `CloseGuard` (`browser/terminal/close_guard`), the small interface Chromium's code reaches. It asks each terminal's shell what runs there through `FindBusyTerminals`, which Clear uses too, and shows a browser-modal dialog with Cancel and a red close button.
 - Four hooks hold a close until the answer. `TabStripModel::CloseTabs` holds every close the user asked for (`tab-tree.patch`). `TabOrganizationController::CloseTask` holds a task's close before it adds the blank tab a window keeps, and Ctrl+Cmd+W goes through it. `UnloadController::HandleBeforeClose` holds a window's close, with the hidden windows of its other workspaces (`uw-live-pins.patch`). `BrowserCloseManager` holds a quit after the pages' own questions (`uw-busy-terminals.patch`).
+- Chromium checks a window's close twice: before it hides the window, and again as the window closes. One answer covers the whole close, until the window is gone or still shows because something else stopped the close. Before T393 the second check asked again, so a window with a terminal hid and never closed.
 - A close with no terminal among its tabs stays synchronous. One with a terminal waits for the shells' answer, a few milliseconds, even when none is busy.
 - Browser tests run with `--test-type`, where the dialog stays off unless a test turns it on with `CloseWarning::AskInTestsForTesting`, so a test that ends with a program running still quits.
 

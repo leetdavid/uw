@@ -20,11 +20,13 @@
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/test/scoped_feature_list.h"
+#include "base/test/test_future.h"
 #include "base/threading/thread_restrictions.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/lifetime/application_lifetime_desktop.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -61,6 +63,7 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/window/dialog_delegate.h"
 #include "url/gurl.h"
+#include "url/url_constants.h"
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/agent/fake_chat.h"
 #include "uw/browser/tab_organization/commands.h"
@@ -71,6 +74,7 @@
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/tab_organization/key_hint.h"
 #include "uw/browser/ui/views/terminal/close_warning.h"
+#include "uw/browser/workspaces/workspace_list.h"
 #include "uw/browser/workspaces/workspace_window.h"
 #include "uw/components/terminal/shell_quote.h"
 
@@ -758,6 +762,47 @@ IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
   EXPECT_EQ(busy_tab->GetContents(), busy);
 }
 
+// A window closes with its hidden windows of other workspaces, and one of
+// them holds a terminal. With shared tabs that one stays, kept hidden, so the
+// close asks nothing and ends. Before T393 the window hid and never closed.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest,
+                       AWindowWithATerminalBehindItCloses) {
+  OpenTerminal();
+  WorkspaceList& list = WorkspaceList::Get();
+  const std::string reading =
+      list.Add("Reading", std::string(list.UnusedIcon()),
+               browser()->GetProfile()->GetBaseName());
+  WorkspaceWindow* behind = WorkspaceWindow::From(browser());
+  ASSERT_TRUE(behind->Switch(reading));
+  BrowserWindowInterface* front = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    for (WorkspaceWindow* partner : behind->Partners()) {
+      if (partner->workspace() == reading && !partner->hidden() &&
+          partner->window()->GetWindow()->IsVisible()) {
+        front = partner->window();
+      }
+    }
+    return front != nullptr;
+  }));
+  base::test::TestFuture<BrowserWindowInterface*> opened;
+  WorkspaceWindow::OpenWindow(reading, opened.GetCallback());
+  BrowserWindowInterface* other = opened.Get();
+  other->GetWindow()->Show();
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      other->GetBrowserForMigrationOnly(), GURL(url::kAboutBlankURL),
+      WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabOrganizationController::ClosesNoTabs(front); }));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabOrganizationController::ClosesNoTabs(other); }));
+
+  ui_test_utils::BrowserDestroyedObserver closed(front);
+  front->GetWindow()->Close();
+  closed.Wait();
+  EXPECT_TRUE(base::test::RunUntil([&] { return behind->keeper(); }));
+}
+
 // With shared tabs off, closing a window closes its tabs, so uw asks first.
 class BusyTerminalWarningOffBrowserTest
     : public BusyTerminalWarningBrowserTest {
@@ -781,6 +826,23 @@ IN_PROC_BROWSER_TEST_F(BusyTerminalWarningOffBrowserTest,
   SaveWidgetScreenshot(dialog, "busy-terminal-window");
   Answer(dialog, false);
   EXPECT_EQ(tabs()->count(), count);
+}
+
+// One answer covers the whole close, though Chromium checks it twice. Before
+// T393 the second check asked again, over a window already hidden.
+IN_PROC_BROWSER_TEST_F(BusyTerminalWarningOffBrowserTest,
+                       ClosingTheWindowClosesItOnceAgreed) {
+  OpenBusyTerminal();
+  Browser* window = browser();
+  Browser* other = CreateBrowser(window->GetProfile());
+  chrome::CloseWindow(window);
+  views::Widget* dialog = Dialog();
+  ASSERT_TRUE(dialog);
+
+  ui_test_utils::BrowserDestroyedObserver closed(window);
+  dialog->widget_delegate()->AsDialogDelegate()->AcceptDialog();
+  closed.Wait();
+  SetBrowser(other);
 }
 
 IN_PROC_BROWSER_TEST_F(BusyTerminalWarningBrowserTest, QuittingAsksFirst) {
