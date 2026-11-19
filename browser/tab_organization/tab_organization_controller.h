@@ -404,7 +404,8 @@ class TabOrganizationController : public TabStripModelObserver,
   bool SavedGroupsLoaded();
   void OnSavedGroupsLoaded();
   // Leaves the workspace's tree as the window closes, so closing it closes no
-  // tab in another window.
+  // tab in another window, and once it has closed, so it takes no copies
+  // while it waits to be deleted.
   void Leave();
   // Gives this window a copy of each page it lacks, and closes its tabs for
   // pages that left the tree. A window that just joined shows first and fills
@@ -530,6 +531,7 @@ class TabOrganizationController : public TabStripModelObserver,
   std::map<tab_groups::TabGroupId, std::string> keys_;
   base::CallbackListSubscription reveals_;
   base::CallbackListSubscription closing_all_;
+  base::CallbackListSubscription did_close_;
   base::RepeatingClosureList pictures_changed_;
   base::RepeatingClosureList command_bar_requests_;
   base::RepeatingClosureList drags_;
@@ -575,6 +577,8 @@ class TabOrganizationController : public TabStripModelObserver,
   bool observing_ = false;
   // Set while the tab strip reports a tab pinned or unpinned.
   bool pinning_ = false;
+  // Set while the tab strip reports tabs leaving for another window.
+  bool departing_ = false;
   bool apply_pending_ = false;
   bool dragging_ = false;
   bool drag_alone_ = false;

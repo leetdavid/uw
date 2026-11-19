@@ -812,6 +812,33 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
             1);
 }
 
+// Moving a window's only tab to another window on its workspace closes the
+// window it left, with no tab in it, and the other window keeps the tab.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AWindowWhoseOnlyTabMovesToAnotherWindowCloses) {
+  Browser* first = browser();
+  tabs::TabInterface* mail = Open(first, kMail);
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(second, kMail) && InStep(first, second); }));
+  TabStripModel* tabs = first->tab_strip_model();
+  while (tabs->count() > 1) {
+    tabs->CloseWebContentsAt(tabs->GetIndexOfTab(mail) == 0 ? 1 : 0,
+                             TabCloseTypes::CLOSE_USER_GESTURE);
+    ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  }
+  ASSERT_EQ(second->tab_strip_model()->count(), 1);
+
+  chrome::MoveTabsToExistingWindow(first, second, {tabs->GetIndexOfTab(mail)});
+  EXPECT_TRUE(tabs->empty());
+  EXPECT_FALSE(second->IsDeleteScheduled());
+  ASSERT_TRUE(base::test::RunUntil([&] { return !IsOpen(first); }));
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(IsOpen(second));
+  EXPECT_EQ(Count(second, kMail), 1);
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(second, kMail)));
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AWindowUsedForAnotherTabStays) {
   Browser* first = browser();
   Open(first, kMail);

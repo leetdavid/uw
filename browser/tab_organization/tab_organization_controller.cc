@@ -148,6 +148,13 @@ TabOrganizationController::TabOrganizationController(
         }
       },
       base::Unretained(this)));
+  did_close_ = window->RegisterBrowserDidClose(base::BindRepeating(
+      [](TabOrganizationController* self, BrowserWindowInterface*) {
+        if (self->joined_) {
+          self->Leave();
+        }
+      },
+      base::Unretained(this)));
 #if BUILDFLAG(IS_WIN)
   StartTray();
 #endif
@@ -222,8 +229,8 @@ std::string TabOrganizationController::TaskKey(
 void TabOrganizationController::JoinWorkspace() {
   const WorkspaceWindow* workspace = WorkspaceWindow::From(window_);
   if (joined_ || !base::FeatureList::IsEnabled(kUwSharedTabs) ||
-      tabs_->closing_all() || !workspace || workspace->workspace().empty() ||
-      !SavedGroupsLoaded()) {
+      tabs_->closing_all() || window_->IsDeleteScheduled() || !workspace ||
+      workspace->workspace().empty() || !SavedGroupsLoaded()) {
     return;
   }
   scoped_refptr<SharedTree> shared = SharedTree::For(workspace->workspace());
@@ -1400,6 +1407,7 @@ void TabOrganizationController::TakeTo(
   }
   to->Mirror({});
   to->arriving_.reset();
+  from.Propagate(this);
   to->NotifyManualMove(to->Roots(pages));
   to->ScheduleApply();
   to->ScheduleUpdate();
@@ -2035,6 +2043,10 @@ void TabOrganizationController::OnTabStripModelChanged(
       moved.insert(*id);
     }
   }
+  // The other windows follow once the tabs reach their window, where their
+  // copies make way. Following now would close those copies first, and with
+  // them a window that had no other tab, before the tabs move into it.
+  base::AutoReset<bool> departing(&departing_, moved_out);
   Mirror(moved);
   NotifyNativeMoves(moved);
   // A window opened for a tab closes once the tab moved on to another window,
@@ -2243,6 +2255,8 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   // copy of it makes way. A window that opened with such tabs was opened for
   // them.
   const bool opening = ids_.empty();
+  // The trees the tabs left, whose windows follow once the tabs are here.
+  std::vector<scoped_refptr<SharedTree>> left;
   for (int i = 0; i < tabs_->count(); ++i) {
     const tabs::TabInterface* tab = tabs_->GetTabAtIndex(i);
     if (tab->IsPinned() || ids_.contains(tab->GetHandle())) {
@@ -2252,6 +2266,9 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
         SharedTree::Arrive(tab->GetHandle());
     if (!transit) {
       continue;
+    }
+    if (transit->from && transit->from != shared_) {
+      left.push_back(transit->from);
     }
     for (const auto& [handle, id] : ids_) {
       if (id == transit->page) {
@@ -2310,7 +2327,12 @@ void TabOrganizationController::Mirror(const std::set<PageId>& moved) {
   ScheduleUpdate();
   if (joined_) {
     shared_->CloseIfEmpty(/*pinned=*/pinning_);
-    shared_->Propagate(this);
+    if (!departing_) {
+      shared_->Propagate(this);
+    }
+  }
+  for (const scoped_refptr<SharedTree>& tree : left) {
+    tree->Propagate(nullptr);
   }
 }
 
@@ -2539,7 +2561,7 @@ void TabOrganizationController::ApplyOrder() {
 void TabOrganizationController::ScheduleApply() {
   // The other windows follow at once, so none of them reads its strip back
   // into the tree before it has caught up.
-  if (joined_) {
+  if (joined_ && !departing_) {
     shared_->Propagate(this);
   }
   ScheduleOwnApply();
