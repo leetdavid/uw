@@ -372,7 +372,7 @@ it for Windows, then publish both as a draft GitHub release.
 
 Usage: node scripts/release.ts <version> [options]
   --sha SHA         Commit to release; default: GitHub's main. It must be pushed.
-  --worktree PATH   Release worktree with its own .chromium; default: ~/dev/uw-release
+  --worktree PATH   Release worktree with its own .chromium; default: ~/dev/worktrees/uw/release
   --jobs NUMBER     Parallel build jobs; default: 8
   --help, -h        Show this help
 
@@ -393,7 +393,7 @@ export function main(argv = process.argv.slice(2)): number {
     if (positionals.length > 1) throw new BuildError("Give one version", 2);
     const jobs = Number(values.jobs ?? "8");
     if (!Number.isSafeInteger(jobs) || jobs < 1) throw new BuildError("--jobs must be a positive integer", 2);
-    const worktree = values.worktree ?? join(homedir(), "dev/uw-release");
+    const worktree = values.worktree ?? join(homedir(), "dev/worktrees/uw/release");
     if (!existsSync(join(worktree, ".chromium/src"))) throw new BuildError(`${worktree} has no .chromium checkout`, 2);
     new Release({ version: positionals[0]!, sha: values.sha, worktree, jobs }).publish();
     return 0;

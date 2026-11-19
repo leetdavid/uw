@@ -31,7 +31,7 @@ A check or download already under way, from the page or the schedule, shows its 
 
 ## Release pipeline
 
-Agreed: previews are built on the owner's Mac in the `~/dev/uw-release` worktree, not in CI. Free GitHub runners stop a job after 6 hours, which is too short for a Chromium build. One command, `pnpm run release <sha>`, runs every step: check out, build, smoke test, sign and notarize with Chromium's `sign_chrome.py`, make the DMG, sign the Sparkle feed entry, and publish the GitHub release. `sign_chrome.py` is upstream Python, like the rest of Chromium's build tools. Agreed on 2026-11-07: with T370 the same command has the owner's Linux workstation build Windows from the same commit; see [Windows](windows.md#distribution).
+Agreed: previews are built on the owner's Mac in the `~/dev/worktrees/uw/release` worktree, not in CI. Free GitHub runners stop a job after 6 hours, which is too short for a Chromium build. One command, `pnpm run release <sha>`, runs every step: check out, build, smoke test, sign and notarize with Chromium's `sign_chrome.py`, make the DMG, sign the Sparkle feed entry, and publish the GitHub release. `sign_chrome.py` is upstream Python, like the rest of Chromium's build tools. Agreed on 2026-11-07: with T370 the same command has the owner's Linux workstation build Windows from the same commit; see [Windows](windows.md#distribution).
 
 ## Versions
 
