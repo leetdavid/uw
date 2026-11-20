@@ -148,6 +148,10 @@ A regular tab nested directly under a parent tab, in its parent's tab branch and
 **Selected tab**:
 The tab whose page is currently displayed in a browser window. In a split view, it is the tab in the pane with focus.
 
+**Unloaded tab**:
+A regular tab whose page uw dropped from memory while it was out of sight. It keeps its place, title, icon, and history, and its page loads again when it is selected.
+_Avoid_: Discarded tab, inactive tab, sleeping tab, suspended tab.
+
 **Split view**:
 Tabs shown together in one window's page area, each in its own pane, made by splitting a pane right or down as in a terminal. Its tabs are in one task, or all in the Scratchpad, and share one box in the sidebar.
 _Avoid_: Side by side, split screen, tiling.
