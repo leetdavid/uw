@@ -38,7 +38,7 @@ Agreed: manual setup is acceptable for the first usable version. Automatic brows
 
 Agreed: performance and stability are basic usability requirements. Crashes, disruptive slowdowns, and broken daily workflows block acceptance. Later features must preserve that baseline.
 
-Agreed: the [automatic organization MVP](plans/automatic-organization.md) is part of the minimum usable version. It automatically files tab branches into task groups. Automatic tab closing and suspension remain deferred.
+Agreed: the [automatic organization MVP](plans/automatic-organization.md) is part of the minimum usable version. It automatically files tab branches into task groups. Automatic tab closing remains deferred. Background tabs unload as [Browser experience](#browser-experience) says.
 
 ### Required extensions
 
@@ -370,7 +370,9 @@ Agreed on 2026-10-21: [workspaces](CONTEXT.md#language) work as Arc's spaces. Th
 
 Agreed on 2026-10-29, and built and on by default since 2026-10-31, not yet verified in daily use: every window showing a workspace shows its tabs, as in Arc, with one live page per tab that moves to the window that selects it, as pins do. Closing a window closes no tabs. The [shared tabs plan](plans/shared-tabs.md) has the details, and [ADR 0024](adr/0024-a-workspaces-tabs-show-in-every-window.md) the reasons.
 
-Proposed: suspend inactive tabs when appropriate and restore sessions reliably.
+Agreed on 2026-11-20: Chromium's Memory Saver is on by default at its Moderate level, so a tab out of sight for 6 hours becomes an [unloaded tab](CONTEXT.md#language), unless the user has gone back to it more than 5 times. Pinned tabs, each window's selected tab, terminals, chats, tabs the agent is acting in, and the pages Chromium keeps stay loaded: sound, picture in picture, capture, devices, notifications, a title or icon that changes out of sight, typed input, and DevTools. An unloaded tab shows Chromium's dashed ring and loads again when selected. The user changes the level or turns it off in Settings → Performance. Ticket T395.
+
+Proposed: restore sessions reliably.
 
 Agreed on 2026-10-14: every command has a menu bar entry and a key, and the tab tree works with the mouse alone. Tasks do not nest: a [tab branch](CONTEXT.md#language) is the only level below a task. Branches collapse, and dragging nests them. The [keyboard and mouse plan](plans/keyboard-and-mouse.md) has the keys and the details.
 
