@@ -1,0 +1,44 @@
+---
+title: Unloaded tabs
+description: Tabs you haven't looked at for hours unload to free memory. They keep their place and load again when you pick them.
+---
+
+## When a tab *unloads*
+
+A tab that has been out of sight for 6 hours unloads, unless you've gone back to it more than 5 times. Time your Mac is asleep doesn't count. The tab keeps its place, title, and icon, and a dotted circle appears around its icon.
+
+<Figure caption="An unloaded tab has a dotted circle around its icon. Click it, and its page loads again.">
+  <Window>
+    <Sidebar>
+      <Task name="Plan the Lisbon trip" color="blue">
+        <TabRow unloaded>Flights to Lisbon</TabRow>
+        <TabRow selected>Alfama apartments</TabRow>
+      </Task>
+      <Scratchpad>
+        <TabRow unloaded>Weather in Lisbon</TabRow>
+        <TabRow>Mail</TabRow>
+      </Scratchpad>
+    </Sidebar>
+    <Page address="stayaway.com/alfama" />
+  </Window>
+</Figure>
+
+Click an unloaded tab, and its page loads again, as it would after you quit and open uw.
+
+## What *stays loaded*
+
+- Pinned tabs, and the tab each window shows.
+- Terminal tabs and chats.
+- Tabs the agent is working in, until it stops.
+- Pages playing sound or in the mini player, and pages using your camera, microphone, or screen, or a Bluetooth or USB device.
+- Pages that can send you notifications, and pages whose title or icon keeps changing, such as a timer.
+- Pages with text you haven't sent, and pages with DevTools open.
+
+## Change *when tabs unload*
+
+Open `uw://settings/performance` and find **Memory Saver**.
+
+- Pick **Balanced** to unload tabs after 4 hours, or **Maximum** for 2 hours. **Moderate** is the default.
+- Turn **Memory Saver** off to keep tabs loaded.
+- Under **Always keep these sites active**, add sites whose tabs should never unload.
+- Turn off **Inactive tabs appearance** to hide the dotted circle.

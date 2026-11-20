@@ -70,6 +70,9 @@ std::unique_ptr<content::WebContents> SwapPage(
     content::WebContents* old,
     std::unique_ptr<content::WebContents> page) {
   content::WebContents* shown = page.get();
+  if (shown->WasDiscarded()) {
+    shown->GetController().SetNeedsReload();
+  }
   std::unique_ptr<content::WebContents> replaced =
       tabs->DiscardWebContents(old, std::move(page));
   shown->NotifyNavigationStateChanged(content::INVALIDATE_TYPE_TAB);

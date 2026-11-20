@@ -410,6 +410,17 @@
   font-style: normal;
 }
 
+.kit-tab.unloaded .kit-icon {
+  border-radius: 50%;
+  outline: 1.5px dashed var(--kit-ink2);
+}
+
+.kit-tab.unloaded .kit-tile {
+  border-radius: 50%;
+  opacity: 0.6;
+  transform: scale(0.7);
+}
+
 .kit-heading {
   display: flex;
   align-items: center;

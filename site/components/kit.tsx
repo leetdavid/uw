@@ -246,6 +246,7 @@ export function TabRow({
   parent,
   collapsed,
   kept,
+  unloaded,
   kind,
   children,
 }: {
@@ -254,6 +255,7 @@ export function TabRow({
   parent?: boolean;
   collapsed?: number;
   kept?: boolean;
+  unloaded?: boolean;
   kind?: "chat" | "terminal";
   children: string;
 }) {
@@ -263,6 +265,7 @@ export function TabRow({
         "kit-row kit-tab",
         selected && "on",
         (parent || collapsed) && "parent",
+        unloaded && "unloaded",
       )}
       style={{ marginLeft: level * 16 }}
     >

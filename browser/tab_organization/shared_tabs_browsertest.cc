@@ -22,6 +22,8 @@
 #include "chrome/browser/actor/enterprise_policy_checker.h"
 #include "chrome/browser/autocomplete/tab_matcher_desktop.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
+#include "chrome/browser/performance_manager/policies/discard_eligibility_policy.h"
+#include "chrome/browser/performance_manager/policies/page_discarding_helper.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
@@ -63,6 +65,7 @@
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
 #include "content/public/test/browser_test_utils.h"
@@ -585,6 +588,43 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ReloadInACopyRunsInTheLivePage) {
     return !TabOrganizationController::IsCopy(copy) &&
            TabOrganizationController::IsCopy(notes);
   }));
+}
+
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AnUnloadedPageLoadsInTheWindowThatPicksIt) {
+  Browser* first = browser();
+  const std::string url = embedded_test_server()->GetURL("/title1.html").spec();
+  tabs::TabInterface* live = Open(first, url.c_str());
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  const PageId id = ControllerOf(first)->IdFor(live).value();
+
+  base::WeakPtr<performance_manager::PageNode> node =
+      performance_manager::PerformanceManager::GetPrimaryPageNodeForWebContents(
+          live->GetContents());
+  ASSERT_TRUE(node);
+  ASSERT_TRUE(performance_manager::policies::PageDiscardingHelper::GetFromGraph(
+                  performance_manager::PerformanceManager::GetGraph())
+                  ->ImmediatelyDiscardMultiplePages(
+                      {node.get()},
+                      performance_manager::policies::DiscardEligibilityPolicy::
+                          DiscardReason::PROACTIVE));
+  EXPECT_TRUE(live->GetContents()->WasDiscarded());
+  EXPECT_FALSE(TabOrganizationController::IsCopy(live));
+  EXPECT_TRUE(ControllerOf(first)->IdFor(live) == id);
+  EXPECT_TRUE(InStep(first, second));
+
+  tabs::TabInterface* copy = TabAt(second, url.c_str());
+  ASSERT_TRUE(copy && TabOrganizationController::IsCopy(copy));
+  SelectByClick(second, copy);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    content::WebContents* page = copy->GetContents();
+    return !TabOrganizationController::IsCopy(copy) &&
+           TabOrganizationController::IsCopy(live) &&
+           !page->GetController().NeedsReload() && !page->IsLoading() &&
+           page->GetPrimaryMainFrame()->IsRenderFrameLive();
+  }));
+  EXPECT_TRUE(ControllerOf(second)->IdFor(copy) == id);
 }
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, PrivateWindowsKeepTheirOwnTabs) {

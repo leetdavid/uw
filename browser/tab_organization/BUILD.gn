@@ -90,6 +90,7 @@ source_set("browser_tests") {
     "shared_tabs_browsertest.cc",
     "tab_organization_controller_browsertest.cc",
     "top_buttons_browsertest.cc",
+    "unloaded_tabs_browsertest.cc",
     "window_screenshot_browsertest.cc",
   ]
   deps = [

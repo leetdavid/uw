@@ -729,7 +729,7 @@ const TEST_SUITES = {
     "AgentCheckBrowserTest.*", "AgentLanguageCheckBrowserTest.*", "AgentTerminalBrowserTest.*", "CommandBarForATaskBrowserTest.*",
     "MouseActionsBrowserTest.*", "PageColorsBrowserTest.*", "ThemePickerBrowserTest.*", "UndoShortcutBrowserTest.*",
     "UwChatDarkModeBrowserTest.*", "UwChatSensitiveSiteBrowserTest.*", "UwChatTerminalBrowserTest.*", "WorkspaceReadyBrowserTest.*", "WorkspaceSwipeBrowserTest.*",
-    "SharedTabsBrowserTest.*", "SharedTabsFirstLaunchBrowserTest.*", "SharedTabsOffBrowserTest.*", "SharedTabsOrganizerBrowserTest.*", "TopButtonsBrowserTest.*",
+    "SharedTabsBrowserTest.*", "SharedTabsFirstLaunchBrowserTest.*", "SharedTabsOffBrowserTest.*", "SharedTabsOrganizerBrowserTest.*", "TopButtonsBrowserTest.*", "UnloadedTabsBrowserTest.*",
     "WorkspacesOffBrowserTest.*", "BusyTerminalWarningOffBrowserTest.*", "WorkingChatWarningOffBrowserTest.*",
     "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*", "UwCommandSectionBrowserTest.*",
     "UwCommandConnectorsBrowserTest.*", "UwCommandChatBrowserTest.*", "SplitViewBrowserTest.*",

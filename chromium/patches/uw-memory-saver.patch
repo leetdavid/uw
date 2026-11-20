@@ -1,0 +1,69 @@
+diff --git a/chrome/browser/performance_manager/policies/cannot_discard_reason.cc b/chrome/browser/performance_manager/policies/cannot_discard_reason.cc
+--- a/chrome/browser/performance_manager/policies/cannot_discard_reason.cc
++++ b/chrome/browser/performance_manager/policies/cannot_discard_reason.cc
+@@ -71,6 +71,8 @@
+       return "Tab is currently shared with Gemini";
+     case CannotDiscardReason::kWebApp:
+       return "Tab is a web application";
++    case CannotDiscardReason::kAgentActing:
++      return "An agent is acting in the tab";
+   }
+   NOTREACHED();
+ }
+diff --git a/chrome/browser/performance_manager/policies/cannot_discard_reason.h b/chrome/browser/performance_manager/policies/cannot_discard_reason.h
+--- a/chrome/browser/performance_manager/policies/cannot_discard_reason.h
++++ b/chrome/browser/performance_manager/policies/cannot_discard_reason.h
+@@ -41,8 +41,9 @@
+   kUserEdits = 27,
+   kGlicShared = 28,
+   kWebApp = 29,
++  kAgentActing = 30,
+ 
+-  kMaxValue = kWebApp,
++  kMaxValue = kAgentActing,
+ };
+ // LINT.ThenChange(//tools/metrics/histograms/enums.xml:CannotDiscardReason)
+ 
+diff --git a/chrome/browser/performance_manager/policies/discard_eligibility_policy.cc b/chrome/browser/performance_manager/policies/discard_eligibility_policy.cc
+--- a/chrome/browser/performance_manager/policies/discard_eligibility_policy.cc
++++ b/chrome/browser/performance_manager/policies/discard_eligibility_policy.cc
+@@ -331,6 +331,12 @@
+   if (live_state_data && is_proactive_or_suggested &&
+       live_state_data->IsGlicPinnedToVisibleInstance()) {
+     add_reason_and_update_result(CannotDiscardReason::kGlicShared,
++                                 CanDiscardResult::kProtected);
++  }
++
++  if (live_state_data &&
++      live_state_data->GetGlicActuationState() != GlicActuationState::kNone) {
++    add_reason_and_update_result(CannotDiscardReason::kAgentActing,
+                                  CanDiscardResult::kProtected);
+   }
+ 
+diff --git a/components/performance_manager/user_tuning/prefs.cc b/components/performance_manager/user_tuning/prefs.cc
+--- a/components/performance_manager/user_tuning/prefs.cc
++++ b/components/performance_manager/user_tuning/prefs.cc
+@@ -32,10 +32,10 @@
+       kMemorySaverModeTimeBeforeDiscardInMinutes,
+       kDefaultMemorySaverModeTimeBeforeDiscardInMinutes);
+   registry->RegisterIntegerPref(
+-      kMemorySaverModeState, static_cast<int>(MemorySaverModeState::kDisabled));
++      kMemorySaverModeState, static_cast<int>(MemorySaverModeState::kEnabled));
+   registry->RegisterIntegerPref(
+       kMemorySaverModeAggressiveness,
+-      static_cast<int>(MemorySaverModeAggressiveness::kMedium));
++      static_cast<int>(MemorySaverModeAggressiveness::kConservative));
+   registry->RegisterIntegerPref(
+       kBatterySaverModeState,
+       static_cast<int>(BatterySaverModeState::kEnabledBelowThreshold));
+diff --git a/tools/metrics/histograms/metadata/performance_manager/enums.xml b/tools/metrics/histograms/metadata/performance_manager/enums.xml
+--- a/tools/metrics/histograms/metadata/performance_manager/enums.xml
++++ b/tools/metrics/histograms/metadata/performance_manager/enums.xml
+@@ -69,6 +69,7 @@
+   <int value="27" label="User Edits"/>
+   <int value="28" label="GLIC Shared"/>
+   <int value="29" label="Web App"/>
++  <int value="30" label="Agent Acting"/>
+ </enum>
+ 
+ <!-- LINT.ThenChange(//chrome/browser/performance_manager/policies/cannot_discard_reason.h:CannotDiscardReason) -->
