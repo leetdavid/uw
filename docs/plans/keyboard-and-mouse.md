@@ -1,6 +1,6 @@
 # Keyboard and mouse
 
-Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The [close button on a task's row](#close-button-on-a-tasks-row), T284, was agreed on 2026-10-31. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. [Keys by scope](#keys-by-scope), the [key card](#key-card), [Move to the previous or next task](#move-to-the-previous-or-next-task), and [Move to Task…](#move-to-task) were agreed on 2026-11-07 in a grilling, as T352 to T356, and the user asked to start building them, Windows included. The other tickets wait for approval. The command bar runs the commands this plan defines.
+Status: scope agreed on 2026-10-14. T53, the menu bar entries and keys, and T57, branch collapse, are built and in review. The user asked for T57 on 2026-10-15. [New child tab](#new-child-tab), T73 and T74, was agreed on 2026-10-15 and comes next, then the [command bar](command-bar.md). The [tab menu](#tab-menu) order, the [new button](#new-button), and the new task keys were agreed on 2026-10-15 as T87, T88, and T90. The [mouse actions](#mouse-actions), T58, were agreed on 2026-10-16, with T55, dragging a branch, after them. The [Keyboard shortcuts](#keyboard-shortcuts) section, T122, and the Keep here key were agreed on 2026-10-19. The [close button on a task's row](#close-button-on-a-tasks-row), T284, was agreed on 2026-10-31. [Sideways drag](#sideways-drag), T56, was agreed and its design signed off on 2026-10-28. It is built after T55. [Keys by scope](#keys-by-scope), the [key card](#key-card), [Move to the previous or next task](#move-to-the-previous-or-next-task), and [Move to Task…](#move-to-task) were agreed on 2026-11-07 in a grilling, as T352 to T356, and the user asked to start building them, Windows included. [Closing with the mouse](#closing-with-the-mouse), T397, was agreed on 2026-11-21 in a grilling. The other tickets wait for approval. The command bar runs the commands this plan defines.
 
 Implementability: **5/10** using the [roadmap convention](roadmap.md#implementability-estimates). The menu entries and keys are routine. Branch collapse is the risk: Chromium hides only whole tab groups, so uw has to hide single rows in the vertical tab strip and teach tab switching to skip them.
 
@@ -206,15 +206,30 @@ Agreed on 2026-10-16 as T58. Each is on by default and has a switch in a new "Mo
 
 | Action | Result |
 | --- | --- |
-| Option-click a tab's close button | Closes its branch, like Close branch. |
+| Click a tab's close button, or middle-click the tab | Closes the tab and the tabs under it, like Close branch. See [Closing with the mouse](#closing-with-the-mouse). |
 | Hover a task's folder row | Shows a "+" before the task's menu button. A click opens the [command bar](command-bar.md#opening-it) for the task. Tooltip "New tab in task". With the command bar switched off, a click opens a blank tab at the end of the task and selects it. |
 | Double-click empty space below the tabs | Does what the foot's "+" does. The space still drags the window, but a double-click there no longer zooms it, as in Arc. |
 | Middle-click a task's folder row | Closes the task and its tabs, like Close task. |
 
 - The task row's "+" opens the command bar since it landed. Agreed on 2026-10-21.
 - Elsewhere in the window, a double-click on space that drags the window still does what macOS's "Double-click a window's title bar" setting says. A double-click below the tabs did too until T58.
-- On Windows, Option-click is Alt-click, per the [Windows plan](windows.md#agreed), and its switch says so. A double-click below the tabs opens a tab there too and no longer maximizes the window; until T351 it only maximized it. A middle-click on a task's row closes the task there too.
+- On Windows, Option-click is Alt-click, per the [Windows plan](windows.md#agreed). A double-click below the tabs opens a tab there too and no longer maximizes the window; until T351 it only maximized it. A middle-click on a task's row closes the task there too.
 - The design is the frames "Mouse actions: the sidebar", "Mouse actions: settings", and "Mouse actions: every state" on the canvas page "Keyboard and mouse", drawn on 2026-10-16. The user signed off on 2026-10-19.
+
+### Closing with the mouse
+
+Agreed on 2026-11-21 as T397, when the user asked that closing a tab close its children by default. Until then a click on the × closed the tab alone and an Option-click closed its branch.
+
+- A click on a tab's × or a middle-click on the tab closes the tab and every tab under it, as Close branch does. A tab with nothing under it closes as before.
+- Option with either click closes the tab alone, and the tabs under it move up one level. With the mouse, Option means the tab alone, as an Option-drag moves it alone.
+- The keys and menus keep their scope, per [Keys by scope](#keys-by-scope): Cmd+W and Close Tab close the tab alone, and Option+Cmd+W and Close Branch close the branch.
+- The × closes its own tab's branch, whichever other tabs are selected. A collapsed parent's × closes the hidden tabs too.
+- While the pointer is on a parent's ×, the parent's row and every row under it take a light tint of the close color, and the × turns that color, as on a [task's row](#close-button-on-a-tasks-row). A collapsed parent's count of hidden tabs turns it too. The tooltip reads "Close this tab and the 3 tabs under it" and a second line, "Option-click to close this tab alone". A tab with nothing under it keeps Chromium's × and its "Close tab".
+- A branch with a busy terminal or a working chat asks first, as Close branch does. Cmd+Shift+T reopens the tabs one per press. Reopening a whole branch at once is T398.
+- One switch in the "Mouse" section: "Closing a tab with the mouse closes the tabs under it", on by default. Off, both clicks close the tab alone, as in Chromium, with no tint, and Option changes nothing. It keeps the setting of the switch it replaces, "Option-click a tab's close button to close its branch", so whoever turned that off keeps Chromium's clicks.
+- On Windows, Option is Alt, per the [Windows plan](windows.md#agreed).
+- Agents' tab tools still close exactly the tabs they name.
+- The frames "Key hints: Option on a tab's ×", "Key hints: every state", and "Mouse actions: settings" are redrawn to match once it is built.
 
 ### Key hints
 
@@ -227,7 +242,7 @@ Agreed on 2026-10-30, when the user asked that holding Option on a tab's close b
 
 | Held on | Hint |
 | --- | --- |
-| Option, a tab's close button, when the tab has tabs under it | The tab's row and every row under it take a light tint of the close color, and the × turns that color. A collapsed parent's count of hidden tabs turns it too. The tooltip "Close tab" becomes "Close this tab and the 3 tabs under it". |
+| Option, a tab's close button, when the tab has tabs under it | Only the tab's row keeps the close tint, and the rows under it fade to half, as for an Option-drag. The tooltip reads "Close this tab alone." and a second line, "The 3 tabs under it stay." Changed on 2026-11-21 in [Closing with the mouse](#closing-with-the-mouse); before, Option tinted the branch. |
 | Option, the rest of a parent tab's row | The rows under it fade to half, since a drag would move the tab alone. The row's tooltip reads "Drag to move this tab alone." and a second line, "The 3 tabs under it stay." An Option-drag keeps them faded until the drop. |
 | Option, the floating sidebar's green window button | The full-screen arrows become a +, as macOS draws its own, and a click zooms the window. |
 | Cmd, a link in a chat's answer | A label by the pointer: "Open in the background". |
@@ -235,7 +250,7 @@ Agreed on 2026-10-30, when the user asked that holding Option on a tab's close b
 
 Tooltips that name the key:
 
-- A parent tab's close button: "Close tab" and a second line, "Option-click to close the 3 tabs under it too". A tab with nothing under it keeps the one line.
+- A parent tab's close button: "Close this tab and the 3 tabs under it" and a second line, "Option-click to close this tab alone". A tab with nothing under it keeps "Close tab".
 - A link in a chat's answer: "Cmd-click to open in the background".
 
 The command bar's Cmd+Return and Option+Return are typed keys with labels of their own, and Chromium's own clicks with keys stay Chromium's.
@@ -349,7 +364,7 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
    - With "Drag sideways to nest tabs" off, sideways does nothing and a straight drag still keeps its parent as above.
    - A window screenshot shows the indent following the pointer, as in the signed-off frames, and the dragged row slides to a new depth.
    - `PageTreeTest` checks the depth rules, and a headless controller test checks nesting by hand. The mouse drags are `MANUAL_` tests in `BranchDragBrowserTest`, run with `pnpm run window-tests`.
-6. A collapsed branch hides its children and shows their count. Ctrl+Tab skips them. Cmd+1 to 9 onto a hidden tab expands the branch. Closing the collapsed parent shows its children one level up. The collapse survives a restart, and an organizer move leaves it collapsed.
+6. A collapsed branch hides its children and shows their count. Ctrl+Tab skips them. Cmd+1 to 9 onto a hidden tab expands the branch. Cmd+W on the collapsed parent, or an Option-click on its ×, shows its children one level up, and a click on its × closes them too. The collapse survives a restart, and an organizer move leaves it collapsed.
 7. Each mouse action works, and does nothing once its switch is off.
 8. Ctrl+Cmd+L focuses the tab list. The arrow keys walk the tree as described, and Esc returns focus to the page. The accessibility tree gives each tab row its level.
 9. "New child tab" on a tab that is not selected and has children opens a selected blank tab directly under it, above those children. Ctrl+Cmd+T does the same for the selected tab. "New tab below" on a tab that is not selected opens below that tab's branch.
@@ -360,13 +375,14 @@ T73, T74, and the command bar are built next, then the other stages. Changed on 
 14. The Keyboard shortcuts section lists uw's and Chromium's keys by menu. A new key for a uw command runs it in a headless window, after a restart too, and in every profile. A key without Cmd is refused. Taking Cmd+G moves it from Find Next, whose row then reads "No key". Reset and Reset all bring back the defaults. `MenuKeysBrowserTest` and `UwShortcutsPageBrowserTest` check this.
 15. Ctrl+Cmd+K keeps the selected tab and a second press lets it go. Keep here is in the tab's right-click menu and the Tasks menu.
 
-16. [Key hints](#key-hints): with Option held on a parent's ×, the branch's rows tint and the tooltip names the count. Releasing Option clears it without moving the pointer, and so does switching apps. A tab with no children, and an action switched off, show nothing. The rows under a parent fade with Option held elsewhere on its row. The floating green button shows a + with Option held. A chat link shows "Open in the background" with Cmd held, and a terminal address underlines only with Cmd held.
+16. [Key hints](#key-hints): with the pointer on a parent's ×, the branch's rows tint and the tooltip names the count, and with Option held the rows under it fade instead. Releasing Option undoes it without moving the pointer, and so does switching apps. A tab with no children, and an action switched off, show nothing. The rows under a parent fade with Option held elsewhere on its row. The floating green button shows a + with Option held. A chat link shows "Open in the background" with Cmd held, and a terminal address underlines only with Cmd held.
 17. [Close button on a task's row](#close-button-on-a-tasks-row): with a Scratchpad tab selected, the pointer on a task's row shows its ×, and a click closes the task and its tabs. With the pointer on the ×, the task's rows tint and the tooltip counts its tabs. Cmd+Shift+T brings the task back. A task with a busy terminal asks first.
 18. [Keys by scope](#keys-by-scope): each key in the [table](#keys) runs its command through a real key event, on the Mac and in a Windows test build. Shift+Ctrl+Cmd+N, Ctrl+Cmd+T, S, K, and period do nothing, and neither do Alt+Shift+P and reading mode's Alt+Shift+R on Windows. A key the user set before the change keeps its command, and a new default it holds shows "No key".
 19. [Move to the previous or next task](#move-to-the-previous-or-next-task): Option+Cmd+] moves a parent and its children from the middle of one task to the top of the next with their nesting, and a second press to the top of the Scratchpad. Option+Cmd+[ from the Scratchpad puts them at the bottom of the last task. At either end nothing moves. A collapsed task they move into opens. `PageTreeTest` checks the places and `TaskKeysBrowserTest` presses the keys.
 20. The ▾ menu and the Tasks menu list Move to New Task under New Task, without a key, and a click moves the selected tab and the tabs under it to a new task.
 21. [Key card](#key-card): holding Option+Cmd shows the branch's keys and outlines the branch, holding Ctrl+Cmd shows the task's keys, outlines the task, and numbers the tasks. A key pressed at once shows nothing, letting go hides it, and Shift joining hides it. A window screenshot matches the signed-off frames.
 22. [Move to Task…](#move-to-task): Option+Cmd+M opens the command bar with the tasks, typing filters them, and Return moves the tab and the tabs under it to the end of the task picked.
+23. [Closing with the mouse](#closing-with-the-mouse): a click on a parent's × and a middle-click on it close its branch, collapsed or not. Option with either closes the parent alone and its children move up one level. Cmd+W still closes it alone. With the switch off, both clicks close the tab alone with no tint, and a switch turned off before the change stays off. A branch with a busy terminal asks first, and Cmd+Shift+T reopens its tabs. On Windows, Alt does what Option does.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 

@@ -171,7 +171,7 @@ A tab currently outside every task, so in the Scratchpad. Its relationship to a 
 The always-visible section holding ungrouped regular tabs and candidate branches in one workspace. It is not a task.
 
 **Key hint**:
-What a button, row, or link shows while a key that changes its click or drag is held, such as the rows an Option-click on a tab's close button would close: the other result, before the click.
+What a button, row, or link shows while a key that changes its click or drag is held, such as the rows that stay open when Option is held on a parent tab's close button: the other result, before the click.
 _Avoid_: Modifier preview, alt state.
 
 **Key card**:
