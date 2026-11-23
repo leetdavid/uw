@@ -293,10 +293,11 @@ function nameMatch(name: string): number {
 
 // Commands and tasks among Chromium's rows: an address being completed, a
 // command or task whose name the typed text starts, the open tabs, the other
-// commands and tasks, then history, bookmarks, and searches.
+// commands and tasks, then history, bookmarks, and searches. The selected
+// tab's task is left out, since going to it stays on the same tab.
 function withOwnRows(matches: MatchRow[]): Row[] {
   const own = [
-    ...tasks.filter(task => task.id)
+    ...tasks.filter(task => task.id && task.id !== selectedTask)
         .map(task => ({row: {kind: 'task', task} as Row, how: nameMatch(task.name)})),
     ...commands.map(
         command =>
@@ -618,23 +619,25 @@ function query(preventInlineAutocomplete: boolean) {
       /*isOnFocus=*/ false, keywords.activeKeyword, InputMethod.kKeyboard);
 }
 
-// Hands the typed text to uw: Cmd asks it in a new chat, Option runs it in a
-// new terminal. The browser takes the text from the query.
-function sendText(key: {metaKey?: boolean, altKey?: boolean}) {
+// Hands the typed text to the browser: Cmd asks uw in a new chat, Option runs
+// it in a new terminal, and Shift opens it in a new tab, as an address or a
+// search, whatever row is selected. The browser takes the text from the query.
+function sendText(
+    key: {metaKey?: boolean, altKey?: boolean, shiftKey?: boolean}) {
   const words = field.value.trim();
   if (!words) {
     return;
   }
   handler.queryAutocomplete(
       ++queryId, words, /*preventInlineAutocomplete=*/ true, words.length,
-      SuggestInventory.kDefault, /*isOnFocus=*/ false, /*keyword=*/ '',
-      InputMethod.kKeyboard);
+      SuggestInventory.kDefault, /*isOnFocus=*/ false,
+      key.shiftKey ? keywords.activeKeyword : '', InputMethod.kKeyboard);
   handler.openAutocompleteMatch(
       NO_ROW, '', /*areMatchesShowing=*/ true, /*mouseButton=*/ 0, {
         altKey: key.altKey ?? false,
         ctrlKey: false,
         metaKey: key.metaKey ?? false,
-        shiftKey: false,
+        shiftKey: key.shiftKey ?? false,
       },
       /*viaKeyboard=*/ true);
 }
@@ -816,6 +819,8 @@ field.addEventListener('keydown', event => {
       sendText({metaKey: true});
     } else if (hasTerminal && (event.altKey || shell)) {
       sendText({altKey: true});
+    } else if (event.shiftKey) {
+      sendText({shiftKey: true});
     } else if (selected === -1) {
       copyAnswer();
     } else if (!event.ctrlKey) {

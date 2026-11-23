@@ -198,9 +198,28 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
         .ExtractString();
   }
 
+  // Opens a second tab, titled "Title Of Awesomeness", and goes back to the
+  // first. Chromium closes a blank tab with no history when you switch away
+  // from it, so the tab you start from shows a page, as it does in use.
+  content::WebContents* OpenAnotherTab() {
+    EXPECT_TRUE(embedded_test_server()->Start());
+    EXPECT_TRUE(content::WaitForLoadStop(bar()->page()));
+    TabStripModel* tabs = browser()->tab_strip_model();
+    EXPECT_TRUE(ui_test_utils::NavigateToURL(
+        browser(), embedded_test_server()->GetURL("/title1.html")));
+    EXPECT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+        browser(), embedded_test_server()->GetURL("/title2.html"),
+        WindowOpenDisposition::NEW_FOREGROUND_TAB,
+        ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+    content::WebContents* open = tabs->GetActiveWebContents();
+    tabs->ActivateTabAt(0);
+    Settle();
+    return open;
+  }
+
   // Finds the open tab whose title is "Title Of Awesomeness" once its visit is
-  // indexed, and picks its row.
-  void PickTheTabRow() {
+  // indexed, and picks its row with Return, `with` a modifier if named.
+  void PickTheTabRow(std::string_view with = "") {
     ASSERT_TRUE(Eventually(
         [&] {
           Type("awesomeness");
@@ -220,7 +239,7 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_EQ("Switch to tab",
               content::EvalJs(bar()->page(),
                               "document.querySelector('#action').textContent"));
-    PressInField("Enter");
+    PressInField("Enter", with);
   }
 
   // Lets uw finish placing tabs after a change to the tab strip.
@@ -627,6 +646,18 @@ IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
   EXPECT_EQ(std::string::npos, Each(".title").find("Close Task"));
 }
 
+// Going to the selected tab's task would stay on the same tab.
+IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest,
+                       TheSelectedTabsTaskIsNotARow) {
+  MakeATask();
+  tabs()->ActivateTabAt(0);
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("plan");
+
+  ASSERT_TRUE(Eventually([&] { return Rows() > 0; }));
+  EXPECT_EQ(std::string::npos, Kinds().find("Task")) << Each(".title");
+}
+
 IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, ATaskRowGoesToTheTask) {
   MakeATask();
   Press(ui::VKEY_T, NSEventModifierFlagCommand);
@@ -771,20 +802,8 @@ IN_PROC_BROWSER_TEST_F(CommandBarRowsBrowserTest, MANUAL_TheRows) {
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnOpenTabRowSwitchesToIt) {
-  ASSERT_TRUE(embedded_test_server()->Start());
-  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  content::WebContents* open = OpenAnotherTab();
   TabStripModel* tabs = browser()->tab_strip_model();
-  // Chromium closes a blank tab with no history when you switch away from it,
-  // so the tab you start from shows a page, as it does in use.
-  ASSERT_TRUE(ui_test_utils::NavigateToURL(
-      browser(), embedded_test_server()->GetURL("/title1.html")));
-  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
-      browser(), embedded_test_server()->GetURL("/title2.html"),
-      WindowOpenDisposition::NEW_FOREGROUND_TAB,
-      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
-  content::WebContents* open = tabs->GetActiveWebContents();
-  tabs->ActivateTabAt(0);
-  Settle();
   const int count = tabs->count();
 
   Press(ui::VKEY_T, NSEventModifierFlagCommand);
@@ -792,6 +811,61 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, AnOpenTabRowSwitchesToIt) {
 
   EXPECT_TRUE(Eventually([&] { return tabs->GetActiveWebContents() == open; }));
   EXPECT_EQ(count, tabs->count());
+}
+
+// Shift+Return opens what was typed in a new tab, here a search, with an open
+// tab's row selected.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ShiftReturnSearchesInANewTab) {
+  content::WebContents* open = OpenAnotherTab();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int count = tabs->count();
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  PickTheTabRow("shiftKey");
+
+  ASSERT_TRUE(Eventually([&] { return tabs->count() == count + 1; }));
+  content::WebContents* opened = tabs->GetActiveWebContents();
+  EXPECT_NE(open, opened);
+  EXPECT_NE(tabs->GetWebContentsAt(0), opened);
+  EXPECT_NE(std::string::npos,
+            opened->GetVisibleURL().query().find("q=awesomeness"))
+      << opened->GetVisibleURL();
+  EXPECT_FALSE(bar()->IsShowing());
+}
+
+// Shift+Return on an open tab's address opens the page again in a new tab.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
+                       ShiftReturnOpensAnOpenAddressAgain) {
+  content::WebContents* open = OpenAnotherTab();
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int count = tabs->count();
+  const GURL page = open->GetLastCommittedURL();
+
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type(page.spec());
+  PressInField("Enter", "shiftKey");
+
+  EXPECT_TRUE(Eventually([&] {
+    return tabs->count() == count + 1 && tabs->GetActiveWebContents() != open &&
+           tabs->GetActiveWebContents()->GetVisibleURL() == page;
+  }));
+}
+
+// Shift+Return searches a sum instead of copying its answer.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ShiftReturnSearchesASum) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  TabStripModel* tabs = browser()->tab_strip_model();
+  const int count = tabs->count();
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("2+2");
+  ASSERT_FALSE(Card().empty());
+  PressInField("Enter", "shiftKey");
+
+  ASSERT_TRUE(Eventually([&] { return tabs->count() == count + 1; }));
+  EXPECT_NE(
+      std::string::npos,
+      tabs->GetActiveWebContents()->GetVisibleURL().query().find("q=2%2B2"))
+      << tabs->GetActiveWebContents()->GetVisibleURL();
 }
 
 // Split Right opens the command bar over the new pane. A page picked there
@@ -1115,6 +1189,9 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, TheFooterNamesTheMacsKeys) {
                                    ".textContent.trim()"));
   EXPECT_EQ(true, content::EvalJs(bar()->page(),
                                   "!!document.querySelector('#terminalKey')"));
+  EXPECT_EQ(true, content::EvalJs(bar()->page(),
+                                  "document.querySelector('#keys').textContent"
+                                  ".includes('New tab')"));
 }
 
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, CmdReturnAsksInANewChat) {

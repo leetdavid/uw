@@ -74,6 +74,19 @@ void UwCommandBarHandler::OpenAutocompleteMatch(
     }
     return;
   }
+  // Shift opens what was typed, whatever row is selected. The page asked for
+  // it just before with inline completion off, so the first match is the typed
+  // text as an address or a search. It opens without its switch to an open
+  // tab.
+  if (modifiers->shift_key) {
+    if (const AutocompleteMatch* typed =
+            autocomplete_controller()->result().default_match()) {
+      RealboxHandler::OpenAutocompleteMatch(0, typed->destination_url,
+                                            are_matches_showing, mouse_button,
+                                            std::move(modifiers), via_keyboard);
+    }
+    return;
+  }
   if (const AutocompleteMatch* match = GetMatchWithUrl(line, url)) {
     if (const std::optional<uint8_t> action = TabSwitchAction(*match)) {
       ExecuteAction(line, *action, url, base::TimeTicks::Now(), mouse_button,
