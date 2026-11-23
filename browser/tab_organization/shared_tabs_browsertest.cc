@@ -879,6 +879,44 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(second, kMail)));
 }
 
+// A drag that takes a tab out of its window opens a window that waits to join
+// until the drag ends. When the tab comes back in, that window closes, and
+// when the drag ends it joins nothing, since Chromium is about to delete it.
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AWindowOpenedAndClosedWithinOneDragTakesNoTabs) {
+  WaitForSavedGroups();
+  Browser* first = browser();
+  Open(first, kMail);
+  tabs::TabInterface* issues = Open(first, kIssues);
+  scoped_refptr<SharedTree> tree;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    const std::string& workspace = WorkspaceWindow::From(first)->workspace();
+    tree = workspace.empty() ? nullptr : SharedTree::For(workspace);
+    return tree && std::ranges::contains(tree->windows(), ControllerOf(first));
+  }));
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+
+  ControllerOf(first)->BeginTabDrag(/*alone=*/true);
+  chrome::MoveTabsToNewWindow(
+      first, {first->tab_strip_model()->GetIndexOfTab(issues)});
+  Browser* own = NewWindow(known);
+  ASSERT_TRUE(own);
+  base::RunLoop().RunUntilIdle();
+  ASSERT_FALSE(std::ranges::contains(tree->windows(), ControllerOf(own)));
+  ASSERT_EQ(Count(own, kMail), 0);
+
+  // The drag ends, and the tab is back before the end settles.
+  ControllerOf(first)->EndTabDrag();
+  chrome::MoveTabsToExistingWindow(own, first, {0});
+  ASSERT_TRUE(own->IsDeleteScheduled());
+
+  ASSERT_TRUE(base::test::RunUntil([&] { return !IsOpen(own); }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(Count(first, kIssues), 1);
+  EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(first, kIssues)));
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AWindowUsedForAnotherTabStays) {
   Browser* first = browser();
   Open(first, kMail);
