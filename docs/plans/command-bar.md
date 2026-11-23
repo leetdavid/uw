@@ -27,7 +27,7 @@ The decision to replace typing in the address bar is recorded in [ADR 0005](../a
 ### What it finds
 
 - Commands: uw's, from the list the [keyboard and mouse plan](keyboard-and-mouse.md#design) defines, and 25 of Chromium's common ones, such as New Window, History, and Developer Tools, the same on the Mac and Windows. A command that can't run on the selected tab is left out. Each command row shows its key. Agreed on 2026-11-07.
-- Tasks, to go to one or to move a tab there. Option+Cmd+M opens it with only the tasks, per [Move to Task…](keyboard-and-mouse.md#move-to-task).
+- Tasks, to go to one or to move a tab there. Option+Cmd+M opens it with only the tasks, per [Move to Task…](keyboard-and-mouse.md#move-to-task). The selected tab's task is left out, since going to it stays on the same tab. Agreed on 2026-11-24.
 - Open tabs, history, bookmarks, and past searches, from the same suggestion engine as Chromium's address bar. Chromium's site search shortcuts, such as `gh` and Tab, work as they do there. An address being typed is completed inline, as the address bar does.
 - Only results that are ready at once. The list changes only when the user types, never because a result arrived late. Changed on 2026-10-15:
   - Live suggestions from the search engine are left out, so nothing typed leaves the Mac until the user picks a row.
@@ -62,6 +62,7 @@ Agreed on 2026-10-15. The user types first and picks where the text goes with th
 | Return | Runs the selected row. |
 | Cmd+Return | Starts a new [chat](../CONTEXT.md#language) with the text as its first message. The chat opens in front, where a blank new tab would. No tab is handed over; a `@` does that. Changed on 2026-10-31 at the user's request: from 2026-10-16, the selected tab was always handed over. |
 | Option+Return | Runs the text as a shell command in a new terminal tab, which opens in front where a blank new tab would. Changed on 2026-10-16: before, in this task's terminal. |
+| Shift+Return | Opens the text in a new tab in front, where a picked page would open, as an address or a web search. It ignores the selected row and the completion after the caret, so it never switches to an open tab. With a sum's answer it searches the text, and with a site search chip it searches that site. After `>` or `@`, and in the Move to Task list, it does what Return does. Shift+Enter on Windows. Agreed on 2026-11-24 at the user's request: Return on a typed search could pick a tab or task row that seemed to do nothing. |
 | Tab | Turns the completion after the caret into typed text, as in Chromium's address bar. With no completion, on a site search keyword such as `gh`, it starts that site search. |
 
 - A `@` typed in an empty field, on a tab that shows a web page, turns into a chip with the page's icon and title. The text is then a question about that page: the rows and the calculator hide, and Return, Cmd+Return, and Option+Return all ask it in a new chat with the page as a [handed tab](../CONTEXT.md#language). The agent is told it is the page the user asked about, reads it first as its tab 1, and can act in it with the usual approvals. Backspace in an empty field removes the chip. Agreed on 2026-10-31.
@@ -155,7 +156,7 @@ These examples are typed in Hong Kong at 6:24 PM on Tuesday, Oct 20, 2026:
 - Chromium's rows keep its scores. uw scores its own rows on the same scale and adds what it learned from picks to every row.
 - Cmd+T, File → New Tab, Cmd+L, the address click, and Cmd+Shift+A are routed to the command bar where Chromium handles `IDC_NEW_TAB`, `IDC_FOCUS_LOCATION`, and `IDC_TAB_SEARCH`. Cmd+T is one of Chromium's reserved keys, so pages never receive it. Cmd+Shift+P is not used by Chromium on the Mac.
 - What uw learns from picks, aliases, and the default currency are profile prefs. Recorded keys are the same in every profile. A history deletion clears what uw learned.
-- Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`.
+- Cmd+Return and Option+Return reach the browser over the searchbox connection the page already has: the page opens with the Cmd or Option flag set, and `UwCommandBarHandler` hands the query's text to its window. Cmd+Shift+P has the handler set the field to `>`, through the searchbox page's `SetInputText`. Shift+Return asks again with inline completion off and the site search keyword, then opens with no row picked, which opens Chromium's default match for the typed text.
 - The page handles Escape, so the browser holds it with the other keys typed right after Cmd+T, and the page asks the browser to close. When the panel closes for any reason but losing focus, the browser has the page forget its text through the same `SetInputText`.
 - Cmd+Return opens `uw://chat` the way New chat does, and the chat page sends the text as if typed.
 - Each time it shows, the page asks its window for the commands that can run and the workspace's tasks over `uw_command_bar.mojom`, and runs a command, goes to a task, or moves tabs the same way. The list of commands is in `browser/ui/views/tab_organization/command_bar_commands.cc`, beside the code that knows each command's key and whether it can run. The sidebar's code hands the list to the command bar, which cannot depend on it. A tab row finds its task by the address its tab shows.
@@ -185,6 +186,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 14. T63: the result menu, Reset ranking, the Cmd+K choices for chats and terminals, and the fallbacks.
 15. T64: Cmd+Shift+A opens it narrowed to tabs.
 16. T65: aliases, and recording a key from the result menu into T122's key list.
+17. T399: Shift+Return opens the typed text in a new tab, and the selected tab's task is not a row. Added on 2026-11-24.
 
 ## Acceptance checks
 
@@ -206,6 +208,7 @@ Each stage is a ticket on the [board](roadmap.md#board), built in this order. Ch
 16. With the clock at 6:24 PM on Tuesday, Oct 20, 2026, in Hong Kong: `now + 100 minutes to UTC` shows 12:04 PM, `3pm London` shows 10:00 PM, `dec 25 - today` shows 66 days, `next friday` shows Friday, Oct 30, 2026, `1760000000 to date` shows Oct 9, 2025, 4:53:20 PM with Thursday, and `now to unix` shows 1792491840. `2026-12-25` shows a date, and `3/4` shows 0.75. `now`, `friday`, and `now in Narnia` show no card, and `feb 30` says it is not a date. With the Mac's 24-hour setting on, `3pm` shows 15:00. A card built on `now` shows the next minute without retyping.
 17. With a page visited by its address, typing the start of the address shows the rest muted after the caret. Backspace deletes a typed letter and the rest goes; → takes it. ↓ to another page's row puts its address in the field with the caret at the end, what was typed in full ink and the rest muted, and a long address shows its end. Backspace edits it, and all of it turns to full ink. ↑ back to the first row shows what was typed and its completion.
 18. With `git` typed and the caret after `g`, a click on the page closes the command bar, and Cmd+T shows `git` with the caret after `g` and the same rows; Ctrl+Cmd+T does too. Escape empties the field and leaves the panel open, and a second Escape closes it, so the next Cmd+T opens empty. After a pick, Cmd+Return, Option+Return, or a copied answer, the next Cmd+T opens empty. Cmd+Shift+P opens an empty `>` over kept text. Typing `a` and Escape right after Cmd+T, before the panel has drawn, leaves it open and empty.
+19. With another tab titled `Title Of Awesomeness` open, typing `awesomeness` lists its tab row first, and Shift+Return opens a search for `awesomeness` in a new tab in front, leaving the open tab as it was. Shift+Return on that tab's address opens the page again in a new tab. Shift+Return on `2+2` searches it. On a tab in a task named `Plan trip`, typing `plan` lists no row for `Plan trip`. The footer shows Shift ↵ New tab while text is typed.
 
 Run `pnpm run check`, then the focused `unit_tests` and `browser_tests` suites with `pnpm run verify`. Browser tests stay headless.
 
