@@ -279,7 +279,7 @@ The button that starts a run of a scheduled chat at once, outside its schedule. 
 _Avoid_: Run now, refresh.
 
 **Retry**:
-Check now, offered on the Inbox's newest error alert of a scheduled chat whose last run failed. Its run always sends an alert saying how it went. Retry all does it at once for every such chat the user hasn't paused.
+Check now, offered on the Inbox's alert of a scheduled chat whose last run failed. Its run always sends an alert saying how it went. Retry all does it at once for every such chat the user hasn't paused.
 _Avoid_: Try again, rerun, rerun all.
 
 **Trigger**:
@@ -307,11 +307,11 @@ A notification after every run of a scheduled chat, saying what the run found.
 _Avoid_: Scheduled summary, digest.
 
 **Alert**:
-A notification from a scheduled chat, kept in uw, such as a change alert, a regular update, a failed run, or a step waiting for approval. Notifications from other chats are not alerts.
+A scheduled chat's latest notification, kept in uw, such as a change alert, a regular update, a failed run, or a step waiting for approval. A new one replaces the chat's older one. Notifications from other chats are not alerts.
 _Avoid_: Notification, when meaning the kept copy.
 
 **Inbox**:
-The list of alerts, opened from a button at the top of the sidebar.
+The list of alerts, one row for each scheduled chat, opened from a button at the top of the sidebar.
 _Avoid_: Notification center, alerts panel.
 
 **Unread alert**:

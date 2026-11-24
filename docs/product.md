@@ -292,8 +292,8 @@ Agreed on 2026-10-29: [Check now](CONTEXT.md#language) starts a run of a schedul
 
 Agreed on 2026-11-03: [Retry](CONTEXT.md#language) is Check now on a failed scheduled chat, offered from the Inbox and from the notification.
 
-- The Inbox shows it on "Couldn't check", "Sign in required", and "Paused" alerts, only on the chat's newest such alert, and only while the chat's last run failed. It hides while a run is under way or waits for approval; "Running now" shows instead.
-- A click marks the alert read, and the Inbox stays open. Retry's run always sends an alert saying how it went, such as "No change · $129" or "Couldn't check · fully.com didn't load", unless the chat is muted. A run that fails again thus brings a new alert with Retry.
+- The Inbox shows it on "Couldn't check", "Sign in required", and "Paused" alerts, only while the chat's last run failed. It hides while a run is under way or waits for approval; "Running now" shows instead.
+- A click marks the alert read, and the Inbox stays open. Retry's run always sends an alert saying how it went, such as "No change · $129" or "Couldn't check · fully.com didn't load", unless the chat is muted. A run that fails again thus brings a new alert with Retry, in the old one's place.
 - On a schedule that 3 failed runs paused, a Retry that succeeds resumes it, and its alert reads "Resumed". One that fails leaves it paused.
 - The notification's Retry does the same when the chat's last run failed and no run is under way, without bringing a window forward. Otherwise it opens the chat, as it does right after uw relaunches, before its schedules have loaded. A click launches uw if it has quit.
 - The new tab page's rows have no Retry.
@@ -327,14 +327,16 @@ Agreed on 2026-10-31: the chat page and the Scheduled page link to each other.
 - The chat page's chat list has Scheduled, with a clock, under New chat. It goes to the window's Scheduled page, or opens it in a new tab, and the chat stays in its tab. Private windows leave it out, since they have no scheduled chats.
 - The Scheduled page has Back to chat above its title. As on `uw://ai`, it goes to the chat tab used last in the window, or opens a new chat when the window has none.
 
-Agreed on 2026-10-28: every notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
+Agreed on 2026-10-28: a notification a scheduled chat sends is also kept in uw as an [alert](CONTEXT.md#language) in the [Inbox](CONTEXT.md#language).
 
-- The Inbox button sits at the top of the sidebar in every normal window, the floating sidebar included, and never in private windows. It shows how many alerts are [unread](CONTEXT.md#language).
+- Agreed on 2026-11-24: the Inbox has one row for each scheduled chat, its latest alert. A new alert replaces the chat's older one and is unread. A run that sends no notification leaves the row as it is. The chat's page still lists every run. Before, the Inbox kept every alert, so a chat that ran often filled it.
+- The Inbox button sits at the top of the sidebar in every normal window, the floating sidebar included, and never in private windows. It shows how many chats have an [unread](CONTEXT.md#language) alert.
 - An alert shows the page's icon, or a clock for a chat with no page, the chat's title, what the notification said, and the time. An unread alert has a dot after the time.
 - A click on a watched page's alert opens the page, or goes to its tab if one is open, with Open chat on hover. Any other alert opens its chat. "Waiting for your approval" always opens the chat. A click on the notification itself still opens the chat.
 - Agreed on 2026-11-02: an alert stays unread until the user opens it from the Inbox, from its notification, or from the new tab page. Mark all read, beside Clear all, marks every alert read. Before, opening the Inbox marked them all read.
 - Agreed on 2026-11-02: a page or chat opened from the Inbox or from a notification opens selected at the top of the Scratchpad, as a [link from another app](#automatic-tab-organization) does. Before, it opened beside the active tab, inside that tab's task.
-- Alerts stay until Clear all or until their chat is deleted. Stopping a watch or removing a schedule keeps them. An approval's alert goes once the step is answered or stopped.
+- An alert stays until its chat sends a new one, until Clear all, or until its chat is deleted. Stopping a watch or removing a schedule keeps it.
+- While a step waits for approval, the chat's row reads "Waits for your approval". Once the step is answered or stopped, the row goes back to the alert it showed before.
 - Agreed on 2026-11-03: while open, the Inbox's pop-up and the watch card's pop-up fit their content whenever it changes, growing or shrinking, and slide to the new height. After Clear all, the Inbox shrinks to its "No alerts" card. The canvas guide `uw-scheduled-page-and-inbox` has the motion. Before, the pop-up kept the height it opened with.
 
 ### The uw command
