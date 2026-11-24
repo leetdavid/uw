@@ -917,6 +917,29 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   EXPECT_FALSE(TabOrganizationController::IsCopy(TabAt(first, kIssues)));
 }
 
+// While one window drags tabs, the others leave their sidebars alone, and
+// catch up at the drop (T400).
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, OtherWindowsWaitForTheDrop) {
+  Browser* first = browser();
+  Open(first, kMail);
+  Open(first, kIssues);
+  Browser* second = CreateBrowser(first->GetProfile());
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(second, kIssues) && InStep(first, second); }));
+  int updates = 0;
+  base::CallbackListSubscription counting = ControllerOf(second)->Observe(
+      base::BindRepeating([](int* count) { ++*count; }, &updates));
+  TabStripModel* tabs = first->tab_strip_model();
+  ControllerOf(first)->BeginTabDrag(/*alone=*/true);
+  tabs->MoveWebContentsAt(tabs->GetIndexOfTab(TabAt(first, kMail)),
+                          tabs->count() - 1, /*select_after_move=*/false);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(updates, 0);
+  ControllerOf(first)->EndTabDrag();
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  EXPECT_GT(updates, 0);
+}
+
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AWindowUsedForAnotherTabStays) {
   Browser* first = browser();
   Open(first, kMail);

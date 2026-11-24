@@ -102,6 +102,36 @@ void WatchClosingAllBrowsers() {
           [](bool closing) { closing_all_browsers = closing; })));
 }
 
+// Holds the rewrite of the session file Chromium makes after every 250
+// changes, which takes long enough with many tabs to stall a drag.
+void HoldSessionRebuilds(Profile* profile, bool held) {
+  if (SessionService* service =
+          SessionServiceFactory::GetForProfileIfExisting(profile)) {
+    service->set_rebuilds_held(held);
+  }
+}
+
+// Lets the session file be rewritten again once no window of the profile
+// drags tabs.
+void ReleaseSessionRebuilds(base::WeakPtr<Profile> profile) {
+  if (!profile) {
+    return;
+  }
+  bool dragging = false;
+  GlobalBrowserCollection::GetInstance()->ForEach(
+      [&](BrowserWindowInterface* window) {
+        const TabOrganizationController* controller =
+            TabOrganizationController::From(window);
+        dragging = window->GetProfile() == profile.get() && controller &&
+                   controller->dragging();
+        return !dragging;
+      },
+      BrowserCollection::Order::kActivation);
+  if (!dragging) {
+    HoldSessionRebuilds(profile.get(), false);
+  }
+}
+
 }  // namespace
 
 // Tells a window once Chromium's saved tab groups have loaded, at once when
@@ -165,6 +195,9 @@ TabOrganizationController::TabOrganizationController(
 }
 
 TabOrganizationController::~TabOrganizationController() {
+  if (dragging_) {
+    HoldSessionRebuilds(window_->GetProfile(), false);
+  }
   tabs_->RemoveObserver(this);
   if (joined_) {
     shared_->Remove(this);
@@ -1770,6 +1803,7 @@ void TabOrganizationController::Undo() {
 
 void TabOrganizationController::BeginTabDrag(bool alone) {
   dragging_ = true;
+  HoldSessionRebuilds(window_->GetProfile(), true);
   drag_alone_ = alone;
   drag_selection_.clear();
   drag_carried_.clear();
@@ -1853,6 +1887,12 @@ void TabOrganizationController::EndTabDrag() {
   }
   dragging_ = false;
   drags_.Notify();
+  // The session file is rewritten a moment after the drop, not during it.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&ReleaseSessionRebuilds,
+                     window_->GetProfile()->GetWeakPtr()),
+      base::Seconds(1));
   if (drag_canceled_) {
     shared_->tree().Restore(drag_before_);
     ScheduleUpdate();

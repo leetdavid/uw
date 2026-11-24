@@ -41,6 +41,7 @@
 #include "chrome/browser/ui/toolbar/app_menu_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
+#include "chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h"
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
@@ -1588,6 +1589,62 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(task);
   EXPECT_EQ(b->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Plan");
+}
+
+// A change to the tree lays the sidebar out a few times, as the rows it
+// changes update, not once for each row. Each row used to make the whole
+// sidebar lay out again, which stalled a drag with many tabs (T400).
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ATreeChangeLaysTheSidebarOutLessThanOncePerRow) {
+  tabs::TabInterface* parent = InitialTab();
+  OpenLinkFrom(parent, GURL("about:blank"));
+  for (int i = 0; i < 20; ++i) {
+    NewTab();
+  }
+  views::View* container = ViewsOfClass("UnpinnedTabContainerView")[0];
+  auto* layout = static_cast<TabCollectionAnimatingLayoutManager*>(
+      container->GetLayoutManager());
+  // Waits until the new tabs stop laying the sidebar out, as their titles and
+  // animations can on a busy Mac.
+  for (int settled = -1;
+       settled != layout->target_calculations_for_testing();) {
+    settled = layout->target_calculations_for_testing();
+    base::RunLoop wait;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, wait.QuitClosure(), base::Milliseconds(500));
+    wait.Run();
+  }
+  const int before = layout->target_calculations_for_testing();
+  Collapse(parent);
+  EXPECT_LT(layout->target_calculations_for_testing() - before,
+            tabs()->count() / 2);
+}
+
+// Chromium rewrites the session file after every 250 changes, which takes
+// long enough with many tabs to stall a drag. A drag holds the rewrite until a
+// moment after the drop (T400).
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       TheSessionFileIsRewrittenAfterADragNotDuringIt) {
+  for (int i = 0; i < 3; ++i) {
+    NewTab();
+  }
+  SessionServiceTestHelper session(browser()->GetProfile());
+  sessions::CommandStorageManager* storage = session.command_storage_manager();
+  ASSERT_TRUE(base::test::RunUntil([&] { return !storage->pending_reset(); }));
+  controller()->BeginTabDrag(/*alone=*/true);
+  for (int i = 0; i < 300; ++i) {
+    tabs()->MoveWebContentsAt(0, tabs()->count() - 1,
+                              /*select_after_move=*/false);
+  }
+  EXPECT_GE(storage->commands_since_reset(), 250);
+  EXPECT_FALSE(storage->pending_reset());
+  controller()->EndTabDrag();
+  base::RunLoop wait;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE, wait.QuitClosure(), base::Milliseconds(1500));
+  wait.Run();
+  tabs()->MoveWebContentsAt(0, 1, /*select_after_move=*/false);
+  EXPECT_TRUE(storage->pending_reset());
 }
 
 // The empty space under the last tab drags the window. Once tabs fill the

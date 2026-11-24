@@ -62,7 +62,7 @@ Moving tabs has to keep to the [tab move budget](../architecture.md#performance)
 
 If the budget still fails after these, the profile shows the next cost, and that gets fixed too, until it holds.
 
-A [real-window test](../../README.md#real-window-tests) drags a tab and holds a move key in a setup like the owner's, and fails when a step takes longer than 8.3 ms. Headless tests count the work: one sidebar layout per tree change, no window lookup while the pointer is in the sidebar, and no session rebuild before the drop. The last check is a drag on the owner's Mac while Xcode's Animation Hitches records dropped frames.
+A [real-window test](../../README.md#real-window-tests), `TabMovesBenchmarkBrowserTest`, drags a tab and holds a move key in a setup like the owner's, and fails when more than one step in twenty takes longer than 8.3 ms. It covers the window lookup too, which only a real drag makes. Headless tests count the rest of the work: one sidebar layout per tree change, no session rebuild before the drop, and no sidebar update in the other windows until the drop. The last check is a drag on the owner's Mac while Xcode's Animation Hitches records dropped frames.
 
 ## Stages
 

@@ -3,10 +3,10 @@
 #include "uw/browser/ui/views/tab_organization/tab_indent.h"
 
 #include <algorithm>
+#include <utility>
 #include <variant>
 #include <vector>
 
-#include "base/functional/bind.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_collection_node.h"
 #include "chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.h"
@@ -89,20 +89,14 @@ bool ShowsSelectedTab(TabCollectionNode* parent, const views::View* child) {
       [](const tabs::TabInterface* tab) { return tab->IsActivated(); });
 }
 
-base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,
-                                                    views::View* container) {
+base::CallbackListSubscription RelayoutOnTreeChange(
+    TabCollectionNode* node,
+    base::RepeatingClosure relayout) {
   TabOrganizationController* controller = ControllerFor(node);
   if (!controller) {
     return {};
   }
-  return controller->Observe(base::BindRepeating(
-      [](views::View* container) {
-        for (views::View* child : container->children()) {
-          child->InvalidateLayout();
-        }
-        container->InvalidateLayout();
-      },
-      base::Unretained(container)));
+  return controller->Observe(std::move(relayout));
 }
 
 }  // namespace uw

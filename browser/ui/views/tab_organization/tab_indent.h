@@ -4,6 +4,7 @@
 #define UW_BROWSER_UI_VIEWS_TAB_ORGANIZATION_TAB_INDENT_H_
 
 #include "base/callback_list.h"
+#include "base/functional/callback.h"
 
 class TabCollectionNode;
 
@@ -25,10 +26,11 @@ bool IsHiddenInBranch(TabCollectionNode* parent, const views::View* child);
 // window's selected tab. A task folded in another window keeps that row.
 bool ShowsSelectedTab(TabCollectionNode* parent, const views::View* child);
 
-// Lays out `container` and its child views again whenever the window's page
-// tree changes. `container` must own the returned subscription.
-base::CallbackListSubscription RelayoutOnTreeChange(TabCollectionNode* node,
-                                                    views::View* container);
+// Runs `relayout` whenever the window's page tree changes. The container
+// `relayout` lays out again must own the returned subscription.
+base::CallbackListSubscription RelayoutOnTreeChange(
+    TabCollectionNode* node,
+    base::RepeatingClosure relayout);
 
 }  // namespace uw
 

@@ -256,8 +256,14 @@ void SharedTree::Propagate(TabOrganizationController* from) {
 void SharedTree::Touch() {
   std::erase_if(pictures_,
                 [this](const auto& entry) { return !tree_.Find(entry.first); });
+  // During a drag only the window that drags lays its sidebar out again. The
+  // others follow at the drop, as they do with the tree.
+  const bool dragging = std::ranges::any_of(
+      windows_, [](const auto& window) { return window->dragging(); });
   for (TabOrganizationController* window : windows_) {
-    window->ScheduleOwnUpdate();
+    if (!dragging || window->dragging()) {
+      window->ScheduleOwnUpdate();
+    }
   }
 }
 

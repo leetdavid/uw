@@ -161,6 +161,7 @@ source_set("browser_tests") {
       "random_actions_browsertest.mm",
       "shared_tabs_drag_browsertest.cc",
       "sidebar_menus_browsertest.mm",
+      "tab_moves_benchmark_browsertest.mm",
       "task_keys_browsertest.mm",
       "undo_shortcut_browsertest.mm",
     ]
