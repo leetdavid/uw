@@ -1,5 +1,5 @@
-// The Inbox, in a bubble under its button at the top of the sidebar: every
-// notification the profile's scheduled chats sent, newest first. See the
+// The Inbox, in a bubble under its button at the top of the sidebar: the
+// latest alert of each of the profile's scheduled chats, newest first. See the
 // frames "Inbox: the pop-up (Fluid)" and "Scheduled page and Inbox: every
 // state (Fluid)" on the canvas page "Agent chats", the canvas guide
 // uw-scheduled-page-and-inbox, and docs/product.md, "Scheduled chats".

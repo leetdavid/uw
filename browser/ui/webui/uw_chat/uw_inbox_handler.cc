@@ -33,19 +33,6 @@ void OpenAtTopOfScratchpad(BrowserWindowInterface* window, const GURL& url) {
   chrome::AddTabAt(window, url, -1, true);
 }
 
-// The id of each chat's newest alert of a failed run: the one that offers
-// Retry.
-std::map<std::string, std::string> AlertsOfFailedRuns(
-    const ChatAlerts& alerts) {
-  std::map<std::string, std::string> newest;
-  for (const ChatAlerts::Alert& alert : alerts.alerts()) {
-    if (OffersRetry(alert.what)) {
-      newest.try_emplace(alert.chat_id, alert.id);
-    }
-  }
-  return newest;
-}
-
 }  // namespace
 
 UwInboxHandler::UwInboxHandler(
@@ -117,11 +104,10 @@ void UwInboxHandler::RetryAll() {
   if (!alerts || !chats) {
     return;
   }
-  const std::map<std::string, std::string> offered =
-      AlertsOfFailedRuns(*alerts);
   for (const std::string& id : chats->ChatsToRetry()) {
-    if (const auto alert = offered.find(id); alert != offered.end()) {
-      alerts->MarkRead(alert->second);
+    const ChatAlerts::Alert* alert = alerts->NewestOf(id);
+    if (alert && OffersRetry(alert->what)) {
+      alerts->MarkRead(alert->id);
     }
   }
   chats->RetryAll();
@@ -215,9 +201,11 @@ void UwInboxHandler::SendAlerts() {
       ++scheduled;
     }
   }
-  const std::map<std::string, std::string> failed =
-      AlertsOfFailedRuns(*alerts);
   for (const ChatAlerts::Alert& alert : alerts->alerts()) {
+    // A chat has one row, its newest alert.
+    if (alerts->NewestOf(alert.chat_id) != &alert) {
+      continue;
+    }
     auto shown = mojom::InboxAlert::New();
     shown->id = alert.id;
     shown->chat_id = alert.chat_id;
@@ -244,9 +232,7 @@ void UwInboxHandler::SendAlerts() {
     shown->time = alert.time.InMillisecondsFSinceUnixEpoch();
     shown->waiting = alert.waiting;
     shown->read = alert.read;
-    if (const auto newest = failed.find(alert.chat_id);
-        newest != failed.end() && newest->second == alert.id && chat &&
-        chat->failing) {
+    if (OffersRetry(alert.what) && chat && chat->failing) {
       shown->running = chats->Running(alert.chat_id);
       shown->retry = !shown->running;
     }

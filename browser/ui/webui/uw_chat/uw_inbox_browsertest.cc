@@ -176,10 +176,11 @@ class InboxBrowserTest : public headless::HeadlessModeBrowserTest {
     return id;
   }
 
-  // The chat's newest alert.
-  const ChatAlerts::Alert& NewestAlertOf(const std::string& chat_id) {
-    return *std::ranges::find(alerts()->alerts(), chat_id,
-                              &ChatAlerts::Alert::chat_id);
+  // How many alerts the Inbox's page lists.
+  int Rows(content::WebContents* page) {
+    return content::EvalJs(page,
+                           "document.querySelectorAll('[data-alert]').length")
+        .ExtractInt();
   }
 
   // Presses the Inbox button and returns the Inbox's page once it shows.
@@ -348,7 +349,8 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
                   page, "document.querySelector('#inbox-mark-read').disabled")
                   .ExtractBool());
 
-  // An alert that comes while the Inbox is open shows in it, unread.
+  // An alert that comes while the Inbox is open shows in it, unread, in the
+  // place of the chat's older one.
   alerts()->Add(alerts()->alerts().front().chat_id, "No change", "Still $479.",
                 /*waiting=*/false);
   EXPECT_TRUE(base::test::RunUntil([&] {
@@ -356,6 +358,33 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, CountsUnreadAlertsUntilMarkedRead) {
   }));
   EXPECT_EQ(alerts()->Unread(), 1u);
   ASSERT_TRUE(Shows(page, "[data-alert][data-unread]"));
+  EXPECT_EQ(alerts()->alerts().size(), 1u);
+  EXPECT_EQ(Rows(page), 1);
+  EXPECT_EQ(Text(page, "#inbox").find("The desk is $479"), std::string::npos);
+}
+
+IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
+                       AWaitingStepTakesTheChatsRowUntilItIsAnswered) {
+  const std::string id = WatchTheDesk();
+  alerts()->Add(id, "Waits for your approval", "Open the desk's page",
+                /*waiting=*/true);
+  // Two unread alerts of one chat count once.
+  ASSERT_EQ(alerts()->alerts().size(), 2u);
+  EXPECT_EQ(alerts()->Unread(), 1u);
+  EXPECT_EQ(button()->GetTooltipText(), u"Inbox, 1 unread");
+  content::WebContents* page = OpenTheInbox();
+  ASSERT_TRUE(Shows(page, "[data-alert]"));
+  EXPECT_EQ(Rows(page), 1);
+  EXPECT_NE(Text(page, "[data-alert]").find("Waits for your approval"),
+            std::string::npos);
+
+  // Once the step is answered, the row says what it said before.
+  alerts()->RemoveWaiting(id);
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return Text(page, "[data-alert]").find("Change alert") != std::string::npos;
+  }));
+  EXPECT_EQ(Rows(page), 1);
+  EXPECT_EQ(alerts()->Unread(), 1u);
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
@@ -400,9 +429,11 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, AFailedRunsAlertOffersRetry) {
   EXPECT_TRUE(base::test::RunUntil([&] {
     return Text(page, "#inbox").find("Still $549.") != std::string::npos;
   }));
-  ASSERT_EQ(alerts()->alerts().size(), 2u);
+  // Its alert takes the place of the failed run's.
+  ASSERT_EQ(alerts()->alerts().size(), 1u);
   EXPECT_EQ(alerts()->alerts()[0].what, "No change");
   EXPECT_FALSE(Has(page, "[data-retry]"));
+  EXPECT_EQ(Rows(page), 1);
 }
 
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
@@ -444,12 +475,12 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest,
   EXPECT_TRUE(chats()->Running(muted));
   EXPECT_FALSE(chats()->Running(paused));
   // The alerts that offered Retry for the runs are read; the paused chat's
-  // and the older failure of the chat failures paused are not.
-  EXPECT_TRUE(NewestAlertOf(desk).read);
-  EXPECT_EQ(NewestAlertOf(stock).what, "Paused");
-  EXPECT_TRUE(NewestAlertOf(stock).read);
-  EXPECT_FALSE(NewestAlertOf(paused).read);
-  EXPECT_EQ(alerts()->Unread(), 2u);
+  // is not.
+  EXPECT_TRUE(alerts()->NewestOf(desk)->read);
+  EXPECT_EQ(alerts()->NewestOf(stock)->what, "Paused");
+  EXPECT_TRUE(alerts()->NewestOf(stock)->read);
+  EXPECT_FALSE(alerts()->NewestOf(paused)->read);
+  EXPECT_EQ(alerts()->Unread(), 1u);
   // Nothing is left to retry while the runs go, and the Inbox stays open.
   EXPECT_TRUE(
       base::test::RunUntil([&] { return !Has(page, "#inbox-retry-all"); }));
@@ -551,9 +582,10 @@ IN_PROC_BROWSER_TEST_F(InboxBrowserTest, ClearAllEmptiesTheInbox) {
 
 // Real windows only: a headless pop-up never takes its page's size.
 IN_PROC_BROWSER_TEST_F(InboxBrowserTest, MANUAL_ClearAllShrinksThePopUp) {
-  const std::string id = WatchTheDesk();
-  for (int i = 0; i < 5; ++i) {
-    alerts()->Add(id, "No change", "Still $479.", /*waiting=*/false);
+  // Each chat has one row, so several chats fill the pop-up.
+  for (const char* watch_for : {"Price drops below $500", "Back in stock",
+                                "New colors", "Free shipping", "A new size"}) {
+    FailedWatch(watch_for);
   }
   content::WebContents* page = OpenTheInbox();
   ASSERT_TRUE(Shows(page, "[data-alert]"));

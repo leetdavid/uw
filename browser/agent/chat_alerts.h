@@ -18,9 +18,10 @@ class Profile;
 
 namespace uw {
 
-// A profile's alerts: a copy of every notification its scheduled chats sent,
-// for the Inbox. Kept in uw_chats/alerts.json until the user clears them or
-// deletes their chat. See docs/product.md, "Scheduled chats".
+// A profile's alerts: the latest notification of each of its scheduled chats,
+// for the Inbox. Kept in uw_chats/alerts.json until the chat sends another,
+// the user clears them, or deletes their chat. See docs/product.md, "Scheduled
+// chats".
 class ChatAlerts : public base::SupportsUserData::Data {
  public:
   struct Alert {
@@ -33,7 +34,8 @@ class ChatAlerts : public base::SupportsUserData::Data {
     base::Time time;
     bool read = false;
     // A step of the chat's run waits for the user's approval. The alert goes
-    // once the step is answered or the run ends.
+    // once the step is answered or the run ends, and the chat's alert from
+    // before it shows again.
     bool waiting = false;
   };
 
@@ -52,11 +54,14 @@ class ChatAlerts : public base::SupportsUserData::Data {
   ~ChatAlerts() override;
 
   bool loaded() const { return loaded_; }
-  // Newest first.
+  // Newest first. A chat has one, and over it one that is `waiting`.
   const std::vector<Alert>& alerts() const { return alerts_; }
-  // How many alerts the user has not read.
+  // The alert the Inbox shows for `chat_id`, its newest, or null.
+  const Alert* NewestOf(std::string_view chat_id) const;
+  // How many chats' newest alert the user has not read.
   size_t Unread() const;
 
+  // Takes the place of the chat's alert. One that is `waiting` goes over it.
   void Add(const std::string& chat_id,
            const std::string& what,
            const std::string& text,

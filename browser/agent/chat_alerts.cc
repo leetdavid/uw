@@ -73,17 +73,34 @@ ChatAlerts::ChatAlerts(const base::FilePath& profile_path)
 
 ChatAlerts::~ChatAlerts() = default;
 
+const ChatAlerts::Alert* ChatAlerts::NewestOf(std::string_view chat_id) const {
+  const auto newest = std::ranges::find(alerts_, chat_id, &Alert::chat_id);
+  return newest == alerts_.end() ? nullptr : &*newest;
+}
+
 size_t ChatAlerts::Unread() const {
-  return static_cast<size_t>(std::ranges::count(alerts_, false, &Alert::read));
+  return static_cast<size_t>(
+      std::ranges::count_if(alerts_, [this](const Alert& alert) {
+        return !alert.read && NewestOf(alert.chat_id) == &alert;
+      }));
 }
 
 void ChatAlerts::Add(const std::string& chat_id,
                      const std::string& what,
                      const std::string& text,
                      bool waiting) {
-  alerts_.insert(alerts_.begin(),
-                 {base::Uuid::GenerateRandomV4().AsLowercaseString(), chat_id,
-                  what, text, base::Time::Now(), false, waiting});
+  // Made first: `chat_id` may be the id of an alert that goes.
+  Alert added{base::Uuid::GenerateRandomV4().AsLowercaseString(),
+              chat_id,
+              what,
+              text,
+              base::Time::Now(),
+              false,
+              waiting};
+  std::erase_if(alerts_, [&added](const Alert& alert) {
+    return alert.chat_id == added.chat_id && (!added.waiting || alert.waiting);
+  });
+  alerts_.insert(alerts_.begin(), std::move(added));
   Changed();
 }
 
@@ -145,9 +162,14 @@ void ChatAlerts::RemoveObserver(Observer* observer) {
 }
 
 void ChatAlerts::OnLoaded(std::vector<Alert> saved) {
-  // Alerts added while the file loaded are newer than it.
+  // Alerts added while the file loaded are newer than it. A file from before
+  // a chat kept only its latest alert holds more, which are left out.
   for (Alert& alert : saved) {
-    alerts_.push_back(std::move(alert));
+    if (std::ranges::none_of(alerts_, [&alert](const Alert& kept) {
+          return kept.chat_id == alert.chat_id && !kept.waiting;
+        })) {
+      alerts_.push_back(std::move(alert));
+    }
   }
   loaded_ = true;
   Changed();

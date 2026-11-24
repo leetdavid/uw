@@ -13,6 +13,7 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/json/values_util.h"
@@ -380,8 +381,8 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   EXPECT_EQ(tabs->count(), 2);
 }
 
-// Every notification a scheduled chat sends is kept as an alert for the
-// Inbox, until the chat goes. See docs/product.md, "Scheduled chats".
+// A scheduled chat's latest notification is kept as an alert for the Inbox,
+// until the chat goes. See docs/product.md, "Scheduled chats".
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
                        ANotificationIsKeptAsAnAlertUntilItsChatGoes) {
   SaveChat();
@@ -401,14 +402,24 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
   alerts->MarkAllRead();
   EXPECT_EQ(alerts->Unread(), 0u);
 
-  // A muted chat sends no notification, so it keeps no alert.
+  // The next notification takes its place, unread.
+  model_.Script(
+      {Report(true, "Down to $469."), ScriptedModel::Answer("Done.")});
+  chats()->CheckNow(kChat);
+  LinesAfterTheRun();
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_THAT(alerts->alerts()[0].text, HasSubstr("Down to $469."));
+  EXPECT_EQ(alerts->Unread(), 1u);
+
+  // A muted chat sends no notification, so its alert stays as it is.
   ScheduledChat muted = DeskWatch(provider);
   muted.muted = true;
   model_.Script(
-      {Report(true, "Down to $469."), ScriptedModel::Answer("Done.")});
+      {Report(true, "Down to $459."), ScriptedModel::Answer("Done.")});
   chats()->Save(kChat, muted);
   LinesAfterTheRun();
-  EXPECT_EQ(alerts->alerts().size(), 1u);
+  ASSERT_EQ(alerts->alerts().size(), 1u);
+  EXPECT_THAT(alerts->alerts()[0].text, HasSubstr("Down to $469."));
 
   // Removing the schedule keeps the alert; deleting the chat takes it.
   chats()->Remove(kChat);
@@ -642,6 +653,50 @@ IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, AlertsLastAcrossARestart) {
   ASSERT_EQ(alerts->alerts().size(), 1u);
   EXPECT_EQ(alerts->alerts()[0].what, "Change alert");
   EXPECT_EQ(alerts->Unread(), 1u);
+}
+
+// A file from before a chat kept only its latest alert holds every alert the
+// chat sent. Each chat's newest stays, in the file too.
+IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest,
+                       AFileOfManyAlertsKeepsEachChatsNewest) {
+  constexpr char kOther[] = "9b3d5e1f-7a2c-4d6e-8f10-1a2b3c4d5e6f";
+  const auto alert = [](std::string_view id, std::string_view chat) {
+    return base::DictValue()
+        .Set("id", id)
+        .Set("chat", chat)
+        .Set("what", "No change")
+        .Set("text", "Still $479.")
+        .Set("time", base::TimeToValue(base::Time::Now()))
+        .Set("read", false);
+  };
+  base::ScopedAllowBlockingForTesting allow_blocking;
+  base::ScopedTempDir temp;
+  ASSERT_TRUE(temp.CreateUniqueTempDir());
+  const base::FilePath file =
+      ChatFile::FolderFor(temp.GetPath()).AppendASCII("alerts.json");
+  ASSERT_TRUE(base::CreateDirectory(file.DirName()));
+  ASSERT_TRUE(base::WriteFile(
+      file, *base::WriteJson(base::DictValue().Set(
+                "alerts", base::ListValue()
+                              .Append(alert("newest", kChat))
+                              .Append(alert("other", kOther))
+                              .Append(alert("older", kChat))
+                              .Append(alert("oldest", kChat))))));
+
+  ChatAlerts alerts(temp.GetPath());
+  ASSERT_TRUE(base::test::RunUntil([&] { return alerts.loaded(); }));
+  ASSERT_EQ(alerts.alerts().size(), 2u);
+  EXPECT_EQ(alerts.alerts()[0].id, "newest");
+  EXPECT_EQ(alerts.alerts()[1].id, "other");
+  EXPECT_EQ(alerts.Unread(), 2u);
+
+  base::RunLoop saved;
+  ChatFile::Sequence()->PostTaskAndReply(FROM_HERE, base::DoNothing(),
+                                         saved.QuitClosure());
+  saved.Run();
+  const std::optional<base::DictValue> kept = ChatFile::Read(file);
+  ASSERT_TRUE(kept && kept->FindList("alerts"));
+  EXPECT_EQ(kept->FindList("alerts")->size(), 2u);
 }
 
 IN_PROC_BROWSER_TEST_F(ScheduledChatsBrowserTest, ARunHappensWithNoWindowOpen) {
