@@ -430,6 +430,10 @@ _Avoid_: Test build, beta, nightly.
 Any uw built on a developer's Mac rather than by the release command. It runs beside the installed preview as a separate app named "uw dev", with its own profile, saved keys, and macOS permissions.
 _Avoid_: uw Dev, dev version, local build, test build.
 
+**Checks build**:
+A second build of uw that only tests run in, with Chromium's development checks on, so a test fails where a rule is broken. Nobody browses with it.
+_Avoid_: Debug build, test build, dev build.
+
 **Problem report**:
 What uw sends, only with the user's consent, to help fix it: a native crash report, or a rage click, dead click, or JavaScript error on one of uw's own pages. Never anything from a website the user visits.
 _Avoid_: Telemetry, analytics, tracking.

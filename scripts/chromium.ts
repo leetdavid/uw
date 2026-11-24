@@ -24,6 +24,7 @@ const CONFIG_SEAL = ".uw-gclient.sha256";
 const DEPENDENCY_HISTORY = ".uw-dependencies.json";
 const ROOT_PREFIX = "UW_CHECKOUT_ROOT=";
 export const OUTPUT = "out/uw";
+export const CHECKS_OUTPUT = "out/uw-checks";
 export const GIB = 1024 ** 3;
 export const WINDOW_VM = "uw-window-tests";
 export const COMMAND_CHECK_TEST = "CommandCheckBrowserTest.MANUAL_JudgesTheExamples";
@@ -42,6 +43,7 @@ export interface Layout {
   readonly root: string;
   readonly tools: string;
   readonly source: string;
+  readonly output: string;
   readonly binary: string;
 }
 
@@ -129,11 +131,11 @@ export function checkoutPath(value: string): string {
 }
 
 // A Mac builds uw for macOS; a Linux host cross-builds it for Windows.
-export function layoutAt(root = process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"), platform: string = process.platform): Layout {
+export function layoutAt(root = process.env.UW_CHROMIUM_ROOT || join(REPO, ".chromium"), platform: string = process.platform, output = OUTPUT): Layout {
   const normalized = checkoutPath(root);
   return {
-    root: normalized, tools: join(normalized, "depot_tools"), source: join(normalized, "src"),
-    binary: join(normalized, "src", OUTPUT, platform === "darwin" ? "uw.app/Contents/MacOS/uw" : "chrome.exe"),
+    root: normalized, tools: join(normalized, "depot_tools"), source: join(normalized, "src"), output,
+    binary: join(normalized, "src", output, platform === "darwin" ? "uw.app/Contents/MacOS/uw" : "chrome.exe"),
   };
 }
 
@@ -482,7 +484,8 @@ export class Chromium {
     this.requireHost();
     this.requireJobsForMemory(jobs);
     this.prepare();
-    const gnArgs = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
+    const written = readFileSync(join(REPO, "chromium/args.gn"), "utf8");
+    const gnArgs = this.layout.output === CHECKS_OUTPUT ? withChecks(written) : written;
     // Without it, the build is uw dev. See docs/adr/0028-local-builds-are-uw-dev.md.
     const identity = release ? ["uw_release = true"] : [];
     const args = [symbols ? withSymbols(gnArgs) : gnArgs, ...this.hostArgs(symbols), ...identity, ...windows?.args ?? []];
@@ -490,9 +493,9 @@ export class Chromium {
     const unstamped = windows ? readFileSync(version, "utf8") : "";
     if (windows) writeFileSync(version, unstamped.replace(/^PATCH=\d+$/m, `PATCH=${windows.patch}`));
     try {
-      this.run([join(this.layout.tools, "gn"), "gen", OUTPUT, `--args=${args.join("\n")}`, "--fail-on-unused-args"],
+      this.run([join(this.layout.tools, "gn"), "gen", this.layout.output, `--args=${args.join("\n")}`, "--fail-on-unused-args"],
         this.layout.source);
-      this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, "chrome", ...windows ? ["mini_installer"] : []],
+      this.run([join(this.layout.tools, "autoninja"), "-C", this.layout.output, `-j${jobs}`, "chrome", ...windows ? ["mini_installer"] : []],
         this.layout.source);
     } finally {
       if (windows) writeFileSync(version, unstamped);
@@ -547,10 +550,10 @@ export class Chromium {
   verify(jobs: number, timeout: number): void {
     this.build(jobs);
     const suites = Object.keys(TEST_SUITES);
-    this.run([join(this.layout.tools, "autoninja"), "-C", OUTPUT, `-j${jobs}`, ...suites], this.layout.source);
+    this.run([join(this.layout.tools, "autoninja"), "-C", this.layout.output, `-j${jobs}`, ...suites], this.layout.source);
     this.smoke(timeout);
     for (const [suite, tests] of Object.entries(TEST_SUITES)) {
-      this.run([join(this.layout.source, OUTPUT, suite), `--gtest_filter=${tests.join(":")}`], this.layout.source);
+      this.run([join(this.layout.source, this.layout.output, suite), `--gtest_filter=${tests.join(":")}`], this.layout.source);
     }
     this.runtime.log("PASS: build, smoke test, and the focused Chromium test suites");
   }
@@ -756,6 +759,7 @@ function help(command?: keyof typeof descriptions): string {
     (takesTimeout(command) ? "  --timeout SECONDS    Browser command timeout; default: 120\n" : "") +
     (command === "build" ? "  --symbols            Keep symbols for crash reports, as releases do\n" : "") +
     (command === "build" ? "  --release            Build the installed uw, not uw dev, as releases do\n" : "") +
+    (takesChecks(command) ? `  --checks             Use ${CHECKS_OUTPUT}, where tests run with Chromium's development checks on\n` : "") +
     (command === "window-tests" ? "  Other options go to browser_tests; without --gtest_filter it runs uw's MANUAL_ tests\n" : "") +
     "  --help, -h           Show this help\n\nExamples:\n" +
     `  node scripts/chromium.ts ${command ?? "doctor"}\n` +
@@ -781,6 +785,18 @@ function splitPassedArgs(args: readonly string[]): [string[], string[]] {
 export function withSymbols(args: string): string {
   if (!/^symbol_level = 0$/m.test(args)) throw new BuildError("chromium/args.gn must set symbol_level = 0 for --symbols to replace");
   return args.replace(/^symbol_level = 0$/m, "symbol_level = 1");
+}
+
+export function withChecks(args: string): string {
+  const off = [/^dcheck_always_on = false$/m, /^enable_dangling_raw_ptr_checks = false$/m] as const;
+  if (!off.every((line) => line.test(args))) {
+    throw new BuildError("chromium/args.gn must set dcheck_always_on = false and enable_dangling_raw_ptr_checks = false for --checks to turn on");
+  }
+  return args.replace(off[0], "dcheck_always_on = true").replace(off[1], "enable_dangling_raw_ptr_checks = true");
+}
+
+function takesChecks(command?: string): boolean {
+  return command === "build" || command === "verify";
 }
 
 function takesJobs(command?: string): boolean {
@@ -813,13 +829,15 @@ export function main(argv = process.argv.slice(2)): number {
         ...(takesJobs(name) ? { jobs: { type: "string" as const } } : {}),
         ...(takesTimeout(name) ? { timeout: { type: "string" as const } } : {}),
         ...(name === "build" ? { symbols: { type: "boolean" as const }, release: { type: "boolean" as const } } : {}),
+        ...(takesChecks(name) ? { checks: { type: "boolean" as const } } : {}),
       },
     });
     if (positionals.length) throw new BuildError("Unexpected positional argument", 2);
     if (values.help) { console.log(help(name)); return 0; }
     const jobs = positiveInteger(String(values.jobs ?? "2"), "--jobs");
     const timeout = positiveInteger(String(values.timeout ?? "120"), "--timeout") * 1000;
-    const layout = layoutAt(values["checkout-dir"]);
+    if (values.checks && (values.symbols || values.release)) throw new BuildError("--checks is for tests; a release is built without it", 2);
+    const layout = layoutAt(values["checkout-dir"], process.platform, values.checks ? CHECKS_OUTPUT : OUTPUT);
     if (name === "root") { console.log(layout.root); return 0; }
     const chromium = new Chromium(layout, loadPins());
     if (name === "doctor") return chromium.doctor() ? 0 : 1;

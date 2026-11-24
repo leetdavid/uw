@@ -6,8 +6,8 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import type { TestContext } from "node:test";
 import {
-  BuildError, CHROMIUM_URL, COMMAND_CHECK_TEST, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, REPO,
-  SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot, withSymbols,
+  BuildError, CHECKS_OUTPUT, CHROMIUM_URL, COMMAND_CHECK_TEST, Chromium, DEPOT_TOOLS_URL, GIB, MARKER, OUTPUT, REPO,
+  SYNC_STAMP, WINDOW_VM, layoutAt, loadPins, requireOwnedRoot, withChecks, withSymbols,
 } from "../scripts/chromium.ts";
 import type { CommandOptions, Pins, Runtime } from "../scripts/chromium.ts";
 
@@ -50,8 +50,8 @@ class Fixture {
   guestBuild = "26A434";
   failWindowTests = false;
 
-  constructor(t: TestContext, platform = "darwin", arch = "arm64", env: NodeJS.ProcessEnv = {}) {
-    this.layout = layoutAt(join(temporary(t), "checkout"), platform);
+  constructor(t: TestContext, platform = "darwin", arch = "arm64", env: NodeJS.ProcessEnv = {}, output = OUTPUT) {
+    this.layout = layoutAt(join(temporary(t), "checkout"), platform, output);
     this.runtime = {
       platform, arch, nodeVersion: "24.13.0", memoryBytes: 16 * GIB,
       env, freeBytes: () => this.free, log: (line) => this.messages.push(line),
@@ -427,6 +427,33 @@ test("build --release builds the installed uw, and any other build is uw dev", (
   assert.match(release!, /^uw_release = true$/m);
 });
 
+test("build --checks turns Chromium's development checks on in the tests' own folder", (t) => {
+  const f = new Fixture(t, "darwin", "arm64", {}, CHECKS_OUTPUT);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.build(2);
+  const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
+  assert.equal(gen[2], CHECKS_OUTPUT);
+  const args = gen.find((arg) => arg.startsWith("--args="))!;
+  assert.match(args, /^dcheck_always_on = true$/m);
+  assert.match(args, /^enable_dangling_raw_ptr_checks = true$/m);
+  assert.doesNotMatch(args, /^(dcheck_always_on|enable_dangling_raw_ptr_checks) = false$/m);
+  const ninja = f.calls.find(({ command }) => basename(command[0]!) === "autoninja")!.command;
+  assert.equal(ninja[2], CHECKS_OUTPUT);
+  assert.ok(f.layout.binary.includes(`/${CHECKS_OUTPUT}/`));
+  assert.throws(() => withChecks("is_debug = false\n"), /dcheck_always_on = false/);
+});
+
+test("any other build keeps the checks off, as the browser people use does", (t) => {
+  const f = new Fixture(t);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.build(2);
+  const gen = f.calls.find(({ command }) => basename(command[0]!) === "gn")!.command;
+  assert.equal(gen[2], OUTPUT);
+  const args = gen.find((arg) => arg.startsWith("--args="))!;
+  assert.match(args, /^dcheck_always_on = false$/m);
+  assert.match(args, /^enable_dangling_raw_ptr_checks = false$/m);
+});
+
 test("a Linux host cross-builds Windows uw with the packaged toolchain", (t) => {
   const toolchain = temporary(t);
   writeFileSync(join(toolchain, "abc123.zip"), "packaged toolchain fixture");
@@ -506,6 +533,18 @@ test("verify builds, smoke-tests, then runs the focused test suites", (t) => {
   assert.ok(f.calls.findLastIndex(({ command }) => command.includes("--dump-dom")) < f.calls.findIndex(({ command }) => command === suites[0]));
 });
 
+test("verify --checks builds and runs the test suites in the checks folder", (t) => {
+  const f = new Fixture(t, "darwin", "arm64", {}, CHECKS_OUTPUT);
+  f.browser.sync(2); f.calls.length = 0;
+  f.browser.verify(2, 30_000);
+  const ran = f.calls.filter(({ options }) => options.inherit).map(({ command }) => command);
+  const folders = ran.filter((command) => basename(command[0]!) === "autoninja").map((command) => command[2]);
+  assert.deepEqual(folders, [CHECKS_OUTPUT, CHECKS_OUTPUT]);
+  const suites = ran.filter((command) => command[1]?.startsWith("--gtest_filter="));
+  assert.deepEqual(suites.map((command) => command[0]),
+    ["unit_tests", "browser_tests"].map((suite) => join(f.layout.source, CHECKS_OUTPUT, suite)));
+});
+
 function invoke(...args: string[]) {
   return spawnSync(process.execPath, [join(REPO, "scripts/chromium.ts"), ...args], { encoding: "utf8", timeout: 15_000 });
 }
@@ -524,6 +563,15 @@ test("invalid job counts and checkout paths fail before host checks", () => {
   }
   const result = invoke("sync", "--checkout-dir", "/tmp/uw build");
   assert.equal(result.status, 2); assert.match(result.stderr, /must not contain spaces/);
+});
+
+test("a release cannot be built with the checks on", () => {
+  for (const flag of ["--release", "--symbols"]) {
+    const result = invoke("build", "--checks", flag);
+    assert.equal(result.status, 2); assert.match(result.stderr, /a release is built without it/);
+  }
+  const result = invoke("smoke", "--checks");
+  assert.equal(result.status, 2);
 });
 
 test("root command resolves a missing path without creating it", (t) => {
