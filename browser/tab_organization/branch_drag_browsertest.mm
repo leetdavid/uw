@@ -214,6 +214,41 @@ class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
   std::optional<tab_groups::TabGroupId> task_;
 };
 
+// A row filed into a task while its mouse button is held, as when the
+// organizer's answer arrives then, ends its drag at the release. The row left
+// the window as it moved, so the release never reached it, and the window
+// stayed in a drag for good (T406, found by T404's random runs).
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       ARowFiledUnderAHeldButtonEndsItsDrag) {
+  tabs::TabInterface* tab = tabs()->GetTabAtIndex(0);
+  Wait(base::Milliseconds(500));
+  views::View* row = RowOf(tab);
+  ASSERT_TRUE(row);
+  base::WeakPtr<views::Widget> widget = row->GetWidget()->GetWeakPtr();
+  const gfx::Point on_screen = row->GetBoundsInScreen().CenterPoint();
+  gfx::Point at = row->GetLocalBounds().CenterPoint();
+  views::View::ConvertPointToWidget(row, &at);
+  ui::MouseEvent press(ui::EventType::kMousePressed, at, on_screen,
+                       ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                       ui::EF_LEFT_MOUSE_BUTTON);
+  widget->OnMouseEvent(&press);
+  ASSERT_TRUE(controller()->dragging());
+
+  // The organizer's answer arrives with the button still down.
+  ASSERT_TRUE(controller()->MoveToNewTask(
+      {controller()->IdFor(tab).value()}, u"Filed",
+      TabOrganizationController::Origin::kOrganizer));
+  base::RunLoop().RunUntilIdle();
+
+  ui::MouseEvent release(ui::EventType::kMouseReleased, at, on_screen,
+                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+  widget->OnMouseEvent(&release);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_FALSE(controller()->dragging());
+  EXPECT_TRUE(tab->GetGroup().has_value());
+}
+
 // A dragged parent takes its children with it, still nested under it, and
 // only the parent stays selected.
 IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
