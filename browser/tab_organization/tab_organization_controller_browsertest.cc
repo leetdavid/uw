@@ -10,7 +10,9 @@
 #include <utility>
 #include <vector>
 
+#include "base/files/file_util.h"
 #include "base/memory/raw_ptr.h"
+#include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -42,6 +44,7 @@
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -123,6 +126,20 @@ class TabMenuDelegate : public TabContextMenuController::Delegate {
 class TabOrganizationControllerBrowserTest
     : public headless::HeadlessModeBrowserTest {
  protected:
+  // For ATaskTheSavedGroupsLostComesBack, the saved groups lose what they
+  // held while the session keeps it, as a crash on 2026-11-24 left them.
+  bool SetUpUserDataDirectory() override {
+    if (std::string_view(testing::UnitTest::GetInstance()
+                             ->current_test_info()
+                             ->name()) == "ATaskTheSavedGroupsLostComesBack") {
+      base::FilePath user_data;
+      CHECK(base::PathService::Get(chrome::DIR_USER_DATA, &user_data));
+      CHECK(base::DeletePathRecursively(
+          user_data.AppendASCII("Default").AppendASCII("Sync Data")));
+    }
+    return true;
+  }
+
   TabOrganizationController* controller() {
     return TabOrganizationController::From(browser());
   }
@@ -1510,6 +1527,67 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(service);
   WaitUntilSavedGroupsLoad(service);
   EXPECT_FALSE(KeepsAClosedTask(service));
+}
+
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PRE_ATaskTheSavedGroupsLostComesBack) {
+  SessionStartupPref::SetStartupPref(
+      browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
+  ASSERT_TRUE(
+      ui_test_utils::NavigateToURL(browser(), GURL("chrome://version/?a")));
+  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
+      browser(), GURL("chrome://version/?b"),
+      WindowOpenDisposition::NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  WaitUntilSavedGroupsLoad(service);
+  // A task made as Chromium makes a group, so the saved groups keep it.
+  const tab_groups::TabGroupId task = tabs()->AddToNewGroup({0, 1});
+  tabs()->ChangeTabGroupVisuals(
+      task, tab_groups::TabGroupVisualData(
+                u"Plan", tab_groups::TabGroupColorId::kBlue));
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return service->GetGroup(task).has_value(); }));
+  // Saves the session and the settings now, as quitting does, in case the
+  // test's browser does not shut down cleanly.
+  SessionServiceTestHelper(browser()->GetProfile()).SaveNow();
+  base::RunLoop committed;
+  browser()->GetProfile()->GetPrefs()->CommitPendingWrite(
+      committed.QuitClosure());
+  committed.Run();
+}
+
+// A task the session holds but the saved groups lost stays open. Chromium
+// closed it at launch, as if another device had deleted it, though uw syncs
+// no groups.
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ATaskTheSavedGroupsLostComesBack) {
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  // Chromium closed the task as the saved groups started up.
+  WaitUntilSavedGroupsLoad(service);
+  base::RunLoop().RunUntilIdle();
+  const auto tab_at = [&](std::string_view url) -> tabs::TabInterface* {
+    for (int i = 0; i < tabs()->count(); ++i) {
+      tabs::TabInterface* tab = tabs()->GetTabAtIndex(i);
+      if (tab->GetContents()->GetVisibleURL() == GURL(url)) {
+        return tab;
+      }
+    }
+    return nullptr;
+  };
+  tabs::TabInterface* a = tab_at("chrome://version/?a");
+  tabs::TabInterface* b = tab_at("chrome://version/?b");
+  ASSERT_TRUE(a && b);
+  const std::optional<tab_groups::TabGroupId> task = a->GetGroup();
+  ASSERT_TRUE(task);
+  EXPECT_EQ(b->GetGroup(), task);
+  EXPECT_EQ(TitleOf(*task), u"Plan");
 }
 
 // The empty space under the last tab drags the window. Once tabs fill the

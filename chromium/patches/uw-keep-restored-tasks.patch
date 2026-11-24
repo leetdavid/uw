@@ -1,0 +1,19 @@
+diff --git a/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc b/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
+index b86cb48d446676b75af90d529920e8e857889f09..9b21efd1da4d100ee68e3d8a0590331bf347e909 100644
+--- a/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
++++ b/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
+@@ -1117,12 +1117,9 @@ void TabGroupSyncServiceImpl::ConnectLocalTabGroup(
+     // Only connect the group if it exists in the model.
+     UpdateLocalTabGroupMapping(sync_id, local_id, opening_source);
+     coordinator_->ConnectLocalTabGroup(sync_id, local_id);
+-  } else {
+-    // This can happen in cases where a group was deleted remotely before
+-    // startup.
+-    // See crbug.com/392174867 for more details.
+-    coordinator_->OnTabGroupRemoved(local_id, TriggerSource::REMOTE);
+   }
++  // uw: a group missing from the model was not deleted on another device,
++  // since uw syncs no groups. It stays open.
+ }
+ 
+ bool TabGroupSyncServiceImpl::IsRemoteDevice(
