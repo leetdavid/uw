@@ -260,9 +260,9 @@ test("a new VM pin keeps a synced checkout buildable", (t) => {
   moved.build(2);
 });
 
-function windowFixture(t: TestContext): Fixture {
-  const f = new Fixture(t);
-  const tests = join(f.layout.source, "out/uw/browser_tests");
+function windowFixture(t: TestContext, output = OUTPUT): Fixture {
+  const f = new Fixture(t, "darwin", "arm64", {}, output);
+  const tests = join(f.layout.source, output, "browser_tests");
   mkdirSync(dirname(tests), { recursive: true });
   writeFileSync(tests, "browser_tests fixture");
   const [suite, check] = COMMAND_CHECK_TEST.split(".");
@@ -309,6 +309,14 @@ test("window tests run browser_tests in the VM and always stop it", (t) => {
   assert.throws(() => f.browser.windowTests(["--gtest_filter=A.MANUAL_B", "--gtest_repeat=100"]), /browser_tests failed/);
   assert.match(windowTestRun(f), /--headful-mode '--gtest_filter=A\.MANUAL_B' '--gtest_repeat=100'$/);
   assert.deepEqual(f.calls.at(-1)!.command, ["tart", "stop", WINDOW_VM]);
+});
+
+test("window tests --checks run the checks build in the VM", (t) => {
+  const f = windowFixture(t, CHECKS_OUTPUT);
+  f.browser.windowTests([]);
+  assert.match(windowTestRun(f), new RegExp(`\\./${CHECKS_OUTPUT}/browser_tests --run-manual --headful-mode `));
+  const result = invoke("window-tests", "--checks", "--help");
+  assert.equal(result.status, 0, result.stderr); assert.match(result.stdout, /--checks/);
 });
 
 test("window tests without uw's tests stop before starting the VM", (t) => {

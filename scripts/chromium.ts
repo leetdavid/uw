@@ -559,7 +559,7 @@ export class Chromium {
   }
 
   windowTests(args: readonly string[]): void {
-    const tests = join(this.layout.source, OUTPUT, "browser_tests");
+    const tests = join(this.layout.source, this.layout.output, "browser_tests");
     if (!existsSync(tests)) throw new BuildError(`${tests} is missing. Build browser_tests first.`);
     const filtered = args.some((arg) => arg.startsWith("--gtest_filter"));
     const run = filtered ? args : [`--gtest_filter=${this.uwWindowTests().join(":")}`, ...args];
@@ -649,7 +649,7 @@ export class Chromium {
     }
     this.guest(ip, `${GUEST_CRASH_REPORTS} -delete`);
     try {
-      this.guest(ip, windowTestCommand(args, Boolean(this.runtime.env.UW_SCREENSHOT_DIR)), true);
+      this.guest(ip, windowTestCommand(this.layout.output, args, Boolean(this.runtime.env.UW_SCREENSHOT_DIR)), true);
     } finally {
       this.guest(ip, `${GUEST_CRASH_REPORTS} -exec cp {} ${quote(`${GUEST_SHARES}/results`)} ';'`);
     }
@@ -689,11 +689,11 @@ function quote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
 }
 
-function windowTestCommand(args: readonly string[], screenshots: boolean): string {
+function windowTestCommand(output: string, args: readonly string[], screenshots: boolean): string {
   return [
     `cd ${quote(`${GUEST_SHARES}/src`)} &&`,
     ...(screenshots ? [`UW_SCREENSHOT_DIR=${quote(`${GUEST_SHARES}/shots`)}`] : []),
-    `./${OUTPUT}/browser_tests`, "--run-manual", "--headful-mode", ...args.map(quote),
+    `./${output}/browser_tests`, "--run-manual", "--headful-mode", ...args.map(quote),
   ].join(" ");
 }
 
@@ -775,7 +775,7 @@ function splitPassedArgs(args: readonly string[]): [string[], string[]] {
   for (let index = 0; index < args.length; index++) {
     const arg = args[index]!;
     if (arg === "--checkout-dir") own.push(arg, args[++index] ?? "");
-    else if (arg.startsWith("--checkout-dir=") || arg === "--help" || arg === "-h") own.push(arg);
+    else if (arg.startsWith("--checkout-dir=") || arg === "--help" || arg === "-h" || arg === "--checks") own.push(arg);
     else passed.push(arg);
   }
   return [own, passed];
@@ -797,7 +797,7 @@ export function withChecks(args: string): string {
 }
 
 function takesChecks(command?: string): boolean {
-  return command === "build" || command === "verify";
+  return command === "build" || command === "verify" || command === "window-tests";
 }
 
 function takesJobs(command?: string): boolean {
