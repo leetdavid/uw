@@ -58,6 +58,7 @@ Today a [split view](../CONTEXT.md#language) is Chromium's: two tabs, side by si
 
 - A split's tabs are all in one task, or all in the Scratchpad.
 - The organizer treats a tab in a split as a [kept tab](../CONTEXT.md#language): it does not ask about it or move it. Once the split ends, its tabs are ordinary tabs again.
+- A tab of a split that the user moves alone to a task or to the Scratchpad leaves the split, and the other panes stay split. Move to Task and Move to Scratchpad did this when T405 was found, and Move to New Task, which crashed, now does too. The owner has not confirmed it.
 
 ### Maximizing a pane
 

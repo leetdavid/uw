@@ -45,6 +45,7 @@ source_set("browser_tests") {
     "//components/prefs",
     "//components/sessions",
     "//components/split_tabs",
+    "//components/tab_groups",
     "//components/tabs:public",
     "//content/public/browser",
     "//content/test:test_support",

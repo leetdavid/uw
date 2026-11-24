@@ -39,6 +39,7 @@
 #include "components/prefs/pref_service.h"
 #include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/sessions/content/session_tab_helper.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_group.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
@@ -130,6 +131,33 @@ void ReleaseSessionRebuilds(base::WeakPtr<Profile> profile) {
   if (!dragging) {
     HoldSessionRebuilds(profile.get(), false);
   }
+}
+
+// Takes each tab at `indices` out of its split unless the whole split is
+// there, and brings `indices` up to date. Chromium's own calls that group
+// tabs do this, and AddToGroupForRestore does not.
+void LeaveSplits(TabStripModel* model, std::vector<int>& indices) {
+  std::vector<tabs::TabInterface*> moving;
+  for (int index : indices) {
+    moving.push_back(model->GetTabAtIndex(index));
+  }
+  for (tabs::TabInterface* tab : moving) {
+    if (!tab->IsSplit()) {
+      continue;
+    }
+    const std::vector<tabs::TabInterface*> panes =
+        model->GetSplitData(*tab->GetSplit())->ListTabs();
+    if (!std::ranges::all_of(panes, [&](tabs::TabInterface* pane) {
+          return std::ranges::contains(moving, pane);
+        })) {
+      model->MoveTabOutOfSplit(model->GetIndexOfTab(tab));
+    }
+  }
+  indices.clear();
+  for (tabs::TabInterface* tab : moving) {
+    indices.push_back(model->GetIndexOfTab(tab));
+  }
+  std::ranges::sort(indices);
 }
 
 }  // namespace
@@ -2542,6 +2570,7 @@ void TabOrganizationController::ApplyTasks() {
     }
     const tab_groups::TabGroupId group =
         tab_groups::TabGroupId::FromRawToken(*token);
+    LeaveSplits(tabs_.get(), indices);
     tabs_->AddToGroupForRestore(indices, group);
     const tab_groups::TabGroupVisualData* created =
         tabs_->group_model()->GetTabGroup(group)->visual_data();

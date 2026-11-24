@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <set>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -40,6 +41,7 @@
 #include "components/sessions/core/session_id.h"
 #include "components/sessions/core/session_types.h"
 #include "components/split_tabs/split_tab_visual_data.h"
+#include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
@@ -61,6 +63,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
 #include "uw/browser/ui/views/command_bar/command_bar.h"
@@ -576,6 +579,32 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   ASSERT_EQ(LayoutOf(panes[0]), "r(0.3,0,d(0.7,1,2))");
   // Lets the session take the tabs' data before the browser quits.
   base::RunLoop().RunUntilIdle();
+}
+
+// A pane moved to a new task alone leaves the split, and the split keeps the
+// panes that stay. It crashed uw (T405).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       APaneMovedToANewTaskLeavesTheSplit) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  TabOrganizationController* organizer =
+      TabOrganizationController::From(browser());
+  const std::optional<tab_groups::TabGroupId> plan = organizer->MoveToNewTask(
+      {organizer->IdFor(panes[0]).value()}, u"Plan");
+  ASSERT_TRUE(plan);
+  EXPECT_FALSE(panes[0]->IsSplit());
+  EXPECT_EQ(panes[0]->GetGroup(), plan);
+  EXPECT_EQ(SplitOf(panes[1]),
+            (std::vector<tabs::TabInterface*>{panes[1], panes[2]}));
+  EXPECT_FALSE(panes[1]->GetGroup().has_value());
+
+  // With two panes, the one that stays is an ordinary tab again.
+  const std::optional<tab_groups::TabGroupId> trip = organizer->MoveToNewTask(
+      {organizer->IdFor(panes[1]).value()}, u"Trip");
+  ASSERT_TRUE(trip);
+  EXPECT_EQ(panes[1]->GetGroup(), trip);
+  EXPECT_FALSE(panes[1]->IsSplit());
+  EXPECT_FALSE(panes[2]->IsSplit());
+  EXPECT_FALSE(panes[2]->GetGroup().has_value());
 }
 
 // After a restart the split comes back with its panes and their directions
