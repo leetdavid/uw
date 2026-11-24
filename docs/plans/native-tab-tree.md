@@ -50,6 +50,19 @@ Agreed on 2026-10-18, at the user's request.
 - The tree is saved as per-tab data in Chromium's session file: see [ADR 0010](../adr/0010-the-tab-tree-is-saved-in-chromiums-session-file.md). Chromium drops that data when it rewrites the file, so `SessionService` keeps each tab's data and writes it again in the rewrite. After a crash Chromium saves nothing until its restore has run, so uw writes every tab's data again once saving is back on.
 - The [Arc-style look](../product.md#minimum-usable-version) is separate work: it restyles Chromium's own views and does not change this structure.
 
+## Smooth moves
+
+Moving tabs has to keep to the [tab move budget](../architecture.md#performance) (T400). On 2026-11-24 a profile of 0.1.13 during a sidebar drag showed the main thread busy 85% of the time, with two freezes of about 140 ms in 8 seconds. The main costs, and the fixes:
+
+1. **One sidebar layout per tree change.** uw invalidated every row, and each row's invalidation made Chromium's animating layout recompute the whole sidebar. The sidebar now lays out once per change.
+2. **No window lookup inside the sidebar.** On every mouse move, Chromium asked macOS which window was under the pointer, which costs a call per uw window. While the pointer stays inside the sidebar that holds the dragged tabs, that sidebar is the target. A floating window over the sidebar, such as the mini player, no longer tears a tab out.
+3. **No session rebuild during a drag.** Each move adds session-file writes, and every 250 writes Chromium rebuilt the whole session file at once. The rebuild now waits for the drop. The writes themselves still happen, so a crash mid-drag loses nothing.
+4. **Other windows wait for the drop.** The other windows on the workspace already keep their order until the drop. They now leave their sidebars alone until then too.
+
+If the budget still fails after these, the profile shows the next cost, and that gets fixed too, until it holds.
+
+A [real-window test](../../README.md#real-window-tests) drags a tab and holds a move key in a setup like the owner's, and fails when a step takes longer than 8.3 ms. Headless tests count the work: one sidebar layout per tree change, no window lookup while the pointer is in the sidebar, and no session rebuild before the drop. The last check is a drag on the owner's Mac while Xcode's Animation Hitches records dropped frames.
+
 ## Stages
 
 Each stage is a ticket on the [board](roadmap.md#board).

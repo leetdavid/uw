@@ -94,6 +94,8 @@ Establish a stock Chromium baseline on the same hardware and test pages. Measure
 
 Tab classification has an [agreed latency budget](product.md#organization-latency). Define its measurement conditions and benchmark the actual pipeline. Set other performance budgets after the first baseline, and record test conditions.
 
+Tab moves have a budget, agreed on 2026-11-24: each step of a tab drag in the sidebar, and each repeat of a held keyboard move, finishes its main-thread work within 8.3 ms, one frame at 120 Hz. The conditions are the owner's: a 14-inch MacBook Pro at 120 Hz, with uw's usual 25 windows, 16 of them browser windows on several workspaces. See [Smooth moves](plans/native-tab-tree.md#smooth-moves) for how it is measured.
+
 ## Tab organization models
 
 Settings hold an optional decision model and a language model. See [ADR 0003](adr/0003-decision-model-beside-the-language-model.md) and the [approved plan](plans/automatic-organization.md).
