@@ -27,6 +27,7 @@
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/automatic_organizer.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/look/menu_card.h"
@@ -56,6 +57,7 @@ TaskNameField::TaskNameField(const tab_groups::TabGroupId& group,
       IDS_TAB_GROUP_HEADER_CXMENU_TAB_GROUP_TITLE_ACCESSIBLE_NAME));
   // The row's layout hides a child it gives no width, and hiding the field
   // takes the keyboard from it, as when a new task's row grows in.
+  SetDefaultWidthInChars(1);
   SetMinimumWidthInChars(1);
   SetProperty(
       views::kFlexBehaviorKey,
@@ -91,9 +93,12 @@ void TaskNameField::Start() {
   }
   views::FocusRing::Remove(this);
   previous_focus_.SetView(GetFocusManager()->GetFocusedView());
-  started_with_ = std::u16string(name_->GetText());
+  views::Label* name = views::AsViewClass<views::Label>(name_.view());
+  started_with_ = name ? std::u16string(name->GetText()) : std::u16string();
   SetText(started_with_);
-  name_->SetVisible(false);
+  if (name) {
+    name->SetVisible(false);
+  }
   SetVisible(true);
   SelectAll(false);
   RequestFocus();
@@ -174,7 +179,9 @@ void TaskNameField::End(bool save, bool restore_focus) {
   }
   previous_focus_.SetView(nullptr);
   SetVisible(false);
-  name_->SetVisible(true);
+  if (views::View* name = name_.view()) {
+    name->SetVisible(true);
+  }
   expand_lock_.reset();
   // Only what the user typed is saved, so a name uw gave meanwhile stays.
   if (!save || typed.empty() || typed == started_with_) {

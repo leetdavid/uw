@@ -11,7 +11,6 @@
 #include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
-#include "base/scoped_observation.h"
 #include "base/time/time.h"
 #include "chrome/browser/picture_in_picture/picture_in_picture_window_manager.h"
 #include "ui/gfx/image/image_skia.h"
@@ -117,9 +116,6 @@ class MiniPlayerStack : public PictureInPictureWindowManager::Observer {
   // The video the stack is playing again, which keeps the home window.
   base::WeakPtr<content::WebContents> replaying_;
   base::RepeatingClosureList observers_;
-  base::ScopedObservation<PictureInPictureWindowManager,
-                          PictureInPictureWindowManager::Observer>
-      picture_in_picture_{this};
   base::WeakPtrFactory<MiniPlayerStack> weak_factory_{this};
 };
 

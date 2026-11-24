@@ -7,7 +7,6 @@
 #include <string>
 
 #include "base/callback_list.h"
-#include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -66,7 +65,8 @@ class TaskNameField : public views::Textfield,
   void End(bool save, bool restore_focus);
 
   const tab_groups::TabGroupId group_;
-  const raw_ptr<views::Label> name_;
+  // The row deletes its name before this field.
+  views::ViewTracker name_;
   std::u16string started_with_;
   bool ending_ = false;
   views::ViewTracker previous_focus_;

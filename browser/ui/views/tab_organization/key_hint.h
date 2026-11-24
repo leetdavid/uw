@@ -7,12 +7,12 @@
 
 #include "base/callback_list.h"
 #include "base/functional/callback.h"
-#include "base/memory/raw_ptr.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/tab_interface.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/view.h"
+#include "ui/views/view_tracker.h"
 
 class BrowserWindowInterface;
 
@@ -61,13 +61,15 @@ class KeyHint : public views::View {
   View* GetTooltipHandlerForPoint(const gfx::Point& point) override;
 
  private:
+  views::Button* CloseButton();
   void OnCloseState();
   // Draws the hint the pointer and the keys call for, and the tooltip.
   void Update();
   void SetFaded(bool faded);
 
   const tabs::TabHandle tab_;
-  const raw_ptr<views::Button> close_;
+  // The row deletes its close button before this hint.
+  views::ViewTracker close_;
   const base::RepeatingClosure update_colors_;
   Shown shown_ = Shown::kNone;
   bool source_ = false;

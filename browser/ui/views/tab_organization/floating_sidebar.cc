@@ -177,6 +177,7 @@ FloatingSidebar::FloatingSidebar(VerticalTabStripRegionView* region,
 FloatingSidebar::~FloatingSidebar() {
   ListenForEsc(false);
   region_->RemovePreTargetHandler(this);
+  region_->SetEventTargeter(nullptr);
 }
 
 gfx::Insets FloatingSidebar::Margin(const gfx::Insets& shown) const {

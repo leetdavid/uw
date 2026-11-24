@@ -33,8 +33,10 @@ MiniPlayerStack::Entry& MiniPlayerStack::Entry::operator=(const Entry&) =
     default;
 MiniPlayerStack::Entry::~Entry() = default;
 
+// The stack is never destroyed and the manager is, at exit, so the stack
+// keeps no pointer to it.
 MiniPlayerStack::MiniPlayerStack() {
-  picture_in_picture_.Observe(PictureInPictureWindowManager::GetInstance());
+  PictureInPictureWindowManager::GetInstance()->AddObserver(this);
 }
 MiniPlayerStack::~MiniPlayerStack() = default;
 

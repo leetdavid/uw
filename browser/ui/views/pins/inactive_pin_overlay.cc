@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
+#include "chrome/browser/ui/views/frame/contents_capture_border_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
 #include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
@@ -333,9 +334,12 @@ void InactivePinOverlay::Update() {
     if (view) {
       view->parent()->RemoveChildViewT(view);
     }
-    view =
-        container->AddChildView(std::make_unique<HazeView>(base::BindRepeating(
-            &InactivePinOverlay::BringPage, base::Unretained(this))));
+    // Chromium keeps the capture border as the container's last child.
+    view = container->AddChildViewAt(
+        std::make_unique<HazeView>(base::BindRepeating(
+            &InactivePinOverlay::BringPage, base::Unretained(this))),
+        container->GetIndexOf(container->capture_contents_border_view())
+            .value());
     haze_.SetView(view);
     contents_.Observe(container->contents_view());
   }

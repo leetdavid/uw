@@ -12,6 +12,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
 #include "components/vector_icons/vector_icons.h"
+#include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -106,6 +107,7 @@ END_METADATA
 
 NamingSpinner::NamingSpinner(const tab_groups::TabGroupId& group)
     : Throbber(kIconSize), group_(group) {
+  GetViewAccessibility().SetRole(ax::mojom::Role::kProgressIndicator);
   GetViewAccessibility().SetName(
       l10n_util::GetStringUTF16(IDS_UW_ACTIVITY_NEEDS_NAME));
   SetProperty(views::kMarginsKey, gfx::Insets::VH(0, kPadding));

@@ -11,6 +11,7 @@
 #include "chrome/browser/ui/color/chrome_color_id.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
+#include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
@@ -47,6 +48,7 @@ std::string ChatIdOf(content::WebContents* contents) {
 }  // namespace
 
 ChatMark::ChatMark(tabs::TabHandle tab) : tab_(tab) {
+  GetViewAccessibility().SetRole(ax::mojom::Role::kImage);
   SetLayoutManager(std::make_unique<views::FillLayout>());
   spinner_ = AddChildView(std::make_unique<views::Throbber>(kSize));
   spinner_->SetVisible(false);

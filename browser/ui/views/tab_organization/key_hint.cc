@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/no_destructor.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -27,6 +28,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
+#include "ui/views/view_utils.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/ui/views/tab_organization/branch_toggle.h"
@@ -160,7 +162,7 @@ KeyHint::KeyHint(tabs::TabHandle tab,
     : tab_(tab), close_(close), update_colors_(std::move(update_colors)) {
   SetCanProcessEventsWithinSubtree(false);
   GetViewAccessibility().SetIsIgnored(true);
-  close_state_ = close_->AddStateChangedCallback(
+  close_state_ = close->AddStateChangedCallback(
       base::BindRepeating(&KeyHint::OnCloseState, base::Unretained(this)));
   card_ = KeyCard::Observe(
       base::BindRepeating(&KeyHint::SchedulePaint, base::Unretained(this)));
@@ -205,9 +207,15 @@ void KeyHint::RemovedFromWidget() {
   }
 }
 
+views::Button* KeyHint::CloseButton() {
+  return views::AsViewClass<views::Button>(close_.view());
+}
+
 void KeyHint::SetRowHovered(bool hovered) {
+  const views::Button* close = CloseButton();
   if (hovered) {
-    Hovered() = {tab_, close_->GetState() == views::Button::STATE_HOVERED};
+    Hovered() = {tab_,
+                 close && close->GetState() == views::Button::STATE_HOVERED};
   } else if (Hovered().tab == tab_) {
     Hovered() = Pointer();
   } else {
@@ -217,8 +225,10 @@ void KeyHint::SetRowHovered(bool hovered) {
 }
 
 void KeyHint::OnCloseState() {
-  const bool on_close = close_->GetState() == views::Button::STATE_HOVERED ||
-                        close_->GetState() == views::Button::STATE_PRESSED;
+  const views::Button* close = CloseButton();
+  const bool on_close =
+      close && (close->GetState() == views::Button::STATE_HOVERED ||
+                close->GetState() == views::Button::STATE_PRESSED);
   if (Hovered().tab != tab_ && !on_close) {
     return;
   }
@@ -276,8 +286,9 @@ void KeyHint::Update() {
                   : base::StrCat({u"Close tab\n", kOptionClick, u" to close ",
                                   TabsUnder(under), u" too"});
   }
-  if (close_->GetTooltipText() != tooltip) {
-    close_->SetTooltipText(tooltip);
+  if (views::Button* close = CloseButton();
+      close && close->GetTooltipText() != tooltip) {
+    close->SetTooltipText(tooltip);
   }
   // The parent's row says which tabs an Option-drag leaves behind.
   const bool stays = hint.kind == Shown::kStays && source;
