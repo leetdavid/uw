@@ -235,6 +235,12 @@ pnpm run check && pnpm run verify --jobs 8
 
 `verify --checks` does the same in `out/uw-checks`, a second build with Chromium's development checks on, where a test fails as soon as uw breaks one of Chromium's rules. `out/uw`, the browser you use, is left alone. The first `--checks` build compiles everything again. See [Native lifetime rules](docs/architecture.md#native-lifetime-rules).
 
+`RandomActionsBrowserTest` does 120 things a person can do to tabs, tasks, windows, and workspaces, picked from a seed, and checks after each that every sidebar matches its tree and that windows on one workspace list the same tabs. `verify` runs seeds 1 to 8. A failure prints its seed and steps. To try another run, from `.chromium/src`:
+
+```sh
+./out/uw/browser_tests --gtest_filter='RandomWalkBrowserTest.MANUAL_ARunPickedByItsSeed' --run-manual --uw-random-seed=11 --uw-random-steps=400
+```
+
 The browser tests run in Chromium's headless mode, so they open no windows and no Dock icon. To watch one, run `.chromium/src/out/uw/browser_tests --gtest_filter='<suite>.*' --headful-mode`.
 
 To see how the window looks without opening it, set `UW_SCREENSHOT_DIR` to an existing folder before running `verify` or the browser tests. The tests then save PNG files of the whole window there: the sidebar with a task in light and dark mode, the hidden and floating sidebar, two picked tints, black dark mode with a picked tint, an automatic move with its card, the activity card for an unsure answer in an ordinary and in a crowded sidebar, a suggestion with its Confirm button, the theme picker, the providers page, the terminal, and the command bar in dark mode, the Organize card while organizing and paused in light and dark mode, the task card in light and dark mode, a task renamed on its row in the wide and the collapsed sidebar, Name Task at work and failed, and the settings page with its models, a failed connection test with its details, and its theme row.

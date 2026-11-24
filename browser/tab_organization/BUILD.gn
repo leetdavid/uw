@@ -158,6 +158,7 @@ source_set("browser_tests") {
       "branch_drag_browsertest.mm",
       "links_from_other_apps_browsertest.mm",
       "mouse_actions_browsertest.mm",
+      "random_actions_browsertest.mm",
       "shared_tabs_drag_browsertest.cc",
       "sidebar_menus_browsertest.mm",
       "task_keys_browsertest.mm",
@@ -166,6 +167,10 @@ source_set("browser_tests") {
     deps += [
       "//chrome/browser:app_controller_mac",
       "//chrome/browser:global_keyboard_shortcuts_mac",
+      "//components/keep_alive_registry",
+      "//uw/browser/little_window:mark",
+      "//uw/browser/ui/views/split_view",
+      "//uw/browser/ui/views/workspaces",
     ]
   }
   if (is_win) {
