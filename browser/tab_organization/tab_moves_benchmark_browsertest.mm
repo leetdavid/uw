@@ -11,6 +11,7 @@
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/test/run_until.h"
@@ -24,6 +25,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/test/browser_test.h"
@@ -32,6 +34,8 @@
 #import "ui/events/test/cocoa_test_event_utils.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/mac/coordinate_conversion.h"
+#include "ui/views/controls/scroll_view.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -262,6 +266,10 @@ class TabMovesBenchmarkBrowserTest : public headless::HeadlessModeBrowserTest {
       return second_errands->GetWindow()->IsVisible() &&
              !second->GetWindow()->IsVisible();
     }));
+    // Only the first window shows, as on the owner's screen. A minimized
+    // window still counts when macOS is asked which window is where.
+    [second_errands->GetWindow()->GetNativeWindow().GetNativeNSWindow()
+        miniaturize:nil];
 
     BrowserView::GetBrowserViewForBrowser(browser())->GetWidget()->SetBounds(
         gfx::Rect(0, 40, 980, 720));
@@ -280,8 +288,32 @@ IN_PROC_BROWSER_TEST_F(TabMovesBenchmarkBrowserTest,
   // trackpad moves.
   std::vector<base::TimeDelta> drag;
   {
+    // The sidebar shows its top, where the first task is, as it does before
+    // the user scrolls. It had scrolled to the last tab opened.
+    for (views::View* view = RowOf(browser(), task[1]); view;
+         view = view->parent()) {
+      if (auto* scroll = views::AsViewClass<views::ScrollView>(view)) {
+        scroll->ScrollToOffset(gfx::PointF());
+        break;
+      }
+    }
+    Wait(base::Milliseconds(500));
     const gfx::Point from =
         RowOf(browser(), task[1])->GetBoundsInScreen().CenterPoint();
+    TabStripModel* tabs = browser()->tab_strip_model();
+    const int start = tabs->GetIndexOfTab(task[1]);
+    // The press lands on the first window, not on another in front of it.
+    NSWindow* front =
+        browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+    const NSPoint point = gfx::ScreenPointToNSPoint(from);
+    ASSERT_EQ([NSWindow windowNumberAtPoint:point
+                  belowWindowWithWindowNumber:0],
+              front.windowNumber)
+        << "visible " << browser()->GetWindow()->IsVisible() << " ns visible "
+        << front.visible << " on space " << front.onActiveSpace << " frame "
+        << base::SysNSStringToUTF8(NSStringFromRect(front.frame)) << " point "
+        << base::SysNSStringToUTF8(NSStringFromPoint(point)) << " from "
+        << from.ToString() << " alpha " << front.alphaValue;
     MoveMouse(from);
     PressMouse(ui_controls::DOWN);
     MainThreadWork work;
@@ -293,6 +325,11 @@ IN_PROC_BROWSER_TEST_F(TabMovesBenchmarkBrowserTest,
       MoveMouse(gfx::Point(from.x(), from.y() + dy));
       Wait(kStepGap);
       drag.push_back(work.Lap());
+      // The steps measured a drag: one ran, and the tab moved with it.
+      if (step == steps) {
+        EXPECT_TRUE(TabDragController::IsActive());
+        EXPECT_NE(tabs->GetIndexOfTab(task[1]), start);
+      }
     }
     PressMouse(ui_controls::UP);
     Wait(base::Seconds(1));
@@ -307,6 +344,8 @@ IN_PROC_BROWSER_TEST_F(TabMovesBenchmarkBrowserTest,
     Wait(base::Milliseconds(500));
     NSWindow* window =
         browser()->GetWindow()->GetNativeWindow().GetNativeNSWindow();
+    TabStripModel* tabs = browser()->tab_strip_model();
+    const int start = tabs->GetIndexOfTab(task[0]);
     MainThreadWork work;
     for (int press = 0; press < 20; ++press) {
       const ui::KeyboardCode key = press < 10 ? ui::VKEY_DOWN : ui::VKEY_UP;
@@ -320,6 +359,10 @@ IN_PROC_BROWSER_TEST_F(TabMovesBenchmarkBrowserTest,
       }
       Wait(kStepGap);
       keys.push_back(work.Lap());
+      // The presses measured moves: the tab went down.
+      if (press == 9) {
+        EXPECT_NE(tabs->GetIndexOfTab(task[0]), start);
+      }
     }
   }
 

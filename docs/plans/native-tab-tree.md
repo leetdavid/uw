@@ -59,6 +59,7 @@ Moving tabs has to keep to the [tab move budget](../architecture.md#performance)
 2. **No window lookup inside the sidebar.** On every mouse move, Chromium asked macOS which window was under the pointer, which costs a call per uw window. While the pointer stays inside the sidebar that holds the dragged tabs, that sidebar is the target. A floating window over the sidebar, such as the mini player, no longer tears a tab out.
 3. **No session rebuild during a drag.** Each move adds session-file writes, and every 250 writes Chromium rebuilt the whole session file at once. The rebuild now waits for the drop. The writes themselves still happen, so a crash mid-drag loses nothing.
 4. **Other windows wait for the drop.** The other windows on the workspace already keep their order until the drop. They now leave their sidebars alone until then too.
+5. **Sliding rows lay out only their list.** While rows slide to their new places, each frame invalidated the list, and that laid the whole window out again, measuring every row. While the list keeps its size, each frame now places its rows directly.
 
 If the budget still fails after these, the profile shows the next cost, and that gets fixed too, until it holds.
 
