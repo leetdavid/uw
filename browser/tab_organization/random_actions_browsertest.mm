@@ -12,6 +12,8 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/functional/bind.h"
+#include "base/functional/callback.h"
 #include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
@@ -20,9 +22,11 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/test/bind.h"
 #include "base/test/insecure_random_generator.h"
 #include "base/test/run_until.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/headless/headless_mode_util.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
@@ -60,13 +64,17 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/models/menu_model.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/base/test/ui_controls.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/events/test/cocoa_test_event_utils.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/animation_test_api.h"
 #include "ui/gfx/geometry/point.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/view.h"
 #include "ui/views/view_utils.h"
@@ -91,6 +99,8 @@ namespace {
 // `--uw-random-seed=7 --uw-random-steps=400` picks the run of a MANUAL_ test.
 constexpr char kSeedSwitch[] = "uw-random-seed";
 constexpr char kStepsSwitch[] = "uw-random-steps";
+// `--uw-random-show-windows` logs every window's tabs after each step.
+constexpr char kShowSwitch[] = "uw-random-show-windows";
 
 // A walk opens no more than this, so a long one stays quick.
 constexpr int kMostTabs = 12;
@@ -112,8 +122,8 @@ bool IsLeftAlone(int command) {
     case kChooseWorkspaceCommand:
     case kMoveTaskToWorkspace:
     case kReportIssue:
-    // A split's tab moved to a task without the rest of its split crashes uw
-    // (T405). Until that is fixed a walk makes no splits, so it gets past it.
+    // With a split open the sidebar stops following its tree's order (T407).
+    // Until that is fixed a run makes no splits.
     case kSplitRight:
     case kSplitDown:
       return true;
@@ -149,6 +159,11 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
   using Action = void (RandomWalkBrowserTest::*)(Browser*);
 
+  void TearDownOnMainThread() override {
+    profile_ = nullptr;
+    headless::HeadlessModeBrowserTest::TearDownOnMainThread();
+  }
+
   // Does `steps` things to the tabs, tasks, windows, and workspaces.
   void Walk(uint64_t seed, int steps) {
     Start(seed);
@@ -170,6 +185,7 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
       const std::vector<Browser*> windows = Windows();
       (this->*PickAction())(windows[Pick(windows.size())]);
       Settle();
+      ShowWindows();
     }
   }
 
@@ -177,6 +193,13 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
     seed_ = seed;
     random_.ReseedForTesting(seed);
     profile_ = browser()->GetProfile();
+    show_ = base::CommandLine::ForCurrentProcess()->HasSwitch(kShowSwitch);
+  }
+
+  void ShowWindows() {
+    if (show_) {
+      LOG(WARNING) << "random walk, after step " << step_ << ":\n" << Layouts();
+    }
   }
 
   size_t Pick(size_t count) { return random_.RandUint64() % count; }
@@ -399,26 +422,46 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
     window->GetWindow()->Activate();
   }
 
+  // A mouse button held on a row. The press and the release go through the
+  // window, which sends them on as it would a real mouse's.
+  struct Held {
+    base::WeakPtr<views::Widget> widget;
+    gfx::Point at;
+    gfx::Point on_screen;
+  };
+
+  static Held Press(views::View* row) {
+    Held held{row->GetWidget()->GetWeakPtr(),
+              row->GetLocalBounds().CenterPoint(),
+              row->GetBoundsInScreen().CenterPoint()};
+    views::View::ConvertPointToWidget(row, &held.at);
+    ui::MouseEvent press(ui::EventType::kMousePressed, held.at, held.on_screen,
+                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+    held.widget->OnMouseEvent(&press);
+    return held;
+  }
+
+  static void LetGo(const Held& held) {
+    if (!held.widget) {
+      return;
+    }
+    ui::MouseEvent release(ui::EventType::kMouseReleased, held.at,
+                           held.on_screen, ui::EventTimeForNow(),
+                           ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
+    held.widget->OnMouseEvent(&release);
+  }
+
   // A press on a row that is held while something else happens, then let go.
   // With the mouse down a person can still press keys, a page can close
-  // itself, and the organizer can file a tab it is free to move. The press
-  // and the release go through the window, which sends them on as it would a
-  // real mouse's.
+  // itself, and the organizer can file a tab it is free to move.
   void HoldARow(Browser* window) {
     const std::vector<views::View*> rows = Rows(window);
     if (rows.empty()) {
       return;
     }
-    views::View* pressed = rows[Pick(rows.size())];
-    base::WeakPtr<views::Widget> widget = pressed->GetWidget()->GetWeakPtr();
-    const gfx::Point on_screen = pressed->GetBoundsInScreen().CenterPoint();
-    gfx::Point at = pressed->GetLocalBounds().CenterPoint();
-    views::View::ConvertPointToWidget(pressed, &at);
     Note("presses a row and holds it");
-    ui::MouseEvent press(ui::EventType::kMousePressed, at, on_screen,
-                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
-                         ui::EF_LEFT_MOUSE_BUTTON);
-    widget->OnMouseEvent(&press);
+    const Held held = Press(rows[Pick(rows.size())]);
 
     TabStripModel* tabs = window->tab_strip_model();
     switch (Pick(3)) {
@@ -445,20 +488,17 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
         }
       }
     }
-    if (!widget) {
-      return;
+    // Any key ends a drag. Without one, a row filed under the button leaves
+    // its drag running (T406), so until that is fixed a run always presses.
+    if (held.widget) {
+      Note("presses Cmd");
+      [NSApp sendEvent:cocoa_test_event_utils::SynthesizeKeyEvent(
+                           held.widget->GetNativeWindow().GetNativeNSWindow(),
+                           /*keyDown=*/true, ui::VKEY_COMMAND,
+                           NSEventModifierFlagCommand)];
     }
-    Note("presses Cmd and lets go of the row");
-    [NSApp sendEvent:cocoa_test_event_utils::SynthesizeKeyEvent(
-                         widget->GetNativeWindow().GetNativeNSWindow(),
-                         /*keyDown=*/true, ui::VKEY_COMMAND,
-                         NSEventModifierFlagCommand)];
-    if (widget) {
-      ui::MouseEvent release(ui::EventType::kMouseReleased, at, on_screen,
-                             ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
-                             ui::EF_LEFT_MOUSE_BUTTON);
-      widget->OnMouseEvent(&release);
-    }
+    Note("lets go of the row");
+    LetGo(held);
   }
 
   Action PickAction() {
@@ -520,6 +560,9 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
     for (Browser* window : Windows()) {
       TabOrganizationController* organizer =
           TabOrganizationController::From(window);
+      if (organizer->dragging()) {
+        return "a window takes a tab as dragged, with no mouse button down";
+      }
       TabStripModel* tabs = window->tab_strip_model();
       std::vector<PageId> strip;
       for (int i = 0; i < tabs->count(); ++i) {
@@ -561,8 +604,12 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
     std::string text;
     for (Browser* window : Windows()) {
       const WorkspaceWindow* workspace = WorkspaceWindow::From(window);
-      text += "window on workspace " +
-              (workspace ? workspace->workspace() : std::string("?")) + ":\n";
+      text +=
+          "window on workspace " +
+          (workspace ? workspace->workspace() : std::string("?")) +
+          (TabOrganizationController::From(window)->dragging() ? ", dragging"
+                                                               : "") +
+          ":\n";
       for (const std::string& row : Layout(window)) {
         text += "  " + row + "\n";
       }
@@ -593,6 +640,7 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
 
   base::test::InsecureRandomGenerator random_;
   raw_ptr<Profile> profile_ = nullptr;
+  bool show_ = false;
   uint64_t seed_ = 0;
   int step_ = 0;
   int pages_ = 0;
@@ -620,6 +668,286 @@ IN_PROC_BROWSER_TEST_F(RandomWalkBrowserTest, MANUAL_ARunPickedByItsSeed) {
     GTEST_SKIP() << "Runs headless only.";
   }
   Walk(SwitchOr(kSeedSwitch, 1), static_cast<int>(SwitchOr(kStepsSwitch, 120)));
+}
+
+// Drags rows in the sidebar with a real mouse, to places and at speeds picked
+// from a seed, while keys are pressed and tabs close. A headless window takes
+// no drags, so this needs a real one. Run it with `pnpm run window-tests`.
+class RandomDragsBrowserTest : public RandomWalkBrowserTest {
+ protected:
+  // One thing a drag does, which calls its argument when it is done. A drag
+  // that takes a tab out of its window runs a loop of its own until the drop,
+  // so each starts when the one before is done instead of the test waiting.
+  using Stage = base::OnceCallback<void(base::OnceClosure)>;
+
+  static void Play(std::vector<Stage> stages,
+                   size_t next,
+                   base::TimeDelta gap,
+                   size_t* reached,
+                   base::OnceClosure done) {
+    *reached = next;
+    if (next == stages.size()) {
+      std::move(done).Run();
+      return;
+    }
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](std::vector<Stage> stages, size_t next, base::TimeDelta gap,
+               size_t* reached, base::OnceClosure done) {
+              Stage stage = std::move(stages[next]);
+              std::move(stage).Run(base::BindOnce(&Play, std::move(stages),
+                                                  next + 1, gap, reached,
+                                                  std::move(done)));
+            },
+            std::move(stages), next, gap, reached, std::move(done)),
+        gap);
+  }
+
+  // Runs `loop` until it quits, and fails after 20 seconds: a real-window
+  // run in the VM has no time limit of its own on a RunLoop.
+  void RunOrFail(base::RunLoop& loop, const std::string& what) {
+    bool late = false;
+    base::OneShotTimer limit;
+    limit.Start(FROM_HERE, base::Seconds(20), base::BindLambdaForTesting([&] {
+                  late = true;
+                  loop.Quit();
+                }));
+    loop.Run();
+    if (late) {
+      ADD_FAILURE() << "a drag never got past " << what << "\n"
+                    << Layouts() << Story();
+    }
+  }
+
+  static Stage MoveTo(const gfx::Point& point) {
+    return base::BindOnce(
+        [](gfx::Point point, base::OnceClosure done) {
+          ui_controls::SendMouseMoveNotifyWhenDone(point.x(), point.y(),
+                                                   std::move(done));
+        },
+        point);
+  }
+
+  // A tree to drag in: tabs opened from one another, and two tasks.
+  void OpenATree() {
+    Browser* window = browser();
+    TabStripModel* tabs = window->tab_strip_model();
+    for (int i = 0; i < 7; ++i) {
+      tabs->ActivateTabAt(static_cast<int>(Pick(tabs->count())));
+      OpenALink(window);
+      base::RunLoop().RunUntilIdle();
+    }
+    TabOrganizationController* organizer =
+        TabOrganizationController::From(window);
+    for (const char16_t* task : {u"Plan", u"Trip"}) {
+      const std::optional<PageId> id = organizer->IdFor(
+          tabs->GetTabAtIndex(static_cast<int>(Pick(tabs->count()))));
+      if (id) {
+        Note("moves a tab to a new task");
+        organizer->MoveToNewTask({*id}, task);
+      }
+    }
+    Settle();
+  }
+
+  // The rows of `window` a real mouse can reach: those on the screen, clear
+  // of the menu bar and the Dock, where a press goes to another app.
+  static std::vector<views::View*> RowsInReach(Browser* window) {
+    const gfx::Rect reach = BrowserView::GetBrowserViewForBrowser(window)
+                                ->GetWidget()
+                                ->GetWorkAreaBoundsInScreen();
+    std::vector<views::View*> rows = Rows(window);
+    std::erase_if(rows, [&](views::View* row) {
+      return !reach.Contains(row->GetBoundsInScreen().CenterPoint());
+    });
+    return rows;
+  }
+
+  void DragARow() {
+    const std::vector<Browser*> windows = Windows();
+    Browser* window = windows[Pick(windows.size())];
+    window->GetWindow()->Activate();
+    Wait(base::Milliseconds(400));
+    const std::vector<views::View*> rows = RowsInReach(window);
+    if (rows.empty()) {
+      return;
+    }
+    const gfx::Point from =
+        rows[Pick(rows.size())]->GetBoundsInScreen().CenterPoint();
+
+    gfx::Point to;
+    std::string where;
+    const size_t kind = Pick(20);
+    if (kind < 3) {
+      to = gfx::Point(from.x() + static_cast<int>(Pick(9)) - 4,
+                      from.y() + 5 + static_cast<int>(Pick(8)));
+      where = "a few points";
+    } else if (kind < 6 && windows.size() < kMostWindows) {
+      const gfx::Rect bounds = BrowserView::GetBrowserViewForBrowser(window)
+                                   ->GetWidget()
+                                   ->GetWindowBoundsInScreen();
+      to = gfx::Point(bounds.right() + 60 + static_cast<int>(Pick(120)),
+                      bounds.y() + 200 + static_cast<int>(Pick(200)));
+      where = "out of the window";
+    } else if (kind < 8) {
+      const gfx::Rect last = rows.back()->GetBoundsInScreen();
+      to =
+          gfx::Point(from.x(), last.bottom() + 20 + static_cast<int>(Pick(40)));
+      where = "below the tabs";
+    } else {
+      const std::vector<views::View*> targets =
+          RowsInReach(windows[Pick(windows.size())]);
+      if (targets.empty()) {
+        return;
+      }
+      const gfx::Rect onto = targets[Pick(targets.size())]->GetBoundsInScreen();
+      constexpr std::array<int, 7> kSideways = {-48, -24, 0, 0, 0, 24, 48};
+      const std::array<int, 3> ys = {onto.y() + 3, onto.CenterPoint().y(),
+                                     onto.bottom() - 3};
+      to =
+          gfx::Point(onto.CenterPoint().x() + kSideways[Pick(kSideways.size())],
+                     ys[Pick(ys.size())]);
+      where = "onto a row";
+    }
+
+    gfx::Rect reach = BrowserView::GetBrowserViewForBrowser(window)
+                          ->GetWidget()
+                          ->GetWorkAreaBoundsInScreen();
+    reach.Inset(4);
+    to.SetToMax(reach.origin());
+    to.SetToMin(gfx::Point(reach.right(), reach.bottom()));
+
+    constexpr std::array<int, 6> kModifiers = {
+        ui_controls::kNoAccelerator, ui_controls::kNoAccelerator,
+        ui_controls::kNoAccelerator, ui_controls::kNoAccelerator,
+        ui_controls::kAlt,           ui_controls::kCommand};
+    const int modifiers = kModifiers[Pick(kModifiers.size())];
+    const int moves = 2 + static_cast<int>(Pick(14));
+    const base::TimeDelta gap =
+        base::Milliseconds(8 + static_cast<int>(Pick(24)));
+
+    std::vector<Stage> stages;
+    for (int move = 1; move <= moves; ++move) {
+      stages.push_back(
+          MoveTo(gfx::Point(from.x() + (to.x() - from.x()) * move / moves,
+                            from.y() + (to.y() - from.y()) * move / moves)));
+    }
+    std::string meanwhile;
+    if (Chance(30)) {
+      const uint64_t which = random_.RandUint64();
+      const size_t at = Pick(stages.size() + 1);
+      switch (Pick(3)) {
+        case 0:
+          meanwhile = ", pressing Escape on the way";
+          stages.insert(
+              stages.begin() + at,
+              base::BindOnce(
+                  [](gfx::NativeWindow native, base::OnceClosure done) {
+                    ui_controls::SendKeyPressNotifyWhenDone(
+                        native, ui::VKEY_ESCAPE, /*control=*/false,
+                        /*shift=*/false, /*alt=*/false, /*command=*/false,
+                        std::move(done));
+                  },
+                  window->GetWindow()->GetNativeWindow()));
+          break;
+        case 1:
+          meanwhile = ", pressing Cmd on the way";
+          stages.insert(
+              stages.begin() + at,
+              base::BindOnce(
+                  [](gfx::NativeWindow native, base::OnceClosure done) {
+                    [NSApp sendEvent:cocoa_test_event_utils::SynthesizeKeyEvent(
+                                         native.GetNativeNSWindow(),
+                                         /*keyDown=*/true, ui::VKEY_COMMAND,
+                                         NSEventModifierFlagCommand)];
+                    std::move(done).Run();
+                  },
+                  window->GetWindow()->GetNativeWindow()));
+          break;
+        default:
+          meanwhile = ", while a tab closes itself";
+          stages.insert(stages.begin() + at,
+                        base::BindOnce(&RandomDragsBrowserTest::CloseATab,
+                                       base::Unretained(this), which));
+      }
+    }
+    stages.push_back(base::BindOnce(
+        [](int modifiers, base::OnceClosure done) {
+          ui_controls::SendMouseEventsNotifyWhenDone(
+              ui_controls::LEFT, ui_controls::UP, std::move(done), modifiers);
+        },
+        modifiers));
+
+    Note(base::StringPrintf(
+        "drags a row from %s %s to %s%s%s, in %d moves %d ms apart",
+        from.ToString().c_str(), where.c_str(), to.ToString().c_str(),
+        modifiers == ui_controls::kAlt       ? " with Option"
+        : modifiers == ui_controls::kCommand ? " with Cmd"
+                                             : "",
+        meanwhile.c_str(), moves, static_cast<int>(gap.InMilliseconds())));
+    ui_controls::EnableUIControls();
+    base::RunLoop moved;
+    ASSERT_TRUE(ui_controls::SendMouseMoveNotifyWhenDone(from.x(), from.y(),
+                                                         moved.QuitClosure()));
+    RunOrFail(moved, "the move to the row");
+    base::RunLoop pressed;
+    ASSERT_TRUE(ui_controls::SendMouseEventsNotifyWhenDone(
+        ui_controls::LEFT, ui_controls::DOWN, pressed.QuitClosure(),
+        modifiers));
+    RunOrFail(pressed, "the press");
+    if (HasFailure()) {
+      return;
+    }
+    base::RunLoop dropped;
+    const size_t count = stages.size();
+    size_t reached = 0;
+    Play(std::move(stages), 0, gap, &reached, dropped.QuitClosure());
+    RunOrFail(dropped,
+              base::StringPrintf("part %zu of %zu on the way", reached, count));
+    if (HasFailure()) {
+      return;
+    }
+    Wait(base::Milliseconds(800));
+  }
+
+  // A page closes its own tab, as window.close() does.
+  void CloseATab(uint64_t which, base::OnceClosure done) {
+    const std::vector<Browser*> windows = Windows();
+    if (!windows.empty()) {
+      TabStripModel* tabs = windows[which % windows.size()]->tab_strip_model();
+      if (tabs->count() > 1) {
+        tabs->CloseWebContentsAt(static_cast<int>(which % tabs->count()),
+                                 TabCloseTypes::CLOSE_NONE);
+      }
+    }
+    std::move(done).Run();
+  }
+};
+
+// The sidebar survives a run of drags, with the animations a desktop shows,
+// and the windows stay in step. `--uw-random-seed` and `--uw-random-steps`
+// pick the run.
+IN_PROC_BROWSER_TEST_F(RandomDragsBrowserTest,
+                       DISABLED_TheSidebarSurvivesDrags) {
+  const auto animated = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+      gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
+  Start(SwitchOr(kSeedSwitch, 1));
+  BrowserView::GetBrowserViewForBrowser(browser())->GetWidget()->SetBounds(
+      gfx::Rect(0, 40, 520, 620));
+  OpenATree();
+  const int drags = static_cast<int>(SwitchOr(kStepsSwitch, 10));
+  for (step_ = 1; step_ <= drags && !HasFailure(); ++step_) {
+    if (Windows().empty()) {
+      break;
+    }
+    DragARow();
+    Settle();
+    ShowWindows();
+  }
+  if (HasFailure()) {
+    LOG(ERROR) << Story();
+  }
 }
 
 }  // namespace
