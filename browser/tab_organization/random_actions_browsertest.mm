@@ -488,9 +488,9 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
         }
       }
     }
-    // Any key ends a drag. Without one, a row filed under the button leaves
-    // its drag running (T406), so until that is fixed a run always presses.
-    if (held.widget) {
+    // Any key ends a drag, so every other step lets go with no key pressed
+    // and leaves the ending to the row.
+    if (held.widget && step_ % 2 == 1) {
       Note("presses Cmd");
       [NSApp sendEvent:cocoa_test_event_utils::SynthesizeKeyEvent(
                            held.widget->GetNativeWindow().GetNativeNSWindow(),
