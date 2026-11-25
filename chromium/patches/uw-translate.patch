@@ -1044,7 +1044,7 @@ index 03364f38b69d463c1c0357e8b2f2e83dc85c5664..5a3fc921d3537956ec8ae067462f7a46
    public_deps = [ "//chrome/browser:browser_public_dependencies" ]
  }
 diff --git a/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc b/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
-index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..620d0a4669d739774cbf1c3c877abf3ddf124b42 100644
+index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..ecf972b70974d5ad4f1c59109cbf175510b73baf 100644
 --- a/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
 +++ b/chrome/browser/ui/views/translate/partial_translate_bubble_view.cc
 @@ -82,6 +82,7 @@
@@ -1055,7 +1055,26 @@ index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..620d0a4669d739774cbf1c3c877abf3d
  
  namespace {
  
-@@ -620,10 +621,18 @@ std::unique_ptr<views::View> PartialTranslateBubbleView::CreateViewErrorNoTitle(
+@@ -357,8 +358,7 @@ PartialTranslateBubbleView::PartialTranslateBubbleView(
+                                     web_contents,
+                                     /*autosize=*/true),
+       model_(std::move(model)),
+-      on_closing_(std::move(on_closing)),
+-      web_contents_(web_contents) {
++      on_closing_(std::move(on_closing)) {
+   UpdateInsets(PartialTranslateBubbleModel::VIEW_STATE_WAITING);
+ 
+   previous_source_language_index_ = model_->GetSourceLanguageIndex();
+@@ -418,7 +418,7 @@ void PartialTranslateBubbleView::ConfirmAdvancedOptions() {
+     previous_source_language_index_ = model_->GetSourceLanguageIndex();
+     previous_target_language_index_ = model_->GetTargetLanguageIndex();
+     UpdateLanguageTabNames();
+-    model_->Translate(web_contents_);
++    model_->Translate(web_contents());
+     target_language_changed_ = true;
+     SwitchView(PartialTranslateBubbleModel::VIEW_STATE_WAITING);
+     if (from_source_language_view) {
+@@ -620,10 +620,18 @@ std::unique_ptr<views::View> PartialTranslateBubbleView::CreateViewErrorNoTitle(
                                 views::MinimumFlexSizeRule::kScaleToZero,
                                 views::MaximumFlexSizeRule::kUnbounded));
  
@@ -1075,25 +1094,52 @@ index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..620d0a4669d739774cbf1c3c877abf3d
    // Button row
    auto button_row = std::make_unique<views::BoxLayoutView>();
    button_row->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
-@@ -1077,6 +1086,16 @@ void PartialTranslateBubbleView::SwitchToErrorView(
+@@ -631,14 +639,13 @@ std::unique_ptr<views::View> PartialTranslateBubbleView::CreateViewErrorNoTitle(
+       provider->GetDistanceMetric(views::DISTANCE_RELATED_BUTTON_HORIZONTAL));
+   auto try_again_button = std::make_unique<views::MdTextButton>(
+       base::BindRepeating(
+-          [](PartialTranslateBubbleModel* model,
+-             content::WebContents* web_contents) {
++          [](PartialTranslateBubbleView* bubble) {
+             translate::ReportPartialTranslateBubbleUiAction(
+                 translate::PartialTranslateBubbleUiEvent::
+                     TRY_AGAIN_BUTTON_CLICKED);
+-            model->Translate(web_contents);
++            bubble->model_->Translate(bubble->web_contents());
+           },
+-          model_.get(), web_contents_),
++          base::Unretained(this)),
+       l10n_util::GetStringUTF16(IDS_TRANSLATE_BUBBLE_TRY_AGAIN));
+   try_again_button->SetID(BUTTON_ID_TRY_AGAIN);
+   button_row->AddChildView(std::move(try_again_button));
+@@ -1077,6 +1084,16 @@ void PartialTranslateBubbleView::SwitchToErrorView(
      translate::TranslateErrors error_type) {
    SwitchView(PartialTranslateBubbleModel::VIEW_STATE_ERROR);
    model_->SetError(error_type);
 +  if (uw_error_title_) {
-+    const std::u16string title = uw::SelectionProblemTitle(web_contents_);
++    const std::u16string title = uw::SelectionProblemTitle(web_contents());
 +    uw_error_title_->SetText(
 +        title.empty() ? l10n_util::GetStringUTF16(
 +                            IDS_PARTIAL_TRANSLATE_BUBBLE_COULD_NOT_TRANSLATE_TITLE)
 +                      : title);
-+    const std::u16string message = uw::SelectionProblemMessage(web_contents_);
++    const std::u16string message = uw::SelectionProblemMessage(web_contents());
 +    uw_error_message_->SetText(message);
 +    uw_error_message_->SetVisible(!message.empty());
 +  }
    // TODO(crbug.com/40221545): Record the error when Partial Translate-specific
    // metrics are added.
  }
+@@ -1128,7 +1145,7 @@ void PartialTranslateBubbleView::TranslateFullPage() {
+   translate::ReportPartialTranslateBubbleUiAction(
+       translate::PartialTranslateBubbleUiEvent::
+           TRANSLATE_FULL_PAGE_BUTTON_CLICKED);
+-  model_.get()->TranslateFullPage(web_contents_);
++  model_.get()->TranslateFullPage(web_contents());
+ }
+ 
+ void PartialTranslateBubbleView::SetTextAlignmentForLocaleTextDirection(
 diff --git a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
-index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..19c765c6caaf95074025f719765a7851934eeeaf 100644
+index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..810747c2d9d982150610a0e74861bc64cf11469f 100644
 --- a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
 +++ b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
 @@ -271,6 +271,10 @@ class PartialTranslateBubbleView : public LocationBarBubbleDelegateView,
@@ -1107,6 +1153,15 @@ index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..19c765c6caaf95074025f719765a7851
  
    raw_ptr<views::LabelButton, DanglingUntriaged> advanced_reset_button_source_ =
        nullptr;
+@@ -320,8 +324,6 @@ class PartialTranslateBubbleView : public LocationBarBubbleDelegateView,
+   const int bubble_max_width_ = 550;
+ 
+   base::OnceClosure on_closing_;
+-
+-  raw_ptr<content::WebContents> web_contents_;
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_TRANSLATE_PARTIAL_TRANSLATE_BUBBLE_VIEW_H_
 diff --git a/chrome/browser/ui/views/translate/translate_bubble_controller.cc b/chrome/browser/ui/views/translate/translate_bubble_controller.cc
 index 8391531447d67dfa58a04e4f176cd5c86f66d3cb..0e1a81437cd09f0de1981b2a1762bad31749bf80 100644
 --- a/chrome/browser/ui/views/translate/translate_bubble_controller.cc

@@ -139,7 +139,7 @@ index c87b8f9f556ba731468f8fa852a8c19a3e719aab..c3b65081d45ffdaef6d3afe45865d41e
        STRINGIFY_STATUS_CASE(DEMUXER_ERROR_BITSTREAM_CONVERSION_FAILED);
        STRINGIFY_STATUS_CASE(CHUNK_DEMUXER_ERROR_APPEND_FAILED);
 diff --git a/media/ffmpeg/ffmpeg_common.cc b/media/ffmpeg/ffmpeg_common.cc
-index 280dce68853c12508ab94bd3c9516896db963664..f75f8349e83e57280f9074fbd7c7968f74b35419 100644
+index 280dce68853c12508ab94bd3c9516896db963664..2c10eb2c836a9d0d939aba4dd8306c80b35b4343 100644
 --- a/media/ffmpeg/ffmpeg_common.cc
 +++ b/media/ffmpeg/ffmpeg_common.cc
 @@ -409,6 +409,14 @@ bool AVCodecContextToAudioDecoderConfig(const AVCodecContext* codec_context,
@@ -157,6 +157,16 @@ index 280dce68853c12508ab94bd3c9516896db963664..f75f8349e83e57280f9074fbd7c7968f
  #if BUILDFLAG(ENABLE_PLATFORM_MPEG_H_AUDIO)
      case AudioCodec::kMpegHAudio:
        channel_layout = CHANNEL_LAYOUT_BITSTREAM;
+@@ -483,6 +491,9 @@ bool AVCodecContextToAudioDecoderConfig(const AVCodecContext* codec_context,
+       if (aac_parser.Parse(extra_data, &media_log))
+         config->set_profile(aac_parser.GetProfile());
+     }
++    // uw: FFmpeg has no AAC decoder here, so |sample_fmt| says nothing of
++    // the float samples AudioToolbox and Media Foundation give.
++    return true;
+   }
+ #endif
+ 
 diff --git a/media/filters/BUILD.gn b/media/filters/BUILD.gn
 index 4a53e96173ce5dc48f81b63f1c29aebd7b73dbf1..3e3a4b928764fd6231ae777b02d7add5987defdd 100644
 --- a/media/filters/BUILD.gn
