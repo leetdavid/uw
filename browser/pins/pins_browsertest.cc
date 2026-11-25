@@ -38,10 +38,12 @@
 #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
 #include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
+#include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/browser_widget.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
+#include "chrome/common/webui_url_constants.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
@@ -374,6 +376,21 @@ IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APinShowsInEveryWindow) {
   EXPECT_TRUE(ShowsPins(browser(), {GURL(kMail), GURL(kIssues)}));
   ASSERT_EQ(store()->pins().size(), 2u);
   EXPECT_EQ(store()->pins()[0].home, GURL(kMail));
+}
+
+// A tab whose page has no address, as a copy of a tab that had not loaded,
+// pins with the new tab page as its home. An empty home made a window that
+// loaded the pin load nothing (T402).
+IN_PROC_BROWSER_TEST_F(PinsBrowserTest, APageWithNoAddressPinsAsABlankTab) {
+  TabStripModel* tabs = browser()->tab_strip_model();
+  tabs->InsertWebContentsAt(
+      tabs->count(),
+      content::WebContents::Create(
+          content::WebContents::CreateParams(browser()->GetProfile())),
+      AddTabTypes::ADD_NONE);
+  tabs->SetTabPinned(tabs->count() - 1, true);
+  ASSERT_EQ(store()->pins().size(), 1u);
+  EXPECT_EQ(store()->pins()[0].home, GURL(chrome::kChromeUINewTabURL));
 }
 
 IN_PROC_BROWSER_TEST_F(PinsBrowserTest, ANewWindowGetsThePins) {

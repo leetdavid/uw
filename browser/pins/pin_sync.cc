@@ -21,6 +21,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/common/webui_url_constants.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/favicon_status.h"
@@ -118,9 +119,15 @@ void Unmark(content::WebContents* page) {
   page->RemoveUserData(PinMark::UserDataKey());
 }
 
+// The page's address, or the one it is loading. A page with neither, as a copy
+// of a tab that had not loaded, is pinned as a blank tab.
 GURL CurrentUrl(content::WebContents* page) {
   const GURL& committed = page->GetLastCommittedURL();
-  return committed.is_valid() ? committed : page->GetVisibleURL();
+  if (committed.is_valid()) {
+    return committed;
+  }
+  const GURL& visible = page->GetVisibleURL();
+  return visible.is_valid() ? visible : GURL(chrome::kChromeUINewTabURL);
 }
 
 PinStore* StoreFor(content::WebContents* page) {
