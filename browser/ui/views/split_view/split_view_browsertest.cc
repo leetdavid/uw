@@ -65,6 +65,7 @@
 #include "uw/browser/agent/chat_tab.h"
 #include "uw/browser/tab_organization/ai_connection.h"
 #include "uw/browser/tab_organization/commands.h"
+#include "uw/browser/tab_organization/shared_tree.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 #include "uw/browser/terminal/terminal_tab.h"
@@ -666,6 +667,30 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   EXPECT_FALSE(panes[1]->IsSplit());
   EXPECT_FALSE(panes[2]->IsSplit());
   EXPECT_FALSE(panes[2]->GetGroup().has_value());
+}
+
+// A pane that is not selected shows the page its tab has now. uw moves a
+// page to the window that selects it and puts a copy in its tab here, and
+// the pane kept showing the page that left, in two windows at once, which
+// stopped uw on a check in the checks build (T417).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       APaneShowsTheCopyThatReplacesItsPage) {
+  tabs::TabInterface* left = tabs()->GetActiveTab();
+  Show(left, 1);
+  Run(kSplitRight);
+  tabs::TabInterface* right = tabs()->GetActiveTab();
+  Show(right, 2);
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(left));
+  ASSERT_FALSE(PaneOf(right).IsEmpty());
+
+  content::WebContents* live = right->GetContents();
+  std::unique_ptr<content::WebContents> taken =
+      tabs()->DiscardWebContents(live, uw::SharedTree::MakeCopy(live));
+  ASSERT_EQ(taken.get(), live);
+
+  BrowserView* view = BrowserView::GetBrowserViewForBrowser(browser());
+  EXPECT_FALSE(view->multi_contents_view()->GetContentsContainerViewFor(live));
+  EXPECT_FALSE(PaneOf(right).IsEmpty());
 }
 
 // A tab moved to a new task while a split is open goes above the Scratchpad,

@@ -1,0 +1,30 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 719ef5e8934cf7a6fe3c4a16357fcc5f5c337e0b..36223cdbde5c36862db1441457f45393bef4ccd4 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -3547,6 +3547,25 @@ void BrowserView::OnTabStripModelChanged(
+     }
+   }
+ 
++  // uw: uw moves a page to the window that selects it and puts a copy in its
++  // tab, also in a split's pane that is not active. That pane shows the new
++  // page; it kept the old one, shown in two windows at once (T417).
++  if (change.type() == TabStripModelChange::kReplaced &&
++      multi_contents_view_->IsInSplitView()) {
++    const TabStripModelChange::Replace* replace = change.GetReplace();
++    tabs::TabInterface* active = tab_strip_model->GetActiveTab();
++    if (active && replace->tab != active && replace->tab->GetSplit() &&
++        replace->tab->GetSplit() == active->GetSplit()) {
++      const std::vector<tabs::TabInterface*> panes =
++          tab_strip_model->GetSplitData(*active->GetSplit())->ListTabs();
++      const auto pane = std::ranges::find(panes, replace->tab.get());
++      if (pane != panes.end()) {
++        multi_contents_view_->SetWebContentsAtIndex(
++            replace->new_contents, static_cast<int>(pane - panes.begin()));
++      }
++    }
++  }
++
+   if (change.type() != TabStripModelChange::kInserted) {
+     return;
+   }
