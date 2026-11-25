@@ -1301,7 +1301,7 @@ index a96f4b8bbca86aec1cc98ddf7d52f632c9529d0a..51a1354c0fb43d3411d61540de430c5f
  
  UnpinnedTabContainerView::~UnpinnedTabContainerView() = default;
 diff --git a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
-index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..8912e4dfaf427a678b49a9150346c4443f1162ef 100644
+index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..3773ae7e331f68bac02071f1bb805125742a4828 100644
 --- a/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
 +++ b/chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h
 @@ -17,6 +17,10 @@ class TabCollectionNode;
@@ -1315,12 +1315,17 @@ index a7cf7995a40d34164d2a88f1b8ff0f94a2b8b5b5..8912e4dfaf427a678b49a9150346c444
  // The view class that represents the unpinned tab region for the
  // tab strip. It hosts all the unpinned tabs and serves as the drag target
  // for unpinned tabs which aren't grouped. Layout is managed by
-@@ -83,6 +87,8 @@ class UnpinnedTabContainerView
+@@ -80,9 +84,13 @@ class UnpinnedTabContainerView
+   // The available main-axis space allocated by TabStripViewLayout.
+   views::SizeBound available_space_;
+ 
++  // uw: set before `layout_manager_`, whose first layout already reads it.
++  raw_ptr<uw::ScratchpadHeading> uw_scratchpad_heading_ = nullptr;
++
    const raw_ref<TabCollectionAnimatingLayoutManager> layout_manager_;
  
    base::CallbackListSubscription node_destroyed_subscription_;
 +  base::CallbackListSubscription uw_tree_subscription_;
-+  raw_ptr<uw::ScratchpadHeading> uw_scratchpad_heading_ = nullptr;
  };
  
  #endif  // CHROME_BROWSER_UI_VIEWS_TABS_COMMON_UNPINNED_TAB_CONTAINER_VIEW_H_
