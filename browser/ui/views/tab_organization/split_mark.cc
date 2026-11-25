@@ -53,13 +53,15 @@ bool SplitMark::ShownOnRow(bool hovered) const {
   if (hovered || !tab || tab->IsActivated() || !tab->GetSplit()) {
     return false;
   }
-  const split_tabs::SplitTabData* split =
-      tab->GetBrowserWindowInterface()->GetTabStripModel()->GetSplitData(
-          *tab->GetSplit());
-  if (!split) {
+  // A row can lay out while its tab moves between windows, with no window, or
+  // while its split is being made again (T417).
+  BrowserWindowInterface* window = tab->GetBrowserWindowInterface();
+  TabStripModel* model = window ? window->GetTabStripModel() : nullptr;
+  if (!model || !model->ListSplits().contains(*tab->GetSplit())) {
     return false;
   }
-  const std::vector<tabs::TabInterface*> tabs = split->ListTabs();
+  const std::vector<tabs::TabInterface*> tabs =
+      model->GetSplitData(*tab->GetSplit())->ListTabs();
   return !tabs.empty() && tabs.front() == tab;
 }
 

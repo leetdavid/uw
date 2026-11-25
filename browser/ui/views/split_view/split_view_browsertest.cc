@@ -28,6 +28,7 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/tabs/existing_base_sub_menu_model.h"
 #include "chrome/browser/ui/tabs/split_tab_menu_model.h"
+#include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
@@ -43,6 +44,7 @@
 #include "components/split_tabs/split_tab_visual_data.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tabs/public/split_tab_data.h"
+#include "components/tabs/public/tab_group.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test.h"
@@ -578,6 +580,66 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   ASSERT_EQ(LayoutOf(panes[0]), "r(0.3,0,d(0.7,1,2))");
   // Lets the session take the tabs' data before the browser quits.
   base::RunLoop().RunUntilIdle();
+}
+
+// Duplicate on a pane of a split of three duplicates every pane into a split
+// of its own with the same layout. Chromium's Duplicate knew only pairs, and
+// a split of three crashed uw (T417).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       DuplicateCopiesEveryPaneOfASplitOfThree) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  const std::string layout = LayoutOf(panes[0]);
+  const int count = tabs()->count();
+  tabs()->ExecuteContextMenuCommand(tabs()->GetIndexOfTab(panes[1]),
+                                    TabStripModel::CommandDuplicate);
+  ASSERT_TRUE(
+      base::test::RunUntil([&] { return tabs()->count() == count + 3; }));
+  tabs::TabInterface* copy = tabs()->GetActiveTab();
+  ASSERT_TRUE(copy->IsSplit());
+  EXPECT_NE(copy->GetSplit(), panes[0]->GetSplit());
+  EXPECT_EQ(SplitOf(copy).size(), 3u);
+  EXPECT_EQ(LayoutOf(copy), layout);
+  EXPECT_EQ(SplitOf(panes[0]), panes);
+}
+
+// A split that is all of its task moves to another window whole. Detaching it
+// left its task empty while Chromium checked the tab strip, and crashed uw
+// (T417).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       ASplitThatIsAWholeTaskMovesToAnotherWindow) {
+  tabs::TabInterface* left = tabs()->GetActiveTab();
+  Show(left, 1);
+  Run(kSplitRight);
+  tabs::TabInterface* right = tabs()->GetActiveTab();
+  Show(right, 2);
+  OpenOther();
+  TabOrganizationController* organizer =
+      TabOrganizationController::From(browser());
+  ASSERT_TRUE(organizer->MoveToNewTask(
+      {organizer->IdFor(left).value(), organizer->IdFor(right).value()},
+      u"Plan"));
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(left->IsSplit());
+  ASSERT_TRUE(left->GetGroup());
+  ASSERT_EQ(tabs()
+                ->group_model()
+                ->GetTabGroup(*left->GetGroup())
+                ->ListTabs()
+                .length(),
+            2u);
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  base::RunLoop().RunUntilIdle();
+
+  // As the tab menu does for the pane it was opened on; Chromium takes the
+  // other pane along.
+  chrome::MoveTabsToExistingWindow(browser(), second,
+                                   {tabs()->GetIndexOfTab(left)});
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return second->tab_strip_model()->GetIndexOfTab(left) !=
+           TabStripModel::kNoTab;
+  }));
+  EXPECT_TRUE(left->IsSplit());
+  EXPECT_EQ(left->GetSplit(), right->GetSplit());
 }
 
 // A pane moved to a new task alone leaves the split, and the split keeps the

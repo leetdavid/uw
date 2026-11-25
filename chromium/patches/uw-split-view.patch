@@ -266,7 +266,7 @@ index f985dcebfa70b1ea5b8dc9fb2ccb1a2e0c0d031b..2f4a854bab3a00ab8b457cd276b58de9
  
  void BookmarkBarController::OnTabStripModelChanged(
 diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
-index ec6ecb7da85d13df72713ff4446c412383c62ab6..eef52a0f9a51debba453ce74e6ddbc50ffe4ac57 100644
+index ec6ecb7da85d13df72713ff4446c412383c62ab6..d1ecf848f796086d67ec7f01f8c26d62569ce0d2 100644
 --- a/chrome/browser/ui/browser_commands.cc
 +++ b/chrome/browser/ui/browser_commands.cc
 @@ -695,9 +695,15 @@ void ReloadInternal(BrowserWindowInterface* browser,
@@ -303,6 +303,23 @@ index ec6ecb7da85d13df72713ff4446c412383c62ab6..eef52a0f9a51debba453ce74e6ddbc50
  
    if (only_active_split_tab_selected) {
      RecordTabCloseCount(1);
+@@ -1726,9 +1737,13 @@ void DuplicateSplit(BrowserWindowInterface* browser,
+   model->ActivateTabAt(active_index);
+   // AddToNewSplit always creates a split with the active index so remove it
+   // from the passed in indices.
+-  duplicated_tab_indices.erase(std::find(duplicated_tab_indices.begin(),
+-                                         duplicated_tab_indices.end(),
+-                                         active_index));
++  // uw: it adds the active index back only to a single index, so a split of
++  // more than two panes keeps every duplicated tab (T417).
++  if (duplicated_tab_indices.size() == 2) {
++    duplicated_tab_indices.erase(std::find(duplicated_tab_indices.begin(),
++                                           duplicated_tab_indices.end(),
++                                           active_index));
++  }
+   model->AddToNewSplit(duplicated_tab_indices,
+                        split_tabs::SplitTabVisualData(
+                            *(model->GetSplitData(split)->visual_data())),
 diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
 index 29db497993227311233af1caa1e346cb49e1c0c8..fcb43cae0d9c521bafd8e1b2668433f5bd25ee58 100644
 --- a/chrome/browser/ui/browser_live_tab_context.cc
@@ -2383,7 +2400,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..c739689eb9bf507b8e25e0d64cad1dca
    // the user drags a link to the edge of the contents view.
    raw_ptr<MultiContentsDropTargetView> drop_target_view_ = nullptr;
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
-index b1024f94e9934909db7e44972b6482085b490cd9..962a36c59bb218d9169bbcd3635f2eb4ffe8db16 100644
+index b1024f94e9934909db7e44972b6482085b490cd9..c442fd7f5fba54385b45bd02b9c1a37d0651050f 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
 @@ -22,6 +22,14 @@
@@ -2401,7 +2418,19 @@ index b1024f94e9934909db7e44972b6482085b490cd9..962a36c59bb218d9169bbcd3635f2eb4
  MultiContentsViewDelegateImpl::MultiContentsViewDelegateImpl(
      BrowserWindowInterface& browser)
      : browser_(browser), tab_strip_model_(*browser.GetTabStripModel()) {}
-@@ -60,12 +68,18 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
+@@ -33,6 +41,11 @@ void MultiContentsViewDelegateImpl::WebContentsFocused(
+   if (!tab || !tab->IsSplit()) {
+     return;
+   }
++  // uw: a pane can take focus while its split is being made again, as Split
++  // Down does, before this window's tab strip has the split (T417).
++  if (!tab_strip_model_->ListSplits().contains(tab->GetSplit().value())) {
++    return;
++  }
+ 
+   std::vector<tabs::TabInterface*> tabs =
+       tab_strip_model_->GetSplitData(tab->GetSplit().value())->ListTabs();
+@@ -60,12 +73,18 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
  
  void MultiContentsViewDelegateImpl::ResizeWebContents(double start_ratio,
                                                        bool done_resizing) {
@@ -3523,3 +3552,24 @@ index 5d14b4e38373ead928a469e954d60c10678ea472..d60c7ce0796fc67ca46c09959e166415
  };
  
  }  // namespace split_tabs
+diff --git a/components/tabs/impl/tab_strip_collection.cc b/components/tabs/impl/tab_strip_collection.cc
+index bfb0b512753a58c0486b3a82669c17c024076e54..4fd854ac9b8cd44a470acd9341a383a56d20c363 100644
+--- a/components/tabs/impl/tab_strip_collection.cc
++++ b/components/tabs/impl/tab_strip_collection.cc
+@@ -355,6 +355,16 @@ void TabStripCollection::InsertTabCollectionAt(
+ 
+ std::unique_ptr<TabCollection> TabStripCollection::RemoveTabCollection(
+     TabCollection* collection) {
++  // uw: a split that is all of its group takes the group with it, as the last
++  // tab of a group does in RemoveTabAtIndexRecursive(). Otherwise the empty
++  // group stays while the tab strip checks its collections (T417).
++  TabCollection* parent_collection = collection->GetParentCollection();
++  if (collection->type() == TabCollection::Type::SPLIT && parent_collection &&
++      parent_collection->type() == TabCollection::Type::GROUP &&
++      parent_collection->ChildCount() == 1) {
++    RemoveTabCollectionImpl(parent_collection);
++    return parent_collection->MaybeRemoveCollection(collection);
++  }
+   // Removed collection can be nullptr in the case of group. Return from
+   // detached collection instead in that case.
+   std::unique_ptr<TabCollection> removed_collection =
