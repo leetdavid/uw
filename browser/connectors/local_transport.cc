@@ -265,7 +265,8 @@ LocalTransport::LocalTransport(
     : on_notification_(std::move(on_notification)),
       on_exit_(std::move(on_exit)) {
   pipes_.emplace(base::ThreadPool::CreateSequencedTaskRunner(
-                     {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+                     {base::MayBlock(), base::WithBaseSyncPrimitives(),
+                      base::TaskPriority::USER_VISIBLE,
                       base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN}),
                  connector, shell, environment, log,
                  base::BindPostTaskToCurrentDefault(base::BindRepeating(

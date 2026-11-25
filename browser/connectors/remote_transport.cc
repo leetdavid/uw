@@ -2,6 +2,10 @@
 
 #include "uw/browser/connectors/remote_transport.h"
 
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 #include "base/base64.h"
@@ -18,6 +22,7 @@
 #include "services/network/public/cpp/resource_request.h"
 #include "services/network/public/cpp/shared_url_loader_factory.h"
 #include "services/network/public/cpp/simple_url_loader.h"
+#include "services/network/public/cpp/simple_url_loader_stream_consumer.h"
 #include "services/network/public/mojom/url_response_head.mojom.h"
 
 namespace uw {
@@ -62,25 +67,71 @@ std::string HeaderValue(std::string_view value) {
 // Where the server says to read how to sign in, from its WWW-Authenticate
 // header.
 std::string ResourceMetadata(const net::HttpResponseHeaders& headers) {
-  std::optional<std::string> value =
-      headers.GetNormalizedHeader("WWW-Authenticate");
-  if (!value) {
-    return std::string();
-  }
   constexpr std::string_view kKey = "resource_metadata=\"";
-  const size_t start = value->find(kKey);
-  if (start == std::string::npos) {
-    return std::string();
+  // A server may send several of these headers, which Chromium keeps apart.
+  size_t iter = 0;
+  while (const std::optional<std::string_view> value =
+             headers.EnumerateHeader(&iter, "WWW-Authenticate")) {
+    const size_t start = value->find(kKey);
+    if (start == std::string_view::npos) {
+      continue;
+    }
+    const size_t from = start + kKey.size();
+    const size_t end = value->find('"', from);
+    if (end != std::string_view::npos) {
+      return std::string(value->substr(from, end - from));
+    }
   }
-  const size_t from = start + kKey.size();
-  const size_t end = value->find('"', from);
-  return end == std::string::npos ? std::string()
-                                  : value->substr(from, end - from);
+  return std::string();
 }
+
+// Keeps an answer as it arrives, up to kMaxAnswer. Chromium's own download
+// into a string stops at 5 MB.
+class AnswerReader : public network::SimpleURLLoaderStreamConsumer {
+ public:
+  using Read = base::OnceCallback<void(std::optional<std::string>)>;
+
+  explicit AnswerReader(Read read) : read_(std::move(read)) {}
+
+  // network::SimpleURLLoaderStreamConsumer:
+  void OnDataReceived(std::string_view chunk,
+                      base::OnceClosure resume) override {
+    if (body_.size() + chunk.size() > kMaxAnswer) {
+      // Never resumed, so the answer ends here. This runs inside the loader,
+      // so the answer goes out from a fresh task.
+      if (read_) {
+        base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE, base::BindOnce(std::move(read_), std::nullopt));
+      }
+      return;
+    }
+    body_.append(chunk);
+    std::move(resume).Run();
+  }
+
+  void OnComplete(bool success) override {
+    if (read_) {
+      std::move(read_).Run(success
+                               ? std::optional<std::string>(std::move(body_))
+                               : std::nullopt);
+    }
+  }
+
+  void OnRetry(base::OnceClosure start_retry) override {
+    body_.clear();
+    std::move(start_retry).Run();
+  }
+
+ private:
+  Read read_;
+  std::string body_;
+};
 
 }  // namespace
 
+// The reader outlives the loader that feeds it.
 struct RemoteTransport::Request {
+  std::unique_ptr<AnswerReader> reader;
   std::unique_ptr<network::SimpleURLLoader> loader;
   Done done;
   bool initialize = false;
@@ -167,11 +218,9 @@ void RemoteTransport::Post(int id,
       },
       weak_factory_.GetWeakPtr(), id));
   request->loader->AttachStringForUpload(std::move(body), "application/json");
-  request->loader->DownloadToString(
-      loader_.get(),
-      base::BindOnce(&RemoteTransport::OnComplete, weak_factory_.GetWeakPtr(),
-                     id),
-      kMaxAnswer);
+  request->reader = std::make_unique<AnswerReader>(base::BindOnce(
+      &RemoteTransport::OnComplete, weak_factory_.GetWeakPtr(), id));
+  request->loader->DownloadAsStream(loader_.get(), request->reader.get());
   requests_[id] = std::move(request);
 }
 
