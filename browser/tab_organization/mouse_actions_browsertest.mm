@@ -107,12 +107,13 @@ class MouseActionsBrowserTest : public headless::HeadlessModeBrowserTest {
     }
   }
 
-  // `a` with `b` under it and `c` under `b`, and `d` on its own.
+  // `a` with `b` under it and `c` under `b`, and `d` on its own. A test may
+  // close some of them and still hold the tree.
   struct Tree {
-    raw_ptr<tabs::TabInterface> a;
-    raw_ptr<tabs::TabInterface> b;
-    raw_ptr<tabs::TabInterface> c;
-    raw_ptr<tabs::TabInterface> d;
+    raw_ptr<tabs::TabInterface, DisableDanglingPtrDetection> a;
+    raw_ptr<tabs::TabInterface, DisableDanglingPtrDetection> b;
+    raw_ptr<tabs::TabInterface, DisableDanglingPtrDetection> c;
+    raw_ptr<tabs::TabInterface, DisableDanglingPtrDetection> d;
   };
 
   TabOrganizationController* controller() {

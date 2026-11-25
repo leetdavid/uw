@@ -13,6 +13,7 @@
 #include "base/strings/strcat.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/threading/thread_restrictions.h"
 #include "base/version_info/version_info.h"
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
@@ -45,6 +46,7 @@ class ReleaseVersionBrowserTest : public headless::HeadlessModeBrowserTest {
 
   // Stands in for an app bundle whose Info.plist carries `version`.
   void UseBundleVersion(const std::string& version) {
+    base::ScopedAllowBlockingForTesting allow_blocking;
     ASSERT_TRUE(bundles_.CreateUniqueTempDir());
     base::FilePath app = bundles_.GetPath().Append("uw.app");
     base::FilePath contents = app.Append("Contents");

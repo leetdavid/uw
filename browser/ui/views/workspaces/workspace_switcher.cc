@@ -301,6 +301,7 @@ void WorkspaceSwitcher::ShowNewWorkspaceCard() {
   if (view && foot->GetVisibleBounds().IsEmpty()) {
     const gfx::Rect window = view->GetBoundsInScreen();
     bubble->SetAnchorView(nullptr);
+    bubble->set_parent_window(view->GetWidget()->GetNativeView());
     bubble->SetAnchorRect(gfx::Rect(window.x() + kCardCornerInset,
                                     window.bottom() - kCardCornerInset, 0, 0));
   }

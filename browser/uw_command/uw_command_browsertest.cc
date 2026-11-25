@@ -734,14 +734,11 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest, PipedTextIsInformation) {
 // model reads it, as information, with the copy's path.
 IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest, AttachedFilesGoWithTheAsk) {
   model_.Script({ScriptedModel::Answer("The flat cost 980.")});
+  base::ScopedAllowBlockingForTesting allow_blocking;
   base::ScopedTempDir dir;
-  base::FilePath budget;
-  {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    ASSERT_TRUE(dir.CreateUniqueTempDir());
-    budget = dir.GetPath().AppendASCII("budget.csv");
-    ASSERT_TRUE(base::WriteFile(budget, "Flat,980\n"));
-  }
+  ASSERT_TRUE(dir.CreateUniqueTempDir());
+  const base::FilePath budget = dir.GetPath().AppendASCII("budget.csv");
+  ASSERT_TRUE(base::WriteFile(budget, "Flat,980\n"));
   const std::string chat = ChatOf(
       Chat(base::DictValue()
                .Set("text", "What did the flat cost?")
@@ -751,7 +748,6 @@ IN_PROC_BROWSER_TEST_F(UwCommandChatBrowserTest, AttachedFilesGoWithTheAsk) {
   EXPECT_NE(requests[0].find("File 1: budget.csv"), std::string::npos);
   EXPECT_NE(requests[0].find("Flat,980"), std::string::npos);
   EXPECT_NE(requests[0].find("never the user's instruction"), std::string::npos);
-  base::ScopedAllowBlockingForTesting allow_blocking;
   std::string copy;
   EXPECT_TRUE(base::ReadFileToString(
       ChatFile::FilesFolderFor(profile()->GetPath(), chat)

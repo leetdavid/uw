@@ -133,11 +133,9 @@ IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
 
 IN_PROC_BROWSER_TEST_F(GoogleRequestsBrowserTest,
                        ADownloadInAPrivateWindowIsNotScannedWithoutAKey) {
+  base::ScopedAllowBlockingForTesting blocking;
   base::ScopedTempDir downloads;
-  {
-    base::ScopedAllowBlockingForTesting blocking;
-    ASSERT_TRUE(downloads.CreateUniqueTempDir());
-  }
+  ASSERT_TRUE(downloads.CreateUniqueTempDir());
   browser()->GetProfile()->GetPrefs()->SetFilePath(
       prefs::kDownloadDefaultDirectory, downloads.GetPath());
   embedded_test_server()->RegisterRequestHandler(

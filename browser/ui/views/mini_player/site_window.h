@@ -55,17 +55,15 @@ class SiteWindow : public content::WebContentsDelegate,
 
   // The tab that opened it, or nullptr once that tab is gone, as while uw
   // quits.
-  content::WebContents* opener() { return weak_opener_.get(); }
+  content::WebContents* opener() { return opener_.get(); }
   // The host of that tab, whose choice of Live it follows.
   const std::string& site() const { return site_; }
   // Whether it keeps running beside a video.
   bool live() const;
   // True while it waits in the stack, paused, under a video.
   bool waiting() const { return waiting_; }
-  // The site's page in it.
+  // The site's page in it, or nullptr once the page is gone.
   content::WebContents* page() { return page_; }
-  // Its own browser window, hidden while the page is docked.
-  BrowserWindowInterface* own_window() { return window_; }
   // The size the site asked for.
   gfx::Size asked_size() const { return asked_; }
   // The dock the page is in, or nullptr while it floats.
@@ -140,10 +138,9 @@ class SiteWindow : public content::WebContentsDelegate,
   content::WebContentsDelegate* DockDelegate();
   content::DocumentPictureInPictureWindowController* controller();
 
-  const raw_ptr<content::WebContents> opener_;
-  const base::WeakPtr<content::WebContents> weak_opener_;
-  const raw_ptr<content::WebContents> page_;
-  const raw_ptr<BrowserWindowInterface> window_;
+  const base::WeakPtr<content::WebContents> opener_;
+  raw_ptr<content::WebContents> page_;
+  raw_ptr<BrowserWindowInterface> window_;
   const std::string site_;
   bool waiting_ = false;
   PrefChangeRegistrar prefs_;
@@ -159,8 +156,6 @@ class SiteWindow : public content::WebContentsDelegate,
   std::unique_ptr<MiniPlayerPlacement> placement_;
   // Looks again while Chromium asks the user something in the window.
   base::RepeatingTimer prompt_check_;
-  // Set once its own window closes, as when uw quits.
-  bool own_window_gone_ = false;
   base::ScopedObservation<views::Widget, views::WidgetObserver>
       own_window_observation_{this};
   base::WeakPtrFactory<SiteWindow> weak_factory_{this};

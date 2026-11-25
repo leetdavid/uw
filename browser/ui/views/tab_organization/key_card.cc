@@ -261,6 +261,7 @@ std::unique_ptr<views::Label> MakeText(const std::u16string& text,
   auto label = std::make_unique<views::Label>(text);
   label->SetEnabledColor(color);
   label->SetAutoColorReadabilityEnabled(false);
+  label->SetSubpixelRenderingEnabled(false);
   label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   label->SetElideBehavior(gfx::ELIDE_TAIL);
   return label;

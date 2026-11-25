@@ -357,8 +357,7 @@ SiteWindow::SiteWindow(content::WebContents* opener,
                        content::WebContents* page,
                        BrowserWindowInterface* window)
     : content::WebContentsObserver(page),
-      opener_(opener),
-      weak_opener_(opener->GetWeakPtr()),
+      opener_(opener->GetWeakPtr()),
       page_(page),
       window_(window),
       site_(opener->GetLastCommittedURL().host()),
@@ -383,16 +382,21 @@ SiteWindow::SiteWindow(content::WebContents* opener,
 }
 
 SiteWindow::~SiteWindow() {
+  // The page can go with it, and has nobody left to tell.
+  Observe(nullptr);
   // Going while its page lives, as when a newer site's window takes its
   // place: the page goes back to its own window, which Chromium closes.
   if (dock_ || held_page_) {
     Float();
   }
+  page_ = nullptr;
 }
 
 bool SiteWindow::ShowsBackToTab() const {
-  BrowserView* view = BrowserView::GetBrowserViewForNativeWindow(
-      window_->GetWindow()->GetNativeWindow());
+  BrowserView* view =
+      window_ ? BrowserView::GetBrowserViewForNativeWindow(
+                    window_->GetWindow()->GetNativeWindow())
+              : nullptr;
   const std::optional<blink::mojom::PictureInPictureWindowOptions> options =
       view ? view->GetDocumentPictureInPictureOptions() : std::nullopt;
   return !options || !options->disallow_return_to_opener;
@@ -487,11 +491,12 @@ bool SiteWindow::HandleKeyboardEvent(
 }
 
 void SiteWindow::WebContentsDestroyed() {
+  page_ = nullptr;
   SiteWindowWatcher::Get().Forget(this);
 }
 
 void SiteWindow::OnWidgetDestroying(views::Widget* widget) {
-  own_window_gone_ = true;
+  window_ = nullptr;
   own_window_observation_.Reset();
   prompt_check_.Stop();
   placement_.reset();
@@ -500,7 +505,7 @@ void SiteWindow::OnWidgetDestroying(views::Widget* widget) {
 }
 
 void SiteWindow::Place(MiniPlayerDock* dock) {
-  if (own_window_gone_ || waiting_) {
+  if (!window_ || !page_ || waiting_) {
     return;
   }
   if (MustFloat()) {
@@ -589,15 +594,19 @@ void SiteWindow::MeetVideo() {
 }
 
 void SiteWindow::Wait() {
+  content::WebContents* tab = opener();
+  if (!tab) {
+    return;
+  }
   waiting_ = true;
   prompt_check_.Stop();
   Undock();
   if (!held_page_ && own_widget()) {
     window_->GetWindow()->Hide();
   }
-  content::MediaSession::Get(opener_)->Suspend(
+  content::MediaSession::Get(tab)->Suspend(
       content::MediaSession::SuspendType::kUI);
-  MiniPlayerStack::Entry entry(opener_);
+  MiniPlayerStack::Entry entry(tab);
   entry.play_site_window =
       base::BindRepeating(&SiteWindow::Resume, weak_factory_.GetWeakPtr());
   entry.drop_site_window =
@@ -610,9 +619,11 @@ void SiteWindow::Resume() {
     return;
   }
   waiting_ = false;
-  MiniPlayerStack::Get().TakeSiteWindow(opener_);
-  content::MediaSession::Get(opener_)->Resume(
-      content::MediaSession::SuspendType::kUI);
+  if (content::WebContents* tab = opener()) {
+    MiniPlayerStack::Get().TakeSiteWindow(tab);
+    content::MediaSession::Get(tab)->Resume(
+        content::MediaSession::SuspendType::kUI);
+  }
   if (!held_page_ && own_widget()) {
     window_->GetWindow()->ShowInactive();
   }
@@ -642,7 +653,7 @@ void SiteWindow::Undock() {
 
 void SiteWindow::Float() {
   Undock();
-  if (!held_page_ || own_window_gone_) {
+  if (!held_page_ || !window_) {
     return;
   }
   held_page_->SetDelegate(nullptr);
@@ -657,7 +668,7 @@ bool SiteWindow::MustFloat() const {
 }
 
 bool SiteWindow::AsksTheUser() const {
-  if (own_window_gone_) {
+  if (!window_) {
     return false;
   }
   BrowserView* view = BrowserView::GetBrowserViewForNativeWindow(
@@ -676,12 +687,14 @@ content::WebContentsDelegate* SiteWindow::DockDelegate() {
 }
 
 content::DocumentPictureInPictureWindowController* SiteWindow::controller() {
-  return content::PictureInPictureWindowController::
-      GetOrCreateDocumentPictureInPictureController(opener_);
+  content::WebContents* tab = opener();
+  return tab ? content::PictureInPictureWindowController::
+                   GetOrCreateDocumentPictureInPictureController(tab)
+             : nullptr;
 }
 
 views::Widget* SiteWindow::own_widget() {
-  if (own_window_gone_) {
+  if (!window_) {
     return nullptr;
   }
   return views::Widget::GetWidgetForNativeWindow(

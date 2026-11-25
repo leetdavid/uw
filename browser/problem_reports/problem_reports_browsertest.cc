@@ -309,9 +309,13 @@ IN_PROC_BROWSER_TEST_F(ProblemReportsBrowserTest,
 // builds are not official, but people browse with them.
 IN_PROC_BROWSER_TEST_F(ProblemReportsBrowserTest,
                        ADumpOnlyCheckLeavesTheBrowserRunning) {
+#if DCHECK_IS_ON()
+  GTEST_SKIP() << "With development checks on, a dump-only check stops uw.";
+#else
   DUMP_WILL_BE_NOTREACHED();
   DUMP_WILL_BE_CHECK(false);
   EXPECT_TRUE(ui_test_utils::NavigateToURL(browser(), GURL("about:blank")));
+#endif
 }
 
 }  // namespace

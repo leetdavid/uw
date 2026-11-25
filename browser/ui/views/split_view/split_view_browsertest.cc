@@ -146,6 +146,7 @@ class SplitViewBrowserTest : public headless::HeadlessModeBrowserTest {
     SessionID active = SessionID::InvalidValue();
     std::string platform_session_id;
     std::set<SessionID> discarded;
+    base::ScopedAllowBlockingForTesting allow_blocking;
     SessionServiceTestHelper(browser()->GetProfile())
         .ReadWindows(&windows, &active, &platform_session_id, &discarded);
     std::string text;
@@ -306,11 +307,9 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, EachDividerResizesItsOwnPanes) {
 // From a terminal, the new pane is a terminal in the same folder. From a chat
 // it is what Cmd+T gives.
 IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest, ATerminalSplitsIntoTheSameFolder) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
   base::ScopedTempDir folder;
-  {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    ASSERT_TRUE(folder.CreateUniqueTempDir());
-  }
+  ASSERT_TRUE(folder.CreateUniqueTempDir());
   OpenTerminalTabIn(browser(), folder.GetPath());
   tabs::TabInterface* terminal = tabs()->GetActiveTab();
   ASSERT_TRUE(base::test::RunUntil(

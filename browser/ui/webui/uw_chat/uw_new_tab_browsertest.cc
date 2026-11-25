@@ -437,11 +437,9 @@ IN_PROC_BROWSER_TEST_F(NewTabBrowserTest,
 }
 
 IN_PROC_BROWSER_TEST_F(NewTabBrowserTest, RunningShowsChatsAndBusyTerminals) {
+  base::ScopedAllowBlockingForTesting allow_blocking;
   base::ScopedTempDir zdotdir;
-  {
-    base::ScopedAllowBlockingForTesting allow_blocking;
-    ASSERT_TRUE(zdotdir.CreateUniqueTempDir());
-  }
+  ASSERT_TRUE(zdotdir.CreateUniqueTempDir());
   // zsh finds none of the user's startup files in an empty folder.
   base::Environment::Create()->SetVar("ZDOTDIR", zdotdir.GetPath().AsUTF8Unsafe());
   OpenTerminalTabRunning(browser(), "sleep 60");
