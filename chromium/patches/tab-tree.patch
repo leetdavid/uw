@@ -2875,7 +2875,7 @@ index a899f322a795f1da39c4676c59c2bc237610f9b9..6a8a26022fe05f86066ac72e84ff010e
                features::IsRoundedIconsEnabled()
                    ? kGridViewIcon
 diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h
-index 25c02ddc5966a14d97706a7addf8efc6157de8f0..d42766b73e38dad891df1bf44290ef7d118b3314 100644
+index 25c02ddc5966a14d97706a7addf8efc6157de8f0..75d1c3481c8dc3f96d468ec2e087cbca3851ecdd 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h
 +++ b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.h
 @@ -125,6 +125,13 @@ class TabCollectionAnimatingLayoutManager
@@ -2892,7 +2892,21 @@ index 25c02ddc5966a14d97706a7addf8efc6157de8f0..d42766b73e38dad891df1bf44290ef7d
   protected:
    // LayoutManagerBase:
    views::ProposedLayout CalculateProposedLayout(
-@@ -212,6 +219,10 @@ class TabCollectionAnimatingLayoutManager
+@@ -182,8 +189,12 @@ class TabCollectionAnimatingLayoutManager
+ 
+   // Precomputed maps for starting and target layouts for fast lookup. Updated
+   // in `SetStartingLayout()` and `SetTargetLayout()`.
++  // uw: the keys are only compared, never followed. A view removed from the
++  // host stays a key until the maps are next rebuilt, and a host deletes its
++  // children before its layout manager, so a key can outlive its view.
+   using ChildViewLayoutMap =
+-      base::flat_map<raw_ptr<const views::View>, views::ChildLayout>;
++      base::flat_map<raw_ptr<const views::View, DisableDanglingPtrDetection>,
++                     views::ChildLayout>;
+   ChildViewLayoutMap start_view_layout_map_;
+   ChildViewLayoutMap target_view_layout_map_;
+ 
+@@ -212,6 +223,10 @@ class TabCollectionAnimatingLayoutManager
    // to its target size. In such cases animating the host's preferred size
    // avoids clipping close / fade-out animations.
    const bool animate_host_size_ = false;
