@@ -2707,7 +2707,7 @@ index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..6024d59c3d0afe38abd42ffe31ab9ff6
                                             tab_drag_datum.attached_view)) {
        break;
 diff --git a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
-index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..77183ed1f433d8b26f3b29ed83383af4e7b98366 100644
+index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..025afa685fd45c37cdfd03702c2da35902e054fc 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_collection_animating_layout_manager.cc
 @@ -7,6 +7,7 @@
@@ -2742,14 +2742,21 @@ index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..77183ed1f433d8b26f3b29ed83383af4
  void TabCollectionAnimatingLayoutManager::AnimationProgressed(
      const gfx::Animation* animation) {
    if (current_offset_ == animation->GetCurrentValue()) {
-@@ -190,6 +201,14 @@ void TabCollectionAnimatingLayoutManager::AnimationProgressed(
+@@ -190,6 +201,21 @@ void TabCollectionAnimatingLayoutManager::AnimationProgressed(
    // animation when queried by the parent.
    UpdateCurrentLayout();
  
-+  // uw: while the host keeps its size, only its children move, so it lays
-+  // them out itself. Invalidating the host would lay the whole window out
-+  // again on every frame.
-+  if (host_view() && current_layout_.host_size == host_view()->size()) {
++  // uw: while the host keeps its size and every child keeps its visibility,
++  // only children move, so it places them itself. Invalidating the host would
++  // lay the whole window out again on every frame. A child that shows or hides
++  // waits for a layout, as one leaving for another container must not be
++  // hidden on its way out.
++  if (host_view() && current_layout_.host_size == host_view()->size() &&
++      std::ranges::all_of(current_layout_.child_layouts,
++                          [](const views::ChildLayout& child) {
++                            return child.visible ==
++                                   child.child_view->GetVisible();
++                          })) {
 +    ApplyLayout(current_layout_);
 +    return;
 +  }
@@ -2757,7 +2764,7 @@ index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..77183ed1f433d8b26f3b29ed83383af4
    // Do not invalidate the target layout as the animation progresses, only the
    // animating layout manager requires invalidation.
    InvalidateHost(/*mark_layouts_changed=*/false);
-@@ -303,6 +322,7 @@ bool TabCollectionAnimatingLayoutManager::RecalculateTarget() {
+@@ -303,6 +329,7 @@ bool TabCollectionAnimatingLayoutManager::RecalculateTarget() {
    if (!host_view()) {
      return false;
    }
@@ -2765,7 +2772,7 @@ index 127ce74d8fdd1d7d6e313cdf2e96f1f27a094e0d..77183ed1f433d8b26f3b29ed83383af4
  
    // Calculate the target layout with unbounded height for vertical or
    // horizontal-wrapping-vertically axes, or bounded by available parent width
-@@ -475,6 +495,18 @@ views::ProposedLayout TabCollectionAnimatingLayoutManager::InterpolateLayout(
+@@ -475,6 +502,18 @@ views::ProposedLayout TabCollectionAnimatingLayoutManager::InterpolateLayout(
          if (child_view->layer() && (child_view->layer()->opacity() != 1.0f)) {
            child_view->layer()->SetOpacity(1.0f);
          }
