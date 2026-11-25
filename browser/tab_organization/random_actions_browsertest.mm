@@ -33,6 +33,7 @@
 #include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
 #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -55,6 +56,7 @@
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
 #include "components/keep_alive_registry/keep_alive_types.h"
 #include "components/keep_alive_registry/scoped_keep_alive.h"
+#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/tab_groups/tab_group_id.h"
 #include "components/tab_groups/tab_group_visual_data.h"
 #include "components/tabs/public/tab_group.h"
@@ -613,6 +615,29 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
       for (const std::string& row : Layout(window)) {
         text += "  " + row + "\n";
       }
+      TabStripModel* tabs = window->tab_strip_model();
+      tab_groups::TabGroupSyncService* saved =
+          tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile_);
+      for (const tab_groups::TabGroupId& group :
+           tabs->group_model()->ListTabGroups()) {
+        text += base::StringPrintf(
+            "  task \"%s\": %s, tabs %s\n",
+            base::UTF16ToUTF8(
+                tabs->group_model()->GetTabGroup(group)->visual_data()->title())
+                .c_str(),
+            saved && saved->GetGroup(group) ? "saved" : "not saved",
+            tabs->group_model()
+                ->GetTabGroup(group)
+                ->ListTabs()
+                .ToString()
+                .c_str());
+      }
+      text += "  selected:";
+      for (size_t index :
+           tabs->selection_model().GetListSelectionModel().selected_indices()) {
+        text += " " + base::NumberToString(index);
+      }
+      text += "\n";
     }
     return text;
   }
