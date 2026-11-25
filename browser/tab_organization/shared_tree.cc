@@ -233,9 +233,16 @@ void SharedTree::Merge(SharedTree& other, bool other_first) {
 }
 
 void SharedTree::Propagate(TabOrganizationController* from) {
-  if (windows_.size() < 2 || propagating_ ||
-      std::ranges::any_of(
-          windows_, [](const auto& window) { return window->dragging(); })) {
+  // A window alone has nobody to tell, so the tree as it stands is what every
+  // window has seen. A window that joins later is then followed for what it
+  // brings, such as a tab that left the first window for it.
+  if (windows_.size() < 2) {
+    propagated_ = tree_;
+    return;
+  }
+  if (propagating_ || std::ranges::any_of(windows_, [](const auto& window) {
+        return window->dragging();
+      })) {
     return;
   }
   base::AutoReset<bool> guard(&propagating_, true);

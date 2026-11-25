@@ -852,6 +852,44 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
             1);
 }
 
+// A tab moved to a window of its own, from a window left alone on its
+// workspace, keeps its row there, and stays open when that window changes
+// next. The window left alone missed the tab's return, had no row for it, and
+// at its next change closed the tab in its new window (T408).
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       ATabMovedOutOfAWindowLeftAloneStaysOpen) {
+  Profile* profile = browser()->GetProfile();
+  // A private window, so the app keeps a window of its own.
+  CreateIncognitoBrowser(profile);
+  Browser* first = browser();
+  Open(first, kMail);
+  first->GetWindow()->Close();
+  WorkspaceWindow* kept = WorkspaceWindow::From(first);
+  ASSERT_TRUE(base::test::RunUntil([&] { return kept->keeper(); }));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return !IsOpen(first) && TabAt(second, kMail); }));
+  base::RunLoop().RunUntilIdle();
+  const PageId id = ControllerOf(second)->IdFor(TabAt(second, kMail)).value();
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+
+  chrome::MoveTabsToNewWindow(
+      second, {second->tab_strip_model()->GetIndexOfTab(TabAt(second, kMail))});
+  Browser* own = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    own = NewWindow(known);
+    return own && ControllerOf(own)->TabFor(id) &&
+           ControllerOf(second)->TabFor(id) && InStep(second, own);
+  })) << Layouts({second});
+
+  Open(second, kIssues);
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return TabAt(own, kIssues) && InStep(second, own); }));
+  EXPECT_TRUE(ControllerOf(own)->TabFor(id));
+  EXPECT_TRUE(ControllerOf(second)->TabFor(id));
+}
+
 // Moving a window's only tab to another window on its workspace closes the
 // window it left, with no tab in it, and the other window keeps the tab.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,

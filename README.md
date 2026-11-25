@@ -235,7 +235,7 @@ pnpm run check && pnpm run verify --jobs 8
 
 `verify --checks` does the same in `out/uw-checks`, a second build with Chromium's development checks on, where a test fails as soon as uw breaks one of Chromium's rules. `out/uw`, the browser you use, is left alone. The first `--checks` build compiles everything again. See [Native lifetime rules](docs/architecture.md#native-lifetime-rules).
 
-`RandomActionsBrowserTest` does 120 things a person can do to tabs, tasks, windows, and workspaces, picked from a seed, and checks after each that every sidebar matches its tree and that windows on one workspace list the same tabs. A failure prints its seed and steps. Seeds 1 to 8 are `Seeds/RandomActionsBrowserTest.*`. They are not in `verify` while T408 and T412 are open, since a seed's steps depend on timing and one now and then walks into those. To try another run, from `.chromium/src`:
+`RandomActionsBrowserTest` does 120 things a person can do to tabs, tasks, windows, and workspaces, picked from a seed, and checks after each that every sidebar matches its tree and that windows on one workspace list the same tabs. A failure prints its seed and steps. Seeds 1 to 8 are `Seeds/RandomActionsBrowserTest.*`. They are not in `verify` while T412 is open, since a seed's steps depend on timing and one now and then walks into it. To try another run, from `.chromium/src`:
 
 ```sh
 ./out/uw/browser_tests --gtest_filter='RandomWalkBrowserTest.MANUAL_ARunPickedByItsSeed' --run-manual --uw-random-seed=11 --uw-random-steps=400
