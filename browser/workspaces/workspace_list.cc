@@ -184,10 +184,13 @@ void WorkspaceList::OnProfileWasRemoved(const base::FilePath& profile_path,
   }
 }
 
+// The list is never destroyed, so it lets go of what the browser frees as it
+// quits, local state included.
 void WorkspaceList::OnProfileManagerDestroying() {
   profiles_observation_.Reset();
   manager_observation_.Reset();
   profile_manager_ = nullptr;
+  local_state_ = nullptr;
 }
 
 std::string WorkspaceList::ProfileName(const base::FilePath& profile) const {
@@ -214,7 +217,9 @@ void WorkspaceList::Save() {
     }
     saved.Append(std::move(entry));
   }
-  local_state_->SetList(kWorkspacesPref, std::move(saved));
+  if (local_state_) {
+    local_state_->SetList(kWorkspacesPref, std::move(saved));
+  }
 }
 
 void WorkspaceList::Changed() {

@@ -74,10 +74,13 @@ void ProviderSync::OnProfileAdded(Profile* profile) {
   Join(profile);
 }
 
+// It is never destroyed, so it lets go of what the browser frees as it
+// quits, local state included.
 void ProviderSync::OnProfileManagerDestroying() {
   registrars_.clear();
   profile_observations_.RemoveAllObservations();
   manager_observation_.Reset();
+  local_state_ = nullptr;
 }
 
 void ProviderSync::OnProfileWillBeDestroyed(Profile* profile) {

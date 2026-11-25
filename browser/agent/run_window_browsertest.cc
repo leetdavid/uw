@@ -75,6 +75,7 @@ class RunWindowBrowserTest : public headless::HeadlessModeBrowserTest {
   void TearDownOnMainThread() override {
     tools_.reset();
     actor::ActorKeyedService::Get(profile_)->ResetForTesting();
+    profile_ = nullptr;
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }
 

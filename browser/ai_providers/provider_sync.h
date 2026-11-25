@@ -57,7 +57,7 @@ class ProviderSync : public ProfileManagerObserver, public ProfileObserver {
   // Gives every loaded profile but `except` the shared providers.
   void Spread(Profile* except);
 
-  const raw_ptr<PrefService> local_state_;
+  raw_ptr<PrefService> local_state_;
   std::map<Profile*, std::unique_ptr<PrefChangeRegistrar>> registrars_;
   // Set while this class writes profiles, so its own writes are not taken
   // for the user's.

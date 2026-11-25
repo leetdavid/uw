@@ -47,6 +47,14 @@ namespace {
 // drags, so these need a real one. Run them with `pnpm run window-tests`.
 class BranchDragBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
+  void TearDownOnMainThread() override {
+    parent_ = nullptr;
+    first_ = nullptr;
+    second_ = nullptr;
+    other_ = nullptr;
+    headless::HeadlessModeBrowserTest::TearDownOnMainThread();
+  }
+
   TabOrganizationController* controller() {
     return TabOrganizationController::From(browser());
   }

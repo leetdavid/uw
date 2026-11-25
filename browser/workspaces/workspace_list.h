@@ -88,7 +88,7 @@ class WorkspaceList : public ProfileAttributesStorageObserver,
   void Changed();
   void Notify();
 
-  const raw_ptr<PrefService> local_state_;
+  raw_ptr<PrefService> local_state_;
   raw_ptr<ProfileManager> profile_manager_;
   std::vector<Workspace> workspaces_;
   bool notify_pending_ = false;

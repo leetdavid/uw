@@ -104,6 +104,7 @@ class MiniPlayerBrowserTest : public headless::HeadlessModeBrowserTest {
   }
 
   void TearDownOnMainThread() override {
+    video_ = nullptr;
     SetAppActiveForTesting(std::nullopt);
     SetCoveredPartForTesting(std::nullopt);
     HeadlessModeBrowserTest::TearDownOnMainThread();

@@ -100,6 +100,7 @@ class AgentLoopBrowserTest : public headless::HeadlessModeBrowserTest {
 
   void TearDownOnMainThread() override {
     agent_.reset();
+    chat_ = nullptr;
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }

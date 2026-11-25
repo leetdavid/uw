@@ -104,6 +104,7 @@ class TabToolsBrowserTest : public headless::HeadlessModeBrowserTest {
   void TearDownOnMainThread() override {
     agent_.reset();
     tools_.reset();
+    chat_ = nullptr;
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
     HeadlessModeBrowserTest::TearDownOnMainThread();
   }

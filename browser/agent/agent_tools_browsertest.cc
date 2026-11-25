@@ -82,6 +82,7 @@ class AgentToolsBrowserTest : public headless::HeadlessModeBrowserTest {
 
   void TearDownOnMainThread() override {
     tools_.reset();
+    chat_ = nullptr;
     // Each task's engine holds the profile, which must outlive it.
     actor::ActorKeyedService::Get(browser()->GetProfile())->ResetForTesting();
     HeadlessModeBrowserTest::TearDownOnMainThread();

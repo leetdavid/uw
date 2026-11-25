@@ -736,7 +736,6 @@ const TEST_SUITES = {
     "WorkspacesOffBrowserTest.*", "BusyTerminalWarningOffBrowserTest.*", "WorkingChatWarningOffBrowserTest.*",
     "MiniPlayerBrowserTest.*", "UwCommandBrowserTest.*", "UwCommandSectionBrowserTest.*",
     "UwCommandConnectorsBrowserTest.*", "UwCommandChatBrowserTest.*", "SplitViewBrowserTest.*",
-    "Seeds/RandomActionsBrowserTest.*",
   ],
 } as const;
 
