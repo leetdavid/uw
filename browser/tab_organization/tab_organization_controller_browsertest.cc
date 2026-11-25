@@ -1566,6 +1566,41 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_TRUE(trip->IsPinned());
 }
 
+// A saved group that is open is not given to a second group. Session restore
+// asked for that when a window opened while uw kept the group's window hidden,
+// and the next tab moved in the first group crashed uw (T412).
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       ASavedGroupThatIsOpenStaysWithItsGroup) {
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  WaitUntilSavedGroupsLoad(service);
+  tabs::TabInterface* plan = InitialTab();
+  tabs::TabInterface* trip = NewTab();
+  tabs::TabInterface* notes = NewTab();
+  tabs::TabInterface* list = NewTab();
+  const tab_groups::TabGroupId open = tabs()->AddToNewGroup(
+      {tabs()->GetIndexOfTab(plan), tabs()->GetIndexOfTab(trip)});
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return service->GetGroup(open).has_value(); }));
+  const base::Uuid saved = service->GetGroup(open)->saved_guid();
+
+  // What session restore does for a restored window's group.
+  const tab_groups::TabGroupId restored = tab_groups::TabGroupId::GenerateNew();
+  tabs()->AddToGroupForRestore(
+      {tabs()->GetIndexOfTab(notes), tabs()->GetIndexOfTab(list)}, restored);
+  service->ConnectLocalTabGroup(
+      saved, restored, tab_groups::OpeningSource::kConnectOnSessionRestore);
+
+  EXPECT_TRUE(service->GetGroup(open).has_value());
+  EXPECT_FALSE(service->GetGroup(restored).has_value());
+  tabs()->MoveWebContentsAt(tabs()->GetIndexOfTab(plan),
+                            tabs()->GetIndexOfTab(trip),
+                            /*select_after_move=*/false, open);
+  EXPECT_EQ(plan->GetGroup(), open);
+}
+
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
                        PRE_ATaskTheSavedGroupsLostComesBack) {
   SessionStartupPref::SetStartupPref(

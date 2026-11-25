@@ -1,8 +1,18 @@
 diff --git a/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc b/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
-index b86cb48d446676b75af90d529920e8e857889f09..9b21efd1da4d100ee68e3d8a0590331bf347e909 100644
+index b86cb48d446676b75af90d529920e8e857889f09..54af6f03ea554996babb869870378704997d65ce 100644
 --- a/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
 +++ b/components/saved_tab_groups/internal/tab_group_sync_service_impl.cc
-@@ -1117,12 +1117,9 @@ void TabGroupSyncServiceImpl::ConnectLocalTabGroup(
+@@ -1113,16 +1113,18 @@ void TabGroupSyncServiceImpl::ConnectLocalTabGroup(
+ 
+   VLOG(2) << __func__;
+ 
+-  if (GetGroup(sync_id)) {
++  // uw: a saved group that is open stays with the group it is open in.
++  // Session restore asks for it again when a window opens while uw keeps the
++  // group's window hidden, and that group is then not a saved one.
++  const std::optional<SavedTabGroup> group = GetGroup(sync_id);
++  if (group &&
++      (!group->local_group_id() || group->local_group_id() == local_id)) {
      // Only connect the group if it exists in the model.
      UpdateLocalTabGroupMapping(sync_id, local_id, opening_source);
      coordinator_->ConnectLocalTabGroup(sync_id, local_id);
