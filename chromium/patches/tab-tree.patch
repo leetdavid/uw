@@ -837,7 +837,7 @@ index 9354e0d5497b85db204ebae5d6adcd41973ea01a..f3b526cc11c8dd433fc17a65c59f0ef6
      "//chrome/browser/dictation",
      "//chrome/browser/glic",
 diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
-index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378722a5cf3 100644
+index cdc7c0f320fed580814d4f71c90702d9450be81e..35eb36e2aea5dfb62ec5db13079862a208723df1 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.cc
 @@ -46,6 +46,8 @@
@@ -861,7 +861,23 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378
    drag_controller_ = std::make_unique<TabDragController>();
  
    DragInitData drag_init_data;
-@@ -253,6 +260,13 @@ TabDragHandlerImpl::DragInitData TabDragHandlerImpl::GetDragInitDataForTabDrag(
+@@ -225,6 +232,15 @@ void TabDragHandlerImpl::InitializeDrag(
+                              EventSourceFromEvent(event)) ==
+       TabDragController::Liveness::kDeleted) {
+     ResetDragState();
++    return;
++  }
++  // uw: a press whose view leaves the window under the held button, as a row
++  // filed into a task or one remade when its tab is pinned, never gets its
++  // release, and a drag left waiting locks the tabs and keeps the window from
++  // closing. The drag ends once the view goes, unless it has started.
++  ++uw_presses_;
++  if (node.view()) {
++    uw_pressed_view_.Observe(node.view());
+   }
+ }
+ 
+@@ -253,6 +269,13 @@ TabDragHandlerImpl::DragInitData TabDragHandlerImpl::GetDragInitDataForTabDrag(
  
    std::map<tab_groups::TabGroupId, TabSlotView*> dragged_groups;
    if (!source_tab->IsPinned()) {
@@ -875,7 +891,7 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378
      // A TabSlotView must be added for each dragged group, in addition to the
      // tabs themselves. These must be inserted into `dragged_views` in the
      // order they appear within the tab strip.
-@@ -343,6 +357,16 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -343,6 +366,16 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
    }
    gfx::Point screen_location(event.location());
    ConvertPointToScreen(&event_source_view, &screen_location);
@@ -892,7 +908,7 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378
  
    // Dragging may start a blocking loop, which may allow this to be destroyed.
    auto ref = weak_factory_.GetWeakPtr();
-@@ -354,10 +378,24 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
+@@ -354,10 +387,24 @@ bool TabDragHandlerImpl::ContinueDrag(views::View& event_source_view,
      ResetDragState();
      return false;
    }
@@ -917,6 +933,96 @@ index cdc7c0f320fed580814d4f71c90702d9450be81e..b96f50aef40fa5e74f85ffa8be48d378
    // Note: we avoid ending the SystemDnD if the `EndDragReason` is "capture
    // lost" because some window managers on Wayland don't send exit events to tab
    // strips, which would cause this to incorrectly end the SystemDnD while the
+@@ -926,6 +973,25 @@ void TabDragHandlerImpl::OnNodeWillDestroy(TabCollectionNode& node) {
+ void TabDragHandlerImpl::ResetDragState() {
+   drag_controller_.reset();
+   scroll_synchronizers_.clear();
++  uw_pressed_view_.Reset();
++}
++
++void TabDragHandlerImpl::OnViewRemovedFromWidget(views::View* observed_view) {
++  uw_pressed_view_.Reset();
++  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&TabDragHandlerImpl::EndPressIfNotDragging,
++                                weak_factory_.GetWeakPtr(), uw_presses_));
++}
++
++void TabDragHandlerImpl::OnViewIsDeleting(views::View* observed_view) {
++  OnViewRemovedFromWidget(observed_view);
++}
++
++void TabDragHandlerImpl::EndPressIfNotDragging(int press) {
++  if (press == uw_presses_ && drag_controller_ &&
++      !drag_controller_->started_drag()) {
++    EndDrag(EndDragReason::kCancel);
++  }
+ }
+ 
+ bool TabDragHandlerImpl::HandleDraggedTabsIntoPosition(
+diff --git a/chrome/browser/ui/views/tabs/common/tab_drag_handler.h b/chrome/browser/ui/views/tabs/common/tab_drag_handler.h
+index 693c28aa0da4045c158fa9954db371b906a4f96c..2d7857af71dbb1b4244ab51df166424446214d5d 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_drag_handler.h
++++ b/chrome/browser/ui/views/tabs/common/tab_drag_handler.h
+@@ -15,6 +15,7 @@
+ #include "base/memory/raw_ref.h"
+ #include "base/memory/stack_allocated.h"
+ #include "base/memory/weak_ptr.h"
++#include "base/scoped_observation.h"
+ #include "chrome/browser/ui/views/frame/browser_root_view.h"
+ #include "chrome/browser/ui/views/tabs/dragging/tab_drag_context.h"
+ #include "chrome/browser/ui/views/tabs/dragging/tab_drag_controller.h"
+@@ -25,6 +26,7 @@
+ #include "ui/events/event.h"
+ #include "ui/gfx/geometry/vector2d.h"
+ #include "ui/views/controls/scroll_view.h"
++#include "ui/views/view_observer.h"
+ 
+ class TabCollectionNode;
+ class TabStripModel;
+@@ -109,7 +111,9 @@ class TabDragHandler {
+ 
+ // Implements a minimal drag context to interact with the central
+ // `TabDragController`.
+-class TabDragHandlerImpl : public TabDragHandler, public TabDragContext {
++class TabDragHandlerImpl : public TabDragHandler,
++                           public TabDragContext,
++                           public views::ViewObserver {
+   METADATA_HEADER(TabDragHandlerImpl, TabDragContext)
+  public:
+   explicit TabDragHandlerImpl(TabStripModel& tab_strip_model,
+@@ -179,6 +183,10 @@ class TabDragHandlerImpl : public TabDragHandler, public TabDragContext {
+   int OnDragUpdated(const ui::DropTargetEvent& event) override;
+   void OnDragExited() override;
+ 
++  // views::ViewObserver
++  void OnViewRemovedFromWidget(views::View* observed_view) override;
++  void OnViewIsDeleting(views::View* observed_view) override;
++
+  private:
+   // Encapsulates data needed to initialize a drag session.
+   struct DragInitData {
+@@ -219,6 +227,9 @@ class TabDragHandlerImpl : public TabDragHandler, public TabDragContext {
+   // Cleans up state tracked by this handler for a given node.
+   void OnNodeWillDestroy(TabCollectionNode& node);
+ 
++  // uw: ends the drag `press` readied unless it has started.
++  void EndPressIfNotDragging(int press);
++
+   // Returns the group id of the dragged group header, or null if the drag
+   // was not initiated by a group header.
+   std::optional<tab_groups::TabGroupId> GetDraggingGroupHeaderId() const;
+@@ -242,6 +253,11 @@ class TabDragHandlerImpl : public TabDragHandler, public TabDragContext {
+   std::map<raw_ptr<const TabCollectionNode>, raw_ptr<TabSlotView>> slot_views_;
+   std::vector<base::CallbackListSubscription> node_destroyed_callbacks_;
+ 
++  // uw: the view pressed to ready the drag, and a count of presses.
++  base::ScopedObservation<views::View, views::ViewObserver> uw_pressed_view_{
++      this};
++  int uw_presses_ = 0;
++
+   base::WeakPtrFactory<TabDragHandlerImpl> weak_factory_{this};
+ };
+ 
 diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc b/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
 index 1ad01e47e1a71b8dee388a090984f15c830dc1fe..2543bacc96f51de5888dfc06c41253fed4696d5a 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_strip_collection_controller.cc
@@ -2023,7 +2129,7 @@ index 48140cb488e51ca30e55afcd492861b94dec6278..29eecec28c90f6c4477a18eacd27e5b5
  
  void TabStripModel::TabGroupStateChanged(
 diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
-index e8d8cb4facb9428bab15389a8fb137ada0982a21..a9a34df40fc6cefedf828eb01dc4bd67551bbb64 100644
+index e8d8cb4facb9428bab15389a8fb137ada0982a21..8cbf6b357ecb61284c66b00531e5d314a698c2b5 100644
 --- a/chrome/browser/ui/views/tabs/common/tab_view.cc
 +++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
 @@ -90,6 +90,10 @@
@@ -2059,19 +2165,9 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..a9a34df40fc6cefedf828eb01dc4bd67
    if (hover_controller_ && !split_) {
      if (hovered_) {
        hover_controller_->SetSubtleOpacityScale(radial_highlight_opacity_);
-@@ -606,6 +618,7 @@ bool TabView::OnMousePressed(const ui::MouseEvent& event) {
-     // eventually kick off the drag-loop.
-     controller->GetDragHandler().InitializeDrag(
-         *collection_node_, original_selection_model, event);
-+    uw_drag_pressed_ = true;
-   }
-   return true;
- }
-@@ -615,14 +628,20 @@ void TabView::OnMouseReleased(const ui::MouseEvent& event) {
- 
+@@ -616,13 +628,18 @@ void TabView::OnMouseReleased(const ui::MouseEvent& event) {
    auto* controller = collection_node_->GetController();
    base::WeakPtr<TabView> self = weak_ptr_factory_.GetWeakPtr();
-+  uw_drag_pressed_ = false;
    if (event.IsOnlyMiddleMouseButton()) {
 -    if (HitTestPoint(event.location())) {
 +    if (HitTestPoint(event.location()) &&
@@ -2089,33 +2185,7 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..a9a34df40fc6cefedf828eb01dc4bd67
    }
    // Cancel the initialized drag (noop if not started). This is considered
    // a cancel because the drag handler assumes mouse capture when the drag
-@@ -773,6 +792,25 @@ void TabView::AddedToWidget() {
- void TabView::RemovedFromWidget() {
-   paint_as_active_subscription_ = {};
-   UpdateHovered(false);
-+  // uw: a row that leaves the window under a held button, as when its tab is
-+  // filed into a task, gets no release, so its drag would never end. A drag
-+  // that has started keeps going: its rows move all the time.
-+  if (std::exchange(uw_drag_pressed_, false)) {
-+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-+        FROM_HERE, base::BindOnce(
-+                       [](base::WeakPtr<TabView> self) {
-+                         auto* controller =
-+                             self && self->collection_node_
-+                                 ? self->collection_node_->GetController()
-+                                 : nullptr;
-+                         if (controller &&
-+                             !controller->GetDragHandler().IsDragging()) {
-+                           controller->GetDragHandler().EndDrag(
-+                               EndDragReason::kCancel);
-+                         }
-+                       },
-+                       weak_ptr_factory_.GetWeakPtr()));
-+  }
- }
- 
- void TabView::OnFocus() {
-@@ -1012,7 +1050,12 @@ void TabView::OnTabStateChanged() {
+@@ -1012,7 +1029,12 @@ void TabView::OnTabStateChanged() {
    int index = tab_strip_model->GetIndexOfTab(tab);
    CHECK(index != TabStripModel::kNoTab);
  
@@ -2129,7 +2199,7 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..a9a34df40fc6cefedf828eb01dc4bd67
    split_ = tab->IsSplit();
    pinned_ = tab->IsPinned();
  
-@@ -1129,6 +1172,9 @@ void TabView::UpdateColors() {
+@@ -1129,6 +1151,9 @@ void TabView::UpdateColors() {
    }
    TabStyle::TabColors colors = tab_styling()->CalculateTargetColors();
    title_->SetEnabledColor(colors.foreground_color);
@@ -2139,7 +2209,7 @@ index e8d8cb4facb9428bab15389a8fb137ada0982a21..a9a34df40fc6cefedf828eb01dc4bd67
    close_button_->SetColors(colors);
    alert_indicator_->OnParentTabButtonColorChanged();
  
-@@ -1150,6 +1196,11 @@ void TabView::UpdateContrastRatioValues() {
+@@ -1150,6 +1175,11 @@ void TabView::UpdateContrastRatioValues() {
  void TabView::CloseButtonPressed(const ui::Event& event) {
    CHECK(collection_node_);
  
@@ -2955,16 +3025,3 @@ index 39fd08b4211e841e94d6a5d471deda8ccd058987..5b68352f4cd81b61441a7480760f35be
      ScheduleResetCommands();
    }
    DidScheduleCommand();
-diff --git a/chrome/browser/ui/views/tabs/common/tab_view.h b/chrome/browser/ui/views/tabs/common/tab_view.h
-index 04458f07af7f0aba0cd5446383df7074065330f2..4ac0b6bdd46e334cf0c469a20191cb45abcc097a 100644
---- a/chrome/browser/ui/views/tabs/common/tab_view.h
-+++ b/chrome/browser/ui/views/tabs/common/tab_view.h
-@@ -228,6 +228,8 @@ class TabView : public views::View,
-   bool collapsed_ = false;
-   bool pinned_ = false;
-   bool shift_pressed_on_mouse_down_ = false;
-+  // uw: true from a press that may start a drag until its release.
-+  bool uw_drag_pressed_ = false;
-   bool should_fill_background_tab_color_ = false;
- 
-   std::unique_ptr<GlowHoverController> hover_controller_;

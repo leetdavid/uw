@@ -14,6 +14,7 @@
 #include "chrome/browser/headless/test/headless_mode_browsertest.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
@@ -255,6 +256,42 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(controller()->dragging());
   EXPECT_TRUE(tab->GetGroup().has_value());
+}
+
+// A row whose tab is pinned while its mouse button is held ends its drag once
+// the button is up. Chromium makes a pinned tab a new row, so the held row
+// and its tab node are gone before anything could look at them, and the
+// window stayed in a drag with its tabs locked and refused to close (found
+// while looking into T414).
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       ARowPinnedUnderAHeldButtonEndsItsDrag) {
+  chrome::AddAndReturnTabAt(browser(), GURL("about:blank"), -1,
+                            /*foreground=*/false);
+  tabs::TabInterface* tab = tabs()->GetTabAtIndex(0);
+  Wait(base::Milliseconds(500));
+  views::View* row = RowOf(tab);
+  ASSERT_TRUE(row);
+  base::WeakPtr<views::Widget> widget = row->GetWidget()->GetWeakPtr();
+  const gfx::Point on_screen = row->GetBoundsInScreen().CenterPoint();
+  gfx::Point at = row->GetLocalBounds().CenterPoint();
+  views::View::ConvertPointToWidget(row, &at);
+  ui::MouseEvent press(ui::EventType::kMousePressed, at, on_screen,
+                       ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                       ui::EF_LEFT_MOUSE_BUTTON);
+  widget->OnMouseEvent(&press);
+  ASSERT_TRUE(controller()->dragging());
+
+  tabs()->SetTabPinned(tabs()->GetIndexOfTab(tab), true);
+
+  ui::MouseEvent release(ui::EventType::kMouseReleased, at, on_screen,
+                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+  widget->OnMouseEvent(&release);
+  Wait(base::Milliseconds(300));
+  EXPECT_FALSE(controller()->dragging());
+  EXPECT_TRUE(
+      BrowserView::GetBrowserViewForBrowser(browser())->IsTabStripEditable());
+  EXPECT_TRUE(tab->IsPinned());
 }
 
 // A dragged parent takes its children with it, still nested under it, and
