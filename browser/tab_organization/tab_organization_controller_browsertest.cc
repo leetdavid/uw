@@ -34,6 +34,7 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
+#include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -1528,6 +1529,41 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(service);
   WaitUntilSavedGroupsLoad(service);
   EXPECT_FALSE(KeepsAClosedTask(service));
+}
+
+// The tab menu's Pin on the last tabs of two tasks at once. Chromium asks
+// before a saved group is deleted, and took the first of the groups to be a
+// saved one. A task uw makes is not when it is made, so uw aborted (T410).
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PinningTheLastTabsOfTwoTasksAtOnce) {
+  tab_groups::TabGroupSyncService* service =
+      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
+          browser()->GetProfile());
+  ASSERT_TRUE(service);
+  WaitUntilSavedGroupsLoad(service);
+  tabs::TabInterface* plan = InitialTab();
+  tabs::TabInterface* trip = NewTab();
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(plan)}, u"Plan"));
+  // A task made as Chromium makes a group, so the saved groups keep it.
+  const tab_groups::TabGroupId kept =
+      tabs()->AddToNewGroup({tabs()->GetIndexOfTab(trip)});
+  ASSERT_TRUE(base::test::RunUntil(
+      [&] { return service->GetGroup(kept).has_value(); }));
+  ASSERT_FALSE(service->GetGroup(*plan->GetGroup()).has_value());
+  ASSERT_LT(tabs()->GetIndexOfTab(plan), tabs()->GetIndexOfTab(trip));
+
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(plan));
+  tabs()->SelectTabAt(tabs()->GetIndexOfTab(trip));
+  tabs()->ExecuteContextMenuCommand(tabs()->GetIndexOfTab(plan),
+                                    TabStripModel::CommandTogglePinned);
+  tab_groups::DeletionDialogController* dialog =
+      browser()->GetFeatures().tab_group_deletion_dialog_controller();
+  if (dialog->IsShowingDialog()) {
+    dialog->SimulateOkButtonForTesting();
+  }
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(plan->IsPinned());
+  EXPECT_TRUE(trip->IsPinned());
 }
 
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
