@@ -619,12 +619,12 @@ IN_PROC_BROWSER_TEST_F(WindowScreenshotBrowserTest,
             tasks);
 
   NewItemsMenu menu(browser());
-  ASSERT_EQ(menu.GetItemCount(), 8u);
+  ASSERT_EQ(menu.GetItemCount(), 9u);
   EXPECT_EQ(menu.GetCommandIdAt(0), IDC_NEW_TAB);
   EXPECT_EQ(menu.GetCommandIdAt(1), IDC_CREATE_NEW_TAB_GROUP);
   EXPECT_EQ(menu.GetCommandIdAt(2), TabOrganizationController::kNewTask);
-  EXPECT_EQ(menu.GetCommandIdAt(6), kSplitRight);
-  EXPECT_EQ(menu.GetCommandIdAt(7), kNewWorkspaceCommand);
+  EXPECT_EQ(menu.GetCommandIdAt(7), kSplitRight);
+  EXPECT_EQ(menu.GetCommandIdAt(8), kNewWorkspaceCommand);
   EXPECT_TRUE(menu.IsEnabledAt(2));
   ui::Accelerator key;
   ASSERT_TRUE(menu.GetAcceleratorForCommandId(IDC_CREATE_NEW_TAB_GROUP, &key));

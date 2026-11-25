@@ -37,6 +37,8 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/find_bar/find_bar.h"
+#include "chrome/browser/ui/find_bar/find_bar_controller.h"
 #include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
@@ -638,6 +640,35 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, PrivateWindowsKeepTheirOwnTabs) {
   base::RunLoop().RunUntilIdle();
   EXPECT_FALSE(TabAt(private_window, kMail));
   EXPECT_FALSE(TabAt(first, kIssues));
+}
+
+// A page whose Find was open goes on to another window, and the window it left
+// closes. The page kept the first window's find bar for Find's focus, and the
+// second window's find bar used it after it was gone (T409).
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, FindGoesWithAPageToAnotherWindow) {
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  tabs::TabInterface* mail = Open(first, kMail, /*select=*/true);
+  tabs::TabInterface* issues = Open(first, kIssues);
+  chrome::Find(first);
+  // Leaving the tab hides its find bar and keeps Find's focus with the page.
+  first->tab_strip_model()->ActivateTabAt(
+      first->tab_strip_model()->GetIndexOfTab(issues));
+  ASSERT_NE(first->tab_strip_model()->GetActiveTab(), mail);
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+  SelectByClick(second, TabAt(second, kMail));
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    return !TabOrganizationController::IsCopy(TabAt(second, kMail));
+  }));
+  CloseBrowserSynchronously(first);
+
+  TabStripModel* tabs = second->tab_strip_model();
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(TabAt(second, kIssues)));
+  tabs->ActivateTabAt(tabs->GetIndexOfTab(TabAt(second, kMail)));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(
+      second->GetFeatures().GetFindBarController()->find_bar()->IsFindBarVisible());
 }
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,

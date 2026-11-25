@@ -698,21 +698,28 @@ IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, KeysRunTheWorkspaceCommands) {
   EXPECT_TRUE(WaitForShown(browser(), reading));
 }
 
-IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest, CmdOptionArrowsSwitchInOrder) {
+// A headless window is never key, so the menu bar's keys cannot be pressed
+// here, and the window a workspace switch shows does not become the active
+// one. The test above checks the keys; this runs their commands on the window
+// that shows.
+IN_PROC_BROWSER_TEST_F(WorkspacesBrowserTest,
+                       NextAndPreviousWorkspaceSwitchInOrder) {
   AddWorkspace("Reading", profile());
   AddWorkspace("Side project", profile());
   const std::string second = list().workspaces()[1].id;
   const std::string third = list().workspaces()[2].id;
 
-  Press(browser(), ui::VKEY_RIGHT, kOptionCmd);
+  chrome::ExecuteCommand(browser()->GetBrowserForMigrationOnly(),
+                         kNextWorkspace);
   BrowserWindowInterface* reading = WaitForShown(browser(), second);
   ASSERT_TRUE(reading);
-  Press(reading, ui::VKEY_RIGHT, kOptionCmd);
+  chrome::ExecuteCommand(reading->GetBrowserForMigrationOnly(), kNextWorkspace);
   BrowserWindowInterface* side_project = WaitForShown(browser(), third);
   ASSERT_TRUE(side_project);
   // Past the last workspace, nothing changes.
   EXPECT_FALSE(CanRunWindowCommand(side_project, kNextWorkspace));
-  Press(side_project, ui::VKEY_LEFT, kOptionCmd);
+  chrome::ExecuteCommand(side_project->GetBrowserForMigrationOnly(),
+                         kPreviousWorkspace);
   EXPECT_EQ(WaitForShown(browser(), second), reading);
 }
 

@@ -202,7 +202,9 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
                                   ui::EF_CONTROL_DOWN | ui::EF_COMMAND_DOWN));
 }
 
-IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, ArrowKeysNestAndMoveBranches) {
+// A headless window is never key, so the menu bar's keys cannot be pressed
+// here. The key list above checks the keys; this runs their commands.
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, NestAndMoveCommandsMoveBranches) {
   tabs::TabInterface* first = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* second = NewTab();
   tabs::TabInterface* third = NewTab();
@@ -211,20 +213,20 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, ArrowKeysNestAndMoveBranches) {
   const std::string c = Id(third).value();
 
   Select(second);
-  Press(ui::VKEY_RIGHT, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kNest);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{a, "  " + b, c}; }));
 
-  Press(ui::VKEY_LEFT, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kOutdent);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{a, b, c}; }));
 
-  Press(ui::VKEY_UP, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kMoveUp);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{b, a, c}; }));
 
-  Press(ui::VKEY_DOWN, kCtrlCmd);
-  Press(ui::VKEY_DOWN, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kMoveDown);
+  chrome::ExecuteCommand(browser(), TabOrganizationController::kMoveDown);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return Rows() == std::vector<std::string>{a, c, b}; }));
   EXPECT_EQ(tabs()->GetIndexOfTab(second), 2);
@@ -391,8 +393,8 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   EXPECT_EQ(tabs()->GetActiveTab(), plan);
 }
 
-IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
-                       NumberKeysGoToTheTabLastUsedInATask) {
+// Runs the number keys' commands, as the test above does the arrows'.
+IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest, GoToTaskGoesToTheTabLastUsedInIt) {
   tabs::TabInterface* loose = tabs()->GetTabAtIndex(0);
   tabs::TabInterface* plan = NewTab();
   tabs::TabInterface* plan_notes = NewTab();
@@ -403,19 +405,18 @@ IN_PROC_BROWSER_TEST_F(TaskKeysBrowserTest,
   Select(plan_notes);
   Select(trip);
 
-  Press(ui::VKEY_1, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), kGoToTask1);
   ASSERT_TRUE(base::test::RunUntil(
       [&] { return tabs()->GetActiveTab() == plan_notes; }));
 
-  Press(ui::VKEY_0, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), kGoToScratchpad);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return tabs()->GetActiveTab() == loose; }));
 
-  Press(ui::VKEY_2, kCtrlCmd);
+  chrome::ExecuteCommand(browser(), kGoToTask1 + 1);
   ASSERT_TRUE(
       base::test::RunUntil([&] { return tabs()->GetActiveTab() == trip; }));
 
-  Press(ui::VKEY_3, kCtrlCmd);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(tabs()->GetActiveTab(), trip);
   EXPECT_FALSE(CanRunWindowCommand(browser(), kGoToTask1 + 2));

@@ -28,3 +28,4 @@ uw-move-task.patch
 uw-memory-saver.patch
 uw-keep-restored-tasks.patch
 uw-delete-group-dialog.patch
+uw-find-bar.patch

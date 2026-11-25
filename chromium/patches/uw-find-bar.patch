@@ -1,0 +1,64 @@
+diff --git a/chrome/browser/ui/views/find_bar_host.cc b/chrome/browser/ui/views/find_bar_host.cc
+index e0748a0202f849dcc2b52a748a642313a735cf97..67153717268ec44e884b7b164122bd14b0b683e1 100644
+--- a/chrome/browser/ui/views/find_bar_host.cc
++++ b/chrome/browser/ui/views/find_bar_host.cc
+@@ -58,12 +58,22 @@ class FindBarHostHelper
+     return FromWebContents(web_contents);
+   }
+ 
++  // uw: `owner` is the find bar that made the tracker. uw shows a page in
++  // several windows, so the page can outlive that find bar (T409).
+   void SetExternalFocusTracker(
+-      std::unique_ptr<views::ExternalFocusTracker> external_focus_tracker) {
++      std::unique_ptr<views::ExternalFocusTracker> external_focus_tracker,
++      const FindBarHost* owner) {
+     external_focus_tracker_ = std::move(external_focus_tracker);
++    owner_ = reinterpret_cast<uintptr_t>(owner);
+   }
+ 
+-  std::unique_ptr<views::ExternalFocusTracker> TakeExternalFocusTracker() {
++  // uw: a tracker another find bar made watches that find bar's view, which
++  // may be gone, so it is dropped.
++  std::unique_ptr<views::ExternalFocusTracker> TakeExternalFocusTracker(
++      const FindBarHost* owner) {
++    if (owner_ != reinterpret_cast<uintptr_t>(owner)) {
++      external_focus_tracker_.reset();
++    }
+     return std::move(external_focus_tracker_);
+   }
+ 
+@@ -78,6 +88,7 @@ class FindBarHostHelper
+       : content::WebContentsUserData<FindBarHostHelper>(*web_contents) {}
+ 
+   std::unique_ptr<views::ExternalFocusTracker> external_focus_tracker_;
++  uintptr_t owner_ = 0;
+ 
+   WEB_CONTENTS_USER_DATA_KEY_DECL();
+ };
+@@ -408,7 +419,7 @@ void FindBarHost::RestoreSavedFocus() {
+   if (!tracker && web_contents()) {
+     auto* helper = FindBarHostHelper::FromWebContents(web_contents());
+     if (helper) {
+-      focus_tracker_from_web_contents = helper->TakeExternalFocusTracker();
++      focus_tracker_from_web_contents = helper->TakeExternalFocusTracker(this);
+       tracker = focus_tracker_from_web_contents.get();
+     }
+   }
+@@ -571,7 +582,7 @@ void FindBarHost::SaveFocusTracker() {
+   if (focus_tracker_) {
+     focus_tracker_->SetFocusManager(nullptr);
+     FindBarHostHelper::CreateOrGetFromWebContents(web_contents())
+-        ->SetExternalFocusTracker(std::move(focus_tracker_));
++        ->SetExternalFocusTracker(std::move(focus_tracker_), this);
+   }
+ }
+ 
+@@ -582,7 +593,7 @@ void FindBarHost::RestoreOrCreateFocusTracker() {
+ 
+   std::unique_ptr<views::ExternalFocusTracker> focus_tracker =
+       FindBarHostHelper::CreateOrGetFromWebContents(web_contents())
+-          ->TakeExternalFocusTracker();
++          ->TakeExternalFocusTracker(this);
+   if (focus_tracker) {
+     focus_tracker_ = std::move(focus_tracker);
+     focus_tracker_->SetFocusManager(host_->GetFocusManager());
