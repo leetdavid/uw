@@ -1332,3 +1332,20 @@ index 63011d9d02a7cda639f0602a05d5145ee2369770..235bc3ab1a4e7a23f140a55a1136b803
    // On non-Android, H264 HW encoder cannot be used unless SW encoder is also
    // available because of assumptions that SW fallback is always possible. This
    // check should be removed when SW implementation is always available.
+diff --git a/media/mojo/services/mojo_video_decoder_service.cc b/media/mojo/services/mojo_video_decoder_service.cc
+index 910a051dfb99745a26f54da16c054701f97480c3..a1addfba9df1f68617494b85df6af6dfc25f93a9 100644
+--- a/media/mojo/services/mojo_video_decoder_service.cc
++++ b/media/mojo/services/mojo_video_decoder_service.cc
+@@ -523,10 +523,8 @@ void MojoVideoDecoderService::OnDecoderOutput(scoped_refptr<VideoFrame> frame) {
+   TRACE_EVENT1("media", "MojoVideoDecoderService::OnDecoderOutput",
+                "video_frame", frame->AsHumanReadableString());
+ 
+-  // All MojoVideoDecoder-based decoders are hardware decoders. If you're the
+-  // first to implement an out-of-process decoder that is not power efficient,
+-  // you can remove this DCHECK.
+-  DCHECK(frame->metadata().power_efficient);
++  // uw: VideoToolbox's software decoder runs here too when accelerated
++  // decoding is off, and its frames are not power efficient (T230, T402).
+ 
+   std::optional<base::UnguessableToken> release_token;
+   if ((decoder_->FramesHoldExternalResources() ||

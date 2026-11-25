@@ -1139,7 +1139,7 @@ index 195ea25b19f8c9b2f367f21473165dcb427bf8c3..ecf972b70974d5ad4f1c59109cbf1755
  
  void PartialTranslateBubbleView::SetTextAlignmentForLocaleTextDirection(
 diff --git a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
-index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..810747c2d9d982150610a0e74861bc64cf11469f 100644
+index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..a0cd50c24f63a38e507ae302878b768c2a969e87 100644
 --- a/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
 +++ b/chrome/browser/ui/views/translate/partial_translate_bubble_view.h
 @@ -271,6 +271,10 @@ class PartialTranslateBubbleView : public LocationBarBubbleDelegateView,
@@ -1148,8 +1148,8 @@ index 36f6c9ba1ff515057a81fd2ae4aabc02ba6b3517..810747c2d9d982150610a0e74861bc64
    raw_ptr<views::Label, DanglingUntriaged> partial_text_label_ = nullptr;
 +  // uw: the error view's title and the engine's own words, for the problem
 +  // that stopped the selection's translation.
-+  raw_ptr<views::Label> uw_error_title_ = nullptr;
-+  raw_ptr<views::Label> uw_error_message_ = nullptr;
++  raw_ptr<views::Label, DanglingUntriaged> uw_error_title_ = nullptr;
++  raw_ptr<views::Label, DanglingUntriaged> uw_error_message_ = nullptr;
  
    raw_ptr<views::LabelButton, DanglingUntriaged> advanced_reset_button_source_ =
        nullptr;
