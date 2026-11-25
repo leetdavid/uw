@@ -39,6 +39,8 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "chrome/browser/ui/find_bar/find_bar.h"
 #include "chrome/browser/ui/find_bar/find_bar_controller.h"
+#include "chrome/browser/ui/navigator/browser_navigator.h"
+#include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tab_ui_helper.h"
 #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
@@ -403,6 +405,35 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
     return window->tab_strip_model()->GetTabForWebContents(page);
   }
 };
+
+// A page still loading in a tab that moves to a new window, from a window that
+// then closes, loads there. Chromium's navigation kept a pointer to the window
+// it started in after that window was gone (T402).
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       APageLoadingWhenItsWindowClosesLoadsInItsNewWindow) {
+  Browser* first = browser();
+  NavigateParams params(first, embedded_test_server()->GetURL("/slow?2"),
+                        ui::PAGE_TRANSITION_LINK);
+  params.disposition = WindowOpenDisposition::NEW_FOREGROUND_TAB;
+  Navigate(&params);
+  content::WebContents* page = params.navigated_or_inserted_contents;
+  ASSERT_TRUE(page);
+  ASSERT_TRUE(page->IsLoading());
+  const std::vector<BrowserWindowInterface*> known =
+      GetAllBrowserWindowInterfaces();
+  chrome::MoveTabsToNewWindow(
+      first, {first->tab_strip_model()->GetIndexOfWebContents(page)});
+  Browser* own = nullptr;
+  ASSERT_TRUE(base::test::RunUntil([&] {
+    own = NewWindow(known);
+    return own && own->tab_strip_model()->GetIndexOfWebContents(page) !=
+                      TabStripModel::kNoTab;
+  }));
+  CloseBrowserSynchronously(first);
+
+  EXPECT_TRUE(content::WaitForLoadStop(page));
+  EXPECT_EQ(page->GetLastCommittedURL().path(), "/slow");
+}
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, WindowsOnAWorkspaceShowOneTree) {
   Browser* first = browser();

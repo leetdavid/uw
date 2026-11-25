@@ -1,0 +1,146 @@
+diff --git a/chrome/browser/ui/web_applications/navigation_capturing_process.cc b/chrome/browser/ui/web_applications/navigation_capturing_process.cc
+index dd0d89cbad72348e7152e83b29ccb1f12b860862..2ab7bc2af5f0dd6cc28c14802afb090ce1576a57 100644
+--- a/chrome/browser/ui/web_applications/navigation_capturing_process.cc
++++ b/chrome/browser/ui/web_applications/navigation_capturing_process.cc
+@@ -415,7 +415,7 @@ NavigationCapturingProcess::MaybeHandleAppNavigation(
+ }
+ 
+ NavigationCapturingProcess::NavigationCapturingProcess(
+-    const NavigateParams& params)
++    const NavigateParams &params)
+     : profile_(raw_ref<Profile>::from_ptr(params.initiating_profile)),
+       source_browser_app_id_(
+           params.browser &&
+@@ -428,9 +428,9 @@ NavigationCapturingProcess::NavigationCapturingProcess(
+                              ? base::OptionalFromPtr(WebAppTabHelper::GetAppId(
+                                    params.source_contents))
+                              : std::nullopt),
+-      navigation_params_url_(params.url),
+-      disposition_(params.disposition),
+-      navigation_params_browser_(params.browser.get()) {
++      navigation_params_url_(params.url), disposition_(params.disposition),
++      navigation_params_browser_(params.browser ? params.browser->GetWeakPtr()
++                                                : nullptr) {
+   CHECK(AreWebAppsUserInstallable(&*profile_));
+   CHECK(params.url.is_valid());
+ 
+@@ -792,8 +792,9 @@ NavigationCapturingProcess::GetInitialNavigationParamsOverride(
+         // For a 'new tab' with the 'browser' requested display mode, use
+         // the originating browser to ensure the new tab pops under in the
+         // typical place.
+-        if (navigation_params_browser_ &&
+-            !web_app::AppBrowserController::From(navigation_params_browser_)) {
++        if (navigation_params_browser_.get() &&
++            !web_app::AppBrowserController::From(
++                navigation_params_browser_.get())) {
+           app_host_window = navigation_params_browser_.get();
+         } else if (client_mode_and_browser->browser) {
+           app_host_window = client_mode_and_browser->browser.get();
+@@ -1223,7 +1224,7 @@ NavigationCapturingProcess::HandleRedirectImpl() {
+           NavigationCapturingRedirectionResult::kReparentBrowserTabToBrowserTab;
+       ReparentWebContentsToTabbedBrowser(web_contents_for_navigation,
+                                          disposition_,
+-                                         navigation_params_browser_);
++                                         navigation_params_browser_.get());
+     } else {
+       debug_data_.Set("!redirection_result", "Noop1");
+       redirection_result_ = NavigationCapturingRedirectionResult::kSameContext;
+@@ -1256,7 +1257,7 @@ NavigationCapturingProcess::HandleRedirectImpl() {
+           NavigationCapturingRedirectionResult::kReparentAppToBrowserTab;
+       ReparentWebContentsToTabbedBrowser(web_contents_for_navigation,
+                                          disposition_,
+-                                         navigation_params_browser_);
++                                         navigation_params_browser_.get());
+       return {content::NavigationThrottle::PROCEED, *target_app_id};
+     }
+     debug_data_.Set("!redirection_result", "app to app");
+@@ -1380,7 +1381,7 @@ NavigationCapturingProcess::HandleRedirectImpl() {
+           NavigationCapturingRedirectionResult::kAppBrowserTabOpened;
+       ReparentWebContentsToTabbedBrowser(web_contents_for_navigation,
+                                          disposition_,
+-                                         navigation_params_browser_);
++                                         navigation_params_browser_.get());
+     }
+     return {content::NavigationThrottle::PROCEED, *target_app_id};
+   }
+@@ -1628,12 +1629,12 @@ NavigationCapturingProcess::GetEffectiveClientModeAndBrowser(
+         // existing browser. Note: This could mean that the provided browser is
+         // not a 'normal' and could be an app browser. It seems fine to
+         // respect this.
+-        if (navigation_params_browser_) {
++        if (navigation_params_browser_.get()) {
+           std::optional<int> tab_index =
+               AppBrowserController::FindTabIndexForApp(
+-                  navigation_params_browser_, app_id, for_focus_existing);
++                  navigation_params_browser_.get(), app_id, for_focus_existing);
+           if (tab_index.has_value()) {
+-            existing_app_host = {.browser = navigation_params_browser_,
++            existing_app_host = {.browser = navigation_params_browser_.get(),
+                                  .tab_index = *tab_index};
+             break;
+           }
+@@ -1651,14 +1652,14 @@ NavigationCapturingProcess::GetEffectiveClientModeAndBrowser(
+         // First try to choose an existing app host based on whether the
+         // params.browser is populated and belongs to the same `app_id`.
+         // If that is not found, start looking into all active app browsers.
+-        if (navigation_params_browser_ &&
+-            WebAppBrowserController::IsForWebApp(navigation_params_browser_,
+-                                                 app_id)) {
++        if (navigation_params_browser_.get() &&
++            WebAppBrowserController::IsForWebApp(
++                navigation_params_browser_.get(), app_id)) {
+           std::optional<int> tab_index =
+               AppBrowserController::FindTabIndexForApp(
+-                  navigation_params_browser_, app_id, for_focus_existing);
++                  navigation_params_browser_.get(), app_id, for_focus_existing);
+           if (tab_index.has_value()) {
+-            existing_app_host = {.browser = navigation_params_browser_,
++            existing_app_host = {.browser = navigation_params_browser_.get(),
+                                  .tab_index = *tab_index};
+             break;
+           }
+@@ -1712,10 +1713,10 @@ NavigationCapturingProcess::GetEffectiveClientModeAndBrowser(
+     case blink::mojom::DisplayMode::kBrowser:
+       // For kBrowser apps, an explicitly specific browser to navigate in
+       // should override what browser we might otherwise use for the profile.
+-      if (navigation_params_browser_ &&
++      if (navigation_params_browser_.get() &&
+           navigation_params_browser_->GetType() ==
+               BrowserWindowInterface::Type::TYPE_NORMAL) {
+-        result.browser = navigation_params_browser_;
++        result.browser = navigation_params_browser_.get();
+       } else {
+         result.browser = FindNormalBrowser(*profile_);
+       }
+@@ -1731,12 +1732,12 @@ NavigationCapturingProcess::GetEffectiveClientModeAndBrowser(
+       // TODO(crbug.com/403587716): Add tests for this case. Test should mimic
+       // opening two app windows and prioritizing the one that gets passed in
+       // NavigateParams.
+-      if (navigation_params_browser_ &&
+-          WebAppBrowserController::IsForWebApp(navigation_params_browser_,
++      if (navigation_params_browser_.get() &&
++          WebAppBrowserController::IsForWebApp(navigation_params_browser_.get(),
+                                                app_id) &&
+-          web_app::AppBrowserController::From(navigation_params_browser_)
++          web_app::AppBrowserController::From(navigation_params_browser_.get())
+               ->has_tab_strip()) {
+-        result.browser = navigation_params_browser_;
++        result.browser = navigation_params_browser_.get();
+         break;
+       }
+       BrowserWindowInterface* browser_for_web_app =
+diff --git a/chrome/browser/ui/web_applications/navigation_capturing_process.h b/chrome/browser/ui/web_applications/navigation_capturing_process.h
+index 8380274130eb23147f08eaad071eeb6da2c7ab77..e3d20515de1423ab4a4fc35ec3b1610f26c60744 100644
+--- a/chrome/browser/ui/web_applications/navigation_capturing_process.h
++++ b/chrome/browser/ui/web_applications/navigation_capturing_process.h
+@@ -284,7 +284,9 @@ class NavigationCapturingProcess
+   const std::optional<webapps::AppId> source_tab_app_id_;
+   const GURL navigation_params_url_;
+   const WindowOpenDisposition disposition_;
+-  const raw_ptr<BrowserWindowInterface> navigation_params_browser_;
++  // uw: weak, since the navigation can outlive the window it started in, as
++  // uw closes windows a workspace no longer needs (T402).
++  const base::WeakPtr<BrowserWindowInterface> navigation_params_browser_;
+   std::optional<webapps::AppId> first_navigation_app_id_;
+   std::optional<blink::mojom::DisplayMode> first_navigation_app_display_mode_;
+ 
