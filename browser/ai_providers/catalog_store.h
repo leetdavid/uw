@@ -64,7 +64,7 @@ class CatalogStore : public base::SupportsUserData::Data {
   struct Saved;
   void OnRead(std::optional<Saved> saved);
   void Download();
-  void OnDownloaded(std::optional<std::string> body);
+  void OnDownloaded(base::FilePath downloaded);
   void OnParsed(std::optional<ModelCatalog> catalog);
   void Answer();
 

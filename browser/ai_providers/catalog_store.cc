@@ -160,7 +160,9 @@ void CatalogStore::Download() {
   loader_ =
       network::SimpleURLLoader::Create(std::move(request), kTrafficAnnotation);
   loader_->SetTimeoutDuration(kTimeout);
-  loader_->DownloadToString(
+  // The catalog is over Chromium's 5 MB limit on a download kept in memory,
+  // so it goes to a file first.
+  loader_->DownloadToTempFile(
       profile_->GetDefaultStoragePartition()
           ->GetURLLoaderFactoryForBrowserProcess()
           .get(),
@@ -168,8 +170,8 @@ void CatalogStore::Download() {
       kMaxCatalogBytes);
 }
 
-void CatalogStore::OnDownloaded(std::optional<std::string> body) {
-  if (!body) {
+void CatalogStore::OnDownloaded(base::FilePath downloaded) {
+  if (downloaded.empty()) {
     loader_.reset();
     Answer();
     return;
@@ -179,16 +181,20 @@ void CatalogStore::OnDownloaded(std::optional<std::string> body) {
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
       base::BindOnce(
-          [](const base::FilePath& path,
-             std::string body) -> std::optional<ModelCatalog> {
+          [](const base::FilePath& path, const base::FilePath& downloaded)
+              -> std::optional<ModelCatalog> {
+            std::string body;
+            const bool read = base::ReadFileToStringWithMaxSize(
+                downloaded, &body, kMaxCatalogBytes);
+            base::DeleteFile(downloaded);
             std::optional<ModelCatalog> catalog =
-                ModelCatalog::FromModelsDev(body);
+                read ? ModelCatalog::FromModelsDev(body) : std::nullopt;
             if (catalog) {
               base::WriteFile(path, catalog->ToSaved());
             }
             return catalog;
           },
-          path_, std::move(*body)),
+          path_, std::move(downloaded)),
       base::BindOnce(&CatalogStore::OnParsed, weak_factory_.GetWeakPtr()));
 }
 
