@@ -39,7 +39,6 @@ class SimpleMenuModel;
 
 namespace uw {
 
-class SavedGroupsWait;
 class SharedTree;
 
 // Owned by EmbedderBrowserWindowFeatures. Mirrors the window's unpinned tabs
@@ -398,11 +397,6 @@ class TabOrganizationController : public TabStripModelObserver,
   // Selects the tab that the most recently used other window on the
   // workspace shows.
   void SelectLastShownTab();
-  // Whether Chromium's saved tab groups have loaded. Until then they miss
-  // changes to tab groups, and at launch they put back their older copy of
-  // each group, so a window joins its workspace only after.
-  bool SavedGroupsLoaded();
-  void OnSavedGroupsLoaded();
   // Leaves the workspace's tree as the window closes, so closing it closes no
   // tab in another window, and once it has closed, so it takes no copies
   // while it waits to be deleted.
@@ -524,8 +518,6 @@ class TabOrganizationController : public TabStripModelObserver,
   const raw_ptr<TabStripModel> tabs_;
   scoped_refptr<SharedTree> shared_;
   bool joined_ = false;
-  bool saved_groups_loaded_ = false;
-  std::unique_ptr<SavedGroupsWait> saved_groups_wait_;
   // This window's tab groups for tasks another window made, each with the
   // task's key in the tree. A group missing here is keyed by its own id.
   std::map<tab_groups::TabGroupId, std::string> keys_;

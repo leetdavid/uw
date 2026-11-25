@@ -1,0 +1,92 @@
+diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
+index 07ff230f0496008a371d30e9a3233bea97802412..e130f218843ab981f11d1bb58faa6a1cb4086c15 100644
+--- a/chrome/browser/sessions/session_restore.cc
++++ b/chrome/browser/sessions/session_restore.cc
+@@ -1257,32 +1257,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+       CHECK(model_tab_group);
+       browser->GetTabStripModel()->ChangeTabGroupVisuals(
+           new_tab_group_id, session_tab_group->visual_data);
+-
+-      ProcessSavedGroup(browser->GetProfile(), new_tab_group_id,
+-                        session_tab_group->saved_guid);
+-    }
+-  }
+-
+-  void ProcessSavedGroup(Profile* profile,
+-                         const tab_groups::LocalTabGroupID& local_id,
+-                         std::optional<std::string> sync_id) {
+-    tab_groups::TabGroupSyncService* service =
+-        tab_groups::TabGroupSyncServiceFactory::GetForProfile(profile);
+-    if (!service) {
+-      return;
+-    }
+-
+-    if (sync_id) {
+-      const base::Uuid& sync_guid = base::Uuid::ParseLowercase(sync_id.value());
+-      service->ConnectLocalTabGroup(
+-          sync_guid, local_id,
+-          tab_groups::OpeningSource::kConnectOnSessionRestore);
+-    } else {
+-      // Default save any groups that are not saved yet. This happens when
+-      // a user goes from V1 of SavedTabGroups to V2 through an update.
+-      service->SaveGroup(
+-          tab_groups::SavedTabGroupUtils::CreateSavedTabGroupFromLocalId(
+-              local_id));
++      // uw: a restored group is not saved, nor joined to a saved group (T416).
+     }
+   }
+ 
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index 7c4e87825c6fb1618c9c4c7ae427bc1b3e75eb02..089fcb8949ca4f5fb9ebd479c239c776fc53f406 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -364,12 +364,10 @@ sessions::LiveTab* BrowserLiveTabContext::AddRestoredTab(
+         !tab_group_service->GetGroup(group_id.value()).has_value()) {
+       // It's possible a tab's group was deleted or was unsaved before this tab
+       // was restored. In that case, if the local group didn't become saved add
+-      // the visual metadata and save it manually.
++      // the visual metadata.
+       browser->GetFeatures().live_tab_context()->SetVisualDataForGroup(
+           group_id.value(), tab.group_visual_data.value());
+-      tab_group_service->SaveGroup(
+-          tab_groups::SavedTabGroupUtils::CreateSavedTabGroupFromLocalId(
+-              tab.group.value()));
++      // uw: and leaves the group unsaved, as every group is (T416).
+     }
+   } else {
+     std::optional<tab_groups::SavedTabGroup> saved_group =
+diff --git a/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc b/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc
+index cdd4a4be2be426942dc682e8a3c5da8b9128033f..d16cdc4d1c315e357e479a7fb56acff8907498df 100644
+--- a/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc
++++ b/chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_model_listener.cc
+@@ -56,27 +56,10 @@ SavedTabGroupModelListener::~SavedTabGroupModelListener() {
+       });
+ }
+ 
++// uw: a new group is not saved. uw syncs no groups and keeps no closed tasks,
++// and Chromium's saved copy of a task disagreed with uw's own (T416).
+ void SavedTabGroupModelListener::OnTabGroupAdded(
+-    const tab_groups::TabGroupId& group_id) {
+-  if (local_tab_group_listeners_.contains(group_id)) {
+-    return;
+-  }
+-
+-  auto group_and_tab_guid_mapping = CreateSavedTabGroupAndTabMapping(group_id);
+-
+-  SavedTabGroup copy_group = group_and_tab_guid_mapping.first;
+-  std::map<tabs::TabInterface*, base::Uuid>& tab_guid_mapping =
+-      group_and_tab_guid_mapping.second;
+-  service_->AddGroup(std::move(copy_group));
+-
+-  // It's possible that the group is null, which happens in case
+-  // TabGroupSyncService is not yet initialized. In that case, we will skip the
+-  // "Connect" step, as that will happen as a part of post-init reconcilition.
+-  std::optional<SavedTabGroup> group = service_->GetGroup(group_id);
+-  if (group.has_value()) {
+-    ConnectToLocalTabGroup(group.value(), tab_guid_mapping);
+-  }
+-}
++    const tab_groups::TabGroupId& group_id) {}
+ 
+ void SavedTabGroupModelListener::OnTabGroupWillBeRemoved(
+     const tab_groups::TabGroupId& group_id) {

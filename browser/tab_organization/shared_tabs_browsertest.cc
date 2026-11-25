@@ -29,7 +29,6 @@
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
-#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -42,7 +41,6 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tab_ui_helper.h"
-#include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
@@ -292,8 +290,8 @@ Browser* Selecting(const std::vector<Browser*>& windows, const char* url) {
   return nullptr;
 }
 
-// The windows' tabs, with each one's page id and whether it holds a copy, for
-// a failure message.
+// The windows' tabs, with each one's page id, whether it holds a copy, its
+// task's name and key, and the selected tab, for a failure message.
 std::string Layouts(const std::vector<Browser*>& windows) {
   std::string text;
   for (Browser* window : windows) {
@@ -302,11 +300,21 @@ std::string Layouts(const std::vector<Browser*>& windows) {
     for (int i = 0; i < tabs->count(); ++i) {
       tabs::TabInterface* tab = tabs->GetTabAtIndex(i);
       const std::optional<PageId> id = ControllerOf(window)->IdFor(tab);
+      std::string task = "-";
+      if (const std::optional<tab_groups::TabGroupId> group = tab->GetGroup()) {
+        task = "\"" +
+               base::UTF16ToUTF8(tabs->group_model()
+                                     ->GetTabGroup(*group)
+                                     ->visual_data()
+                                     ->title()) +
+               "\" " + ControllerOf(window)->KeyOf(*group);
+      }
       text += base::StringPrintf(
-          "  %s %s%s\n",
+          "  %s %s%s %s%s\n",
           tab->GetContents()->GetLastCommittedURL().spec().c_str(),
           id ? id->value().c_str() : "-",
-          TabOrganizationController::IsCopy(tab) ? " copy" : "");
+          TabOrganizationController::IsCopy(tab) ? " copy" : "", task.c_str(),
+          i == tabs->active_index() ? " selected" : "");
     }
   }
   return text;
@@ -385,16 +393,6 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
         base::test::RunUntil([&] { return page->GetTitle() != title; }));
   }
 
-  // Chromium's saved tab groups miss a task named before they load, and at
-  // the next launch put their copy, without the name, back. A user is never
-  // that quick, so tests that restart wait.
-  void WaitForSavedGroups() {
-    tab_groups::TabGroupSyncServiceInitializedObserver(
-        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
-            browser()->GetProfile()))
-        .Wait();
-  }
-
   tabs::TabInterface* Open(Browser* window,
                            const char* url,
                            bool select = false) {
@@ -403,6 +401,15 @@ class SharedTabsBrowserTest : public headless::HeadlessModeBrowserTest {
     EXPECT_TRUE(content::WaitForLoadStop(page));
     base::RunLoop().RunUntilIdle();
     return window->tab_strip_model()->GetTabForWebContents(page);
+  }
+};
+
+// Starts with no blank tab of the test's own, so the session alone decides
+// what each window shows after a restart.
+class SharedTabsRestartBrowserTest : public SharedTabsBrowserTest {
+ public:
+  SharedTabsRestartBrowserTest() {
+    set_open_about_blank_on_browser_launch(false);
   }
 };
 
@@ -1030,7 +1037,6 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
 // when the drag ends it joins nothing, since Chromium is about to delete it.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        AWindowOpenedAndClosedWithinOneDragTakesNoTabs) {
-  WaitForSavedGroups();
   Browser* first = browser();
   Open(first, kMail);
   tabs::TabInterface* issues = Open(first, kIssues);
@@ -1300,7 +1306,6 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
 // them and does not come back after a restart.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        PRE_AnUnusedBlankTabGoesWhenUwQuits) {
-  WaitForSavedGroups();
   Browser* first = browser();
   SessionStartupPref::SetStartupPref(
       first->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
@@ -1333,7 +1338,6 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, AnUnusedBlankTabGoesWhenUwQuits) {
 // A new window on a workspace with many tabs shows at once and fills in with
 // copies after, a slice at a time, while every page keeps its place.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest, ANewWindowFillsInAfterItShows) {
-  WaitForSavedGroups();
   Browser* first = browser();
   constexpr int kPages = 40;
   for (int i = 0; i < kPages; ++i) {
@@ -1614,9 +1618,8 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
 
 // After a restart, each window comes back with its selected tab and each page
 // once, its live page in one window and a copy in the other.
-IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+IN_PROC_BROWSER_TEST_F(SharedTabsRestartBrowserTest,
                        PRE_EachWindowComesBackWithItsSelectedTab) {
-  WaitForSavedGroups();
   Browser* first = browser();
   Profile* profile = first->GetProfile();
   SessionStartupPref::SetStartupPref(
@@ -1643,7 +1646,7 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
   base::RunLoop().RunUntilIdle();
 }
 
-IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+IN_PROC_BROWSER_TEST_F(SharedTabsRestartBrowserTest,
                        EachWindowComesBackWithItsSelectedTab) {
   Profile* profile = browser()->GetProfile();
   Browser* on_mail = nullptr;
@@ -1684,7 +1687,6 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
 // next window to show the workspace takes them.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        PRE_AKeptWindowStaysHiddenAfterARestart) {
-  WaitForSavedGroups();
   Browser* first = browser();
   Profile* profile = first->GetProfile();
   SessionStartupPref::SetStartupPref(
@@ -1770,7 +1772,6 @@ std::vector<std::string> LayoutAfterLaunch(Browser* window) {
 // After a restart, a copy shows its page's icon before anything loads it.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        PRE_ACopyShowsItsPagesIconAfterARestart) {
-  WaitForSavedGroups();
   Browser* first = browser();
   Profile* profile = first->GetProfile();
   SessionStartupPref::SetStartupPref(
@@ -1808,7 +1809,6 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
 // shows its icon after a restart, and so does a new window's copy of it.
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
                        PRE_APageNoWindowHoldsShowsItsIconAfterARestart) {
-  WaitForSavedGroups();
   Browser* first = browser();
   Profile* profile = first->GetProfile();
   SessionStartupPref::SetStartupPref(
@@ -1859,7 +1859,6 @@ class SharedTabsFirstLaunchBrowserTest : public SharedTabsBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(SharedTabsFirstLaunchBrowserTest,
                        PRE_TheFirstLaunchMergesEachWorkspacesWindows) {
-  WaitForSavedGroups();
   Browser* back = browser();
   Profile* profile = back->GetProfile();
   SessionStartupPref::SetStartupPref(

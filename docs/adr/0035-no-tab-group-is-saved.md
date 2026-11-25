@@ -1,0 +1,10 @@
+# No tab group is saved
+
+Chromium saves every tab group as a "saved tab group": it keeps a record of each group's tabs and checks that record against the window as tabs move. uw's tasks are tab groups, but uw shows a task in several windows, each with a group of its own, moves tasks between windows and workspaces, keeps a workspace's last window hidden when it closes, and restores tasks from its own session data. Chromium's record and uw's tasks disagreed four times, each time a crash or lost tasks: restored tasks closed at launch (T403), a dialog that read the first of several groups as saved (T410), a saved group taken from a task open in a hidden window (T412), and a crash when a task moved to another workspace while saved. uw uses nothing the record gives: it syncs no groups and keeps no closed tasks, per [Product](../product.md). We decided on 2026-11-25 that no tab group is saved: a new group is not saved, session restore neither saves a group nor joins it to a saved one, and a tab Cmd+Shift+T reopens into a group does not save the group.
+
+Considered options:
+
+- Turning saved tab groups off. Chromium's sync service and six more places check that the saved-groups service exists, so uw did not start (tried in T412).
+- Saving every task, as Chromium saves every group it makes. Tried on 2026-11-25: moving a task to another workspace crashed on Chromium's check that a saved group's tabs match its window, and every move of a task across windows would have had to keep the record consistent.
+
+Consequences: three small changes to Chromium in `uw-no-saved-groups.patch`, and the work-arounds for T403 and T410 are gone. A window no longer waits at launch for the saved groups to load before it joins its workspace. The saved-groups service still runs and stays empty; groups an older uw saved are cleared at the next start, as uw already clears closed groups at each start. A way of saving a group that Chromium adds later would bring the record back, so a browser test checks that no group is saved.

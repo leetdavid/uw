@@ -13,7 +13,6 @@
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/no_destructor.h"
-#include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
@@ -26,7 +25,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
-#include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
@@ -37,7 +35,6 @@
 #include "chrome/common/webui_url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/prefs/pref_service.h"
-#include "components/saved_tab_groups/public/tab_group_sync_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "components/tabs/public/split_tab_data.h"
 #include "components/tabs/public/tab_group.h"
@@ -162,31 +159,6 @@ void LeaveSplits(TabStripModel* model, std::vector<int>& indices) {
 
 }  // namespace
 
-// Tells a window once Chromium's saved tab groups have loaded, at once when
-// they already have.
-class SavedGroupsWait : public tab_groups::TabGroupSyncService::Observer {
- public:
-  SavedGroupsWait(tab_groups::TabGroupSyncService* service,
-                  base::OnceClosure loaded)
-      : loaded_(std::move(loaded)) {
-    observation_.Observe(service);
-  }
-  ~SavedGroupsWait() override = default;
-
-  // tab_groups::TabGroupSyncService::Observer:
-  void OnInitialized() override {
-    if (loaded_) {
-      std::move(loaded_).Run();
-    }
-  }
-
- private:
-  base::OnceClosure loaded_;
-  base::ScopedObservation<tab_groups::TabGroupSyncService,
-                          tab_groups::TabGroupSyncService::Observer>
-      observation_{this};
-};
-
 DEFINE_USER_DATA(TabOrganizationController);
 
 TabOrganizationController::TabOrganizationController(
@@ -291,7 +263,7 @@ void TabOrganizationController::JoinWorkspace() {
   const WorkspaceWindow* workspace = WorkspaceWindow::From(window_);
   if (joined_ || !base::FeatureList::IsEnabled(kUwSharedTabs) ||
       tabs_->closing_all() || window_->IsDeleteScheduled() || !workspace ||
-      workspace->workspace().empty() || !SavedGroupsLoaded()) {
+      workspace->workspace().empty()) {
     return;
   }
   scoped_refptr<SharedTree> shared = SharedTree::For(workspace->workspace());
@@ -391,28 +363,6 @@ void TabOrganizationController::SelectLastShownTab() {
   if (tabs::TabInterface* tab = shown ? TabFor(*shown) : nullptr) {
     tabs_->ActivateTabAt(tabs_->GetIndexOfTab(tab));
   }
-}
-
-bool TabOrganizationController::SavedGroupsLoaded() {
-  if (!saved_groups_loaded_ && !saved_groups_wait_) {
-    tab_groups::TabGroupSyncService* service =
-        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
-            window_->GetProfile());
-    if (!service) {
-      return true;
-    }
-    saved_groups_wait_ = std::make_unique<SavedGroupsWait>(
-        service, base::BindOnce(&TabOrganizationController::OnSavedGroupsLoaded,
-                                weak_factory_.GetWeakPtr()));
-  }
-  return saved_groups_loaded_;
-}
-
-void TabOrganizationController::OnSavedGroupsLoaded() {
-  saved_groups_loaded_ = true;
-  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-      FROM_HERE, base::BindOnce(&TabOrganizationController::JoinWorkspace,
-                                weak_factory_.GetWeakPtr()));
 }
 
 void TabOrganizationController::Leave() {
@@ -1459,13 +1409,6 @@ void TabOrganizationController::TakeTo(
       into.generated_names().insert(std::move(name));
     }
     to->keys_[*group] = task;
-    tab_groups::TabGroupSyncService* saved =
-        tab_groups::TabGroupSyncServiceFactory::GetForProfile(
-            window_->GetProfile());
-    std::unique_ptr<tab_groups::ScopedLocalObservationPauser> pause;
-    if (saved && saved->GetGroup(*group)) {
-      pause = saved->CreateScopedLocalObserverPauser();
-    }
     to->tabs_->InsertDetachedTabGroupAt(
         tabs_->DetachTabGroupForInsertion(*group), to->EndOfTasks());
   } else {
@@ -2532,8 +2475,7 @@ void TabOrganizationController::ApplyCopies() {
       ids_[tab->GetHandle()] = page.id;
     }
     // The session learns a tab's history as it loads, which a copy never
-    // does, so it is told at once. Chromium's saved tab groups would
-    // otherwise reload the task's tabs to match at launch.
+    // does, so it is told at once, or the window comes back without it.
     if (SessionService* service =
             SessionServiceFactory::GetForProfileIfExisting(
                 window_->GetProfile())) {

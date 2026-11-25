@@ -73,8 +73,8 @@ The user chose copies in each window's tab list on 2026-10-29, after the spike. 
 uw chose how restarts work for T254 on 2026-10-31:
 
 - Each tab saves its page's id in the session file, as before. A copy also saves that it is one, and a restart brings it back as a copy before it loads, so each page loads in one window. A window's tab group for a task another window made saves that task's key, so the task is still one task after a restart.
-- A copy never loads, so Chromium's session would not learn its history. uw hands the session each copy as it is inserted. Without that, a window came back without its copies, and Chromium's saved tab groups, which still held them, reloaded the task's tabs at launch to match, loading pages into the wrong tabs.
-- Chromium's saved tab groups miss changes made to a group before they load, and at launch put their older copy of each open group back, name and tabs. So at launch a window joins its workspace only once they have loaded. A task named in the first moment after launch still loses its name at the next launch; that is Chromium's, with shared tabs or without.
+- A copy never loads, so Chromium's session would not learn its history. uw hands the session each copy as it is inserted. Without that, a window came back without its copies.
+- No tab group is saved ([ADR 0035](../adr/0035-no-tab-group-is-saved.md)). Chromium's saved copy of each group put an older name and older tabs back at launch, so windows waited for it before joining their workspace. They no longer wait.
 - At launch, each window joins with the tabs it saved, the window in front first. A page two windows saved keeps one place, and a window whose selected tab came back as a copy takes the live page if no shown window holds it.
 
 Rejected on 2026-10-29, not tried: uw draws each workspace's list in the sidebar from a model of its own, and each window's Chromium tab list holds only the pages it has shown. A copy would cost almost nothing, but uw would draw the tree, the tasks, and drags itself again, which [ADR 0002](../adr/0002-tasks-are-native-tab-groups.md) moved away from.

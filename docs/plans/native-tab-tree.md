@@ -29,7 +29,7 @@ Agreed on 2026-10-18, at the user's request.
 - The whole tree comes back: each tab's parent, sibling order, collapsed branches, task names, and who named each task. A child nested by hand keeps its hold once T74 adds it, per [Branch moves](automatic-organization.md#branch-moves).
 - It comes back after quitting uw, after uw crashed or was killed, and after the last window closed while uw kept running and a new one opened.
 - Every launch after a quit restores without asking. After a crash, Chromium's prompt asks until the user ticks its "Always restore after a crash" box, per [Product](../product.md#pinned-tabs).
-- A task comes back even when Chromium's saved tab groups have lost it, as a crash can leave them. Chromium closed such a task at launch, as if another device had deleted it. uw syncs no groups, so it keeps the task open (T403).
+- A task comes back from the session alone. No tab group is saved, so no saved copy can close it or change it at launch ([ADR 0035](../adr/0035-no-tab-group-is-saved.md)). Chromium closed a task its saved groups had lost, as if another device had deleted it (T403).
 - A chat's agent tabs come back under the chat. Its tab cards fill in again at the agent's next step.
 - A terminal tab comes back in its place with a new shell. Its folder, command history, and scrollback are later work in the [terminal plan](terminal-tab.md).
 - Later: Cmd+Shift+T on a closed tab, branch, or task puts it back in its place in the tree.

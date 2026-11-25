@@ -10,9 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "base/files/file_util.h"
 #include "base/memory/raw_ptr.h"
-#include "base/path_service.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -34,7 +32,6 @@
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/session_crashed_bubble.h"
 #include "chrome/browser/ui/tabs/tab_enums.h"
-#include "chrome/browser/ui/tabs/tab_group_deletion_dialog_controller.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -46,7 +43,6 @@
 #include "chrome/browser/ui/views/tabs/common/tab_group_header_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
 #include "chrome/browser/ui/views/tabs/tab/tab_context_menu_controller.h"
-#include "chrome/common/chrome_paths.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -128,20 +124,6 @@ class TabMenuDelegate : public TabContextMenuController::Delegate {
 class TabOrganizationControllerBrowserTest
     : public headless::HeadlessModeBrowserTest {
  protected:
-  // For ATaskTheSavedGroupsLostComesBack, the saved groups lose what they
-  // held while the session keeps it, as a crash on 2026-11-24 left them.
-  bool SetUpUserDataDirectory() override {
-    if (std::string_view(testing::UnitTest::GetInstance()
-                             ->current_test_info()
-                             ->name()) == "ATaskTheSavedGroupsLostComesBack") {
-      base::FilePath user_data;
-      CHECK(base::PathService::Get(chrome::DIR_USER_DATA, &user_data));
-      CHECK(base::DeletePathRecursively(
-          user_data.AppendASCII("Default").AppendASCII("Sync Data")));
-    }
-    return true;
-  }
-
   TabOrganizationController* controller() {
     return TabOrganizationController::From(browser());
   }
@@ -1531,11 +1513,11 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   EXPECT_FALSE(KeepsAClosedTask(service));
 }
 
-// The tab menu's Pin on the last tabs of two tasks at once. Chromium asks
-// before a saved group is deleted, and took the first of the groups to be a
-// saved one. A task uw makes is not when it is made, so uw aborted (T410).
+// No tab group is saved: not a task uw makes, not a group Chromium makes, and
+// not a task a closed tab reopens into. A saved copy of a task disagreed with
+// uw's own and crashed uw (T403, T410, T412, T416).
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       PinningTheLastTabsOfTwoTasksAtOnce) {
+                       NoTabGroupIsSaved) {
   tab_groups::TabGroupSyncService* service =
       tab_groups::TabGroupSyncServiceFactory::GetForProfile(
           browser()->GetProfile());
@@ -1543,66 +1525,46 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   WaitUntilSavedGroupsLoad(service);
   tabs::TabInterface* plan = InitialTab();
   tabs::TabInterface* trip = NewTab();
+  tabs::TabInterface* note = NewTab();
+  ASSERT_TRUE(
+      content::NavigateToURL(note->GetContents(), GURL("chrome://version/")));
+  ASSERT_TRUE(controller()->MoveToNewTask({Id(plan), Id(note)}, u"Plan"));
+  tabs()->AddToNewGroup({tabs()->GetIndexOfTab(trip)});
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(service->GetAllGroups().empty());
+
+  tabs()->CloseWebContentsAt(tabs()->GetIndexOfTab(note),
+                             TabCloseTypes::CLOSE_CREATE_HISTORICAL_TAB);
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 2; }));
+  chrome::RestoreTab(browser());
+  ASSERT_TRUE(base::test::RunUntil([&] { return tabs()->count() == 3; }));
+  base::RunLoop().RunUntilIdle();
+  EXPECT_TRUE(service->GetAllGroups().empty());
+}
+
+// The tab menu's Pin on the last tabs of two tasks at once pins both. Chromium
+// asked before deleting a saved group, and when only some of the groups were
+// saved, read the first as saved and aborted uw (T410).
+IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
+                       PinningTheLastTabsOfTwoTasksAtOnce) {
+  tabs::TabInterface* plan = InitialTab();
+  tabs::TabInterface* trip = NewTab();
   ASSERT_TRUE(controller()->MoveToNewTask({Id(plan)}, u"Plan"));
-  // A task made as Chromium makes a group, so the saved groups keep it.
-  const tab_groups::TabGroupId kept =
-      tabs()->AddToNewGroup({tabs()->GetIndexOfTab(trip)});
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return service->GetGroup(kept).has_value(); }));
-  ASSERT_FALSE(service->GetGroup(*plan->GetGroup()).has_value());
+  tabs()->AddToNewGroup({tabs()->GetIndexOfTab(trip)});
+  base::RunLoop().RunUntilIdle();
   ASSERT_LT(tabs()->GetIndexOfTab(plan), tabs()->GetIndexOfTab(trip));
 
   tabs()->ActivateTabAt(tabs()->GetIndexOfTab(plan));
   tabs()->SelectTabAt(tabs()->GetIndexOfTab(trip));
   tabs()->ExecuteContextMenuCommand(tabs()->GetIndexOfTab(plan),
                                     TabStripModel::CommandTogglePinned);
-  tab_groups::DeletionDialogController* dialog =
-      browser()->GetFeatures().tab_group_deletion_dialog_controller();
-  if (dialog->IsShowingDialog()) {
-    dialog->SimulateOkButtonForTesting();
-  }
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(plan->IsPinned());
   EXPECT_TRUE(trip->IsPinned());
 }
 
-// A saved group that is open is not given to a second group. Session restore
-// asked for that when a window opened while uw kept the group's window hidden,
-// and the next tab moved in the first group crashed uw (T412).
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       ASavedGroupThatIsOpenStaysWithItsGroup) {
-  tab_groups::TabGroupSyncService* service =
-      tab_groups::TabGroupSyncServiceFactory::GetForProfile(
-          browser()->GetProfile());
-  ASSERT_TRUE(service);
-  WaitUntilSavedGroupsLoad(service);
-  tabs::TabInterface* plan = InitialTab();
-  tabs::TabInterface* trip = NewTab();
-  tabs::TabInterface* notes = NewTab();
-  tabs::TabInterface* list = NewTab();
-  const tab_groups::TabGroupId open = tabs()->AddToNewGroup(
-      {tabs()->GetIndexOfTab(plan), tabs()->GetIndexOfTab(trip)});
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return service->GetGroup(open).has_value(); }));
-  const base::Uuid saved = service->GetGroup(open)->saved_guid();
-
-  // What session restore does for a restored window's group.
-  const tab_groups::TabGroupId restored = tab_groups::TabGroupId::GenerateNew();
-  tabs()->AddToGroupForRestore(
-      {tabs()->GetIndexOfTab(notes), tabs()->GetIndexOfTab(list)}, restored);
-  service->ConnectLocalTabGroup(
-      saved, restored, tab_groups::OpeningSource::kConnectOnSessionRestore);
-
-  EXPECT_TRUE(service->GetGroup(open).has_value());
-  EXPECT_FALSE(service->GetGroup(restored).has_value());
-  tabs()->MoveWebContentsAt(tabs()->GetIndexOfTab(plan),
-                            tabs()->GetIndexOfTab(trip),
-                            /*select_after_move=*/false, open);
-  EXPECT_EQ(plan->GetGroup(), open);
-}
-
-IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       PRE_ATaskTheSavedGroupsLostComesBack) {
+                       PRE_ATaskComesBackUnsavedAfterARestart) {
   SessionStartupPref::SetStartupPref(
       browser()->GetProfile(), SessionStartupPref(SessionStartupPref::LAST));
   ASSERT_TRUE(
@@ -1616,13 +1578,12 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
           browser()->GetProfile());
   ASSERT_TRUE(service);
   WaitUntilSavedGroupsLoad(service);
-  // A task made as Chromium makes a group, so the saved groups keep it.
   const tab_groups::TabGroupId task = tabs()->AddToNewGroup({0, 1});
   tabs()->ChangeTabGroupVisuals(
       task, tab_groups::TabGroupVisualData(
                 u"Plan", tab_groups::TabGroupColorId::kBlue));
-  ASSERT_TRUE(base::test::RunUntil(
-      [&] { return service->GetGroup(task).has_value(); }));
+  base::RunLoop().RunUntilIdle();
+  ASSERT_TRUE(service->GetAllGroups().empty());
   // Saves the session and the settings now, as quitting does, in case the
   // test's browser does not shut down cleanly.
   SessionServiceTestHelper(browser()->GetProfile()).SaveNow();
@@ -1632,16 +1593,15 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   committed.Run();
 }
 
-// A task the session holds but the saved groups lost stays open. Chromium
-// closed it at launch, as if another device had deleted it, though uw syncs
-// no groups.
+// A task comes back after a restart, though no saved group holds it.
+// Chromium closed a task its saved groups had lost, as if another device had
+// deleted it (T403), and now session restore makes no saved group of it.
 IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
-                       ATaskTheSavedGroupsLostComesBack) {
+                       ATaskComesBackUnsavedAfterARestart) {
   tab_groups::TabGroupSyncService* service =
       tab_groups::TabGroupSyncServiceFactory::GetForProfile(
           browser()->GetProfile());
   ASSERT_TRUE(service);
-  // Chromium closed the task as the saved groups started up.
   WaitUntilSavedGroupsLoad(service);
   base::RunLoop().RunUntilIdle();
   const auto tab_at = [&](std::string_view url) -> tabs::TabInterface* {
@@ -1660,6 +1620,7 @@ IN_PROC_BROWSER_TEST_F(TabOrganizationControllerBrowserTest,
   ASSERT_TRUE(task);
   EXPECT_EQ(b->GetGroup(), task);
   EXPECT_EQ(TitleOf(*task), u"Plan");
+  EXPECT_TRUE(service->GetAllGroups().empty());
 }
 
 // A change to the tree lays the sidebar out a few times, as the rows it
