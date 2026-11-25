@@ -4,9 +4,11 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
@@ -41,6 +43,7 @@
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/tabs/common/tab_view.h"
@@ -657,6 +660,49 @@ IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
        TabRestoreServiceFactory::GetForProfile(profile)->entries()) {
     EXPECT_NE(entry->type, sessions::tab_restore::WINDOW);
   }
+}
+
+// Closes `window` the first time `strip` reports a new tab, while the strip is
+// still reporting it, as a window's partner closing on the way does.
+class CloseOnInsert : public TabStripModelObserver {
+ public:
+  CloseOnInsert(TabStripModel* strip, BrowserWindowInterface* window)
+      : window_(window) {
+    strip->AddObserver(this);
+  }
+
+  // TabStripModelObserver:
+  void OnTabStripModelChanged(TabStripModel*,
+                              const TabStripModelChange& change,
+                              const TabStripSelectionChange&) override {
+    if (change.type() == TabStripModelChange::kInserted && window_) {
+      std::exchange(window_, nullptr)->GetWindow()->Close();
+    }
+  }
+
+ private:
+  raw_ptr<BrowserWindowInterface> window_;
+};
+
+// A window that closes while another window on its workspace reports a change
+// hands its live pages over once that change is done. Handing them over during
+// it crashed uw (T413).
+IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,
+                       AWindowClosingWhileAnotherChangesHandsOverAfter) {
+  Browser* first = browser();
+  Profile* profile = first->GetProfile();
+  tabs::TabInterface* notes = Open(first, kNotes, /*select=*/true);
+  ASSERT_TRUE(content::ExecJs(notes->GetContents(), kTypeIntoNotes));
+  Browser* second = CreateBrowser(profile);
+  ASSERT_TRUE(base::test::RunUntil([&] { return InStep(first, second); }));
+
+  CloseOnInsert closer(second->tab_strip_model(), first);
+  Open(second, kIssues);
+  ASSERT_TRUE(base::test::RunUntil([&] { return !IsOpen(first); }));
+  tabs::TabInterface* kept = TabAt(second, kNotes);
+  ASSERT_TRUE(kept);
+  EXPECT_FALSE(TabOrganizationController::IsCopy(kept));
+  EXPECT_EQ("half-typed", content::EvalJs(kept->GetContents(), kNotesInput));
 }
 
 IN_PROC_BROWSER_TEST_F(SharedTabsBrowserTest,

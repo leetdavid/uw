@@ -669,6 +669,22 @@ bool TabOrganizationController::KeepsWindow(BrowserWindowInterface* window) {
       browser_shutdown::IsTryingToQuit() || closing_all_browsers) {
     return false;
   }
+  // Closing hands the window's live pages to another window on the workspace.
+  // uw changes no tab strip while it reports a change, so while one of them
+  // does, the window closes right after.
+  if (std::ranges::any_of(self->shared_->windows(), [&](const auto& other) {
+        return other != self && other->tabs_->IsChanging();
+      })) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<BrowserWindowInterface> window) {
+                         if (window) {
+                           window->GetWindow()->Close();
+                         }
+                       },
+                       window->GetWeakPtr()));
+    return true;
+  }
   self->CloseUnusedBlank(/*closing=*/true);
   if (self->shared_->windows().size() > 1) {
     self->shared_->HandOver(self);
@@ -2423,6 +2439,12 @@ void TabOrganizationController::Apply() {
   if (applying_ || !tabs_->SupportsTabGroups()) {
     return;
   }
+  // uw changes no tab strip while it reports a change, which Chromium forbids.
+  // The window catches up right after.
+  if (tabs_->IsChanging()) {
+    ScheduleOwnApply();
+    return;
+  }
   {
     base::AutoReset<bool> guard(&applying_, true);
     base::WeakPtr<TabOrganizationController> self = weak_factory_.GetWeakPtr();
@@ -2584,12 +2606,38 @@ void TabOrganizationController::ApplyTasks() {
 }
 
 void TabOrganizationController::ApplyOrder() {
-  for (int i = 0; i < tabs_->count(); ++i) {
-    if (tabs_->GetTabAtIndex(i)->IsSplit()) {
+  int next = tabs_->IndexOfFirstNonPinnedTab();
+  // Chromium keeps a split's tabs side by side, so a split moves as one, to
+  // the place of the first of its panes the tree lists. One whose panes are
+  // not all in the same task stays where it is.
+  std::set<split_tabs::SplitTabId> placed;
+  const auto place = [&](const tabs::TabInterface* tab,
+                         std::optional<tab_groups::TabGroupId> group) {
+    if (const std::optional<split_tabs::SplitTabId> split = tab->GetSplit()) {
+      const std::vector<tabs::TabInterface*> panes =
+          tabs_->GetSplitData(*split)->ListTabs();
+      if (!placed.insert(*split).second ||
+          !std::ranges::all_of(panes, [&](const tabs::TabInterface* pane) {
+            return pane->GetGroup() == group;
+          })) {
+        return;
+      }
+      int first = tabs_->count();
+      for (const tabs::TabInterface* pane : panes) {
+        first = std::min(first, tabs_->GetIndexOfTab(pane));
+      }
+      if (first != next) {
+        tabs_->MoveSplitTo(*split, next, /*pinned=*/false, group);
+      }
+      next += static_cast<int>(panes.size());
       return;
     }
-  }
-  int next = tabs_->IndexOfFirstNonPinnedTab();
+    const int index = tabs_->GetIndexOfTab(tab);
+    if (index != next) {
+      tabs_->MoveWebContentsAt(index, next, /*select_after_move=*/false, group);
+    }
+    ++next;
+  };
   for (const std::string& task : shared_->tree().Tasks()) {
     const std::optional<tab_groups::TabGroupId> group = GroupFor(task);
     if (!group) {
@@ -2604,12 +2652,7 @@ void TabOrganizationController::ApplyOrder() {
       if (!tab || page.task != task || tab->GetGroup() != group) {
         continue;
       }
-      const int index = tabs_->GetIndexOfTab(tab);
-      if (index != next) {
-        tabs_->MoveWebContentsAt(index, next, /*select_after_move=*/false,
-                                 group);
-      }
-      ++next;
+      place(tab, group);
     }
     next = static_cast<int>(native->ListTabs().end());
   }
@@ -2618,12 +2661,7 @@ void TabOrganizationController::ApplyOrder() {
     if (!tab || !page.task.empty() || tab->GetGroup()) {
       continue;
     }
-    const int index = tabs_->GetIndexOfTab(tab);
-    if (index != next) {
-      tabs_->MoveWebContentsAt(index, next, /*select_after_move=*/false,
-                               std::nullopt);
-    }
-    ++next;
+    place(tab, std::nullopt);
   }
 }
 

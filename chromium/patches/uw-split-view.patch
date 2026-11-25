@@ -1096,10 +1096,21 @@ index 29eecec28c90f6c4477a18eacd27e5b5830ba260..2a6fed1b23d07c9db61ca94b32f2bd61
        }
      }
 diff --git a/chrome/browser/ui/tabs/tab_strip_model.h b/chrome/browser/ui/tabs/tab_strip_model.h
-index eb02a95efe49df7b96d89eb395ed518293ce6bbc..7f3051f2691f94ec61cfafcd932e27ba658b217c 100644
+index eb02a95efe49df7b96d89eb395ed518293ce6bbc..4c777223d67cb23dcbe75e87766f289a8a496523 100644
 --- a/chrome/browser/ui/tabs/tab_strip_model.h
 +++ b/chrome/browser/ui/tabs/tab_strip_model.h
-@@ -640,6 +640,24 @@ class TabStripModel {
+@@ -250,6 +250,10 @@ class TabStripModel {
+   // avoid doing meaningless or unhelpful work.
+   bool closing_all() const { return closing_all_; }
+ 
++  // uw: true while the tabstrip makes a change and tells its observers of
++  // it, when it may not be changed.
++  bool IsChanging() const { return reentrancy_guard_; }
++
+   // Basic API /////////////////////////////////////////////////////////////////
+ 
+   // Determines if the specified index is contained within the TabStripModel.
+@@ -640,6 +644,24 @@ class TabStripModel {
                          double start_content_ratio,
                          bool is_intermediate = false);
  
@@ -1124,7 +1135,7 @@ index eb02a95efe49df7b96d89eb395ed518293ce6bbc..7f3051f2691f94ec61cfafcd932e27ba
    // Updates the split tab at index `split_index` with the tab at
    // `update_index`. The split that includes `split_index` must include the
    // active tab in the tab strip.
-@@ -1234,6 +1252,37 @@ class TabStripModel {
+@@ -1234,6 +1256,37 @@ class TabStripModel {
                              int update_index,
                              SplitUpdateType update_type);
  
@@ -1162,7 +1173,7 @@ index eb02a95efe49df7b96d89eb395ed518293ce6bbc..7f3051f2691f94ec61cfafcd932e27ba
    // Adds tabs to newly-allocated group id `new_group`. This group must be new
    // and have no tabs in it.
    void AddToNewGroupImpl(
-@@ -1485,6 +1534,10 @@ class TabStripModel {
+@@ -1485,6 +1538,10 @@ class TabStripModel {
    // True if all tabs are currently being closed via CloseAllTabs.
    bool closing_all_ = false;
  

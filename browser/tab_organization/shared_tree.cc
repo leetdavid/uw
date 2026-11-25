@@ -15,6 +15,7 @@
 #include "chrome/browser/performance_manager/policies/discard_eligibility_policy.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+#include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/performance_manager/public/graph/page_node.h"
 #include "components/performance_manager/public/performance_manager.h"
 #include "components/tabs/public/tab_interface.h"
@@ -348,7 +349,28 @@ void SharedTree::BringLivePage(TabOrganizationController* window,
   if (!here || !IsCopy(here->GetContents())) {
     return;
   }
-  if (TabOrganizationController* holder = HolderOf(id, window)) {
+  TabOrganizationController* holder = HolderOf(id, window);
+  // uw changes no tab strip while it reports a change, which Chromium forbids.
+  // The page comes over right after.
+  if (window->window()->GetTabStripModel()->IsChanging() ||
+      (holder && holder->window()->GetTabStripModel()->IsChanging())) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<SharedTree> tree,
+               base::WeakPtr<BrowserWindowInterface> window, PageId id) {
+              TabOrganizationController* controller =
+                  window ? TabOrganizationController::From(window.get())
+                         : nullptr;
+              if (tree && controller &&
+                  std::ranges::contains(tree->windows(), controller)) {
+                tree->BringLivePage(controller, id);
+              }
+            },
+            weak_factory_.GetWeakPtr(), window->window()->GetWeakPtr(), id));
+    return;
+  }
+  if (holder) {
     tabs::TabInterface* there = holder->TabFor(id);
     content::WebContents* live = there->GetContents();
     TakePicture(live, base::BindOnce(&SharedTree::SetPicture,

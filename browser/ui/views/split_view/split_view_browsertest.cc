@@ -606,6 +606,36 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   EXPECT_FALSE(panes[2]->GetGroup().has_value());
 }
 
+// A tab moved to a new task while a split is open goes above the Scratchpad,
+// with the tasks, and the split moves as one. With any split open, the tab
+// strip stopped following the tree's order (T407).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       TheTabsKeepTheTreesOrderWithASplitOpen) {
+  const std::vector<tabs::TabInterface*> panes = ThreePanes();
+  tabs::TabInterface* other = OpenOther();
+  ASSERT_LT(tabs()->GetIndexOfTab(panes[2]), tabs()->GetIndexOfTab(other));
+  TabOrganizationController* organizer =
+      TabOrganizationController::From(browser());
+  ASSERT_TRUE(
+      organizer->MoveToNewTask({organizer->IdFor(other).value()}, u"Plan"));
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_LT(tabs()->GetIndexOfTab(other), tabs()->GetIndexOfTab(panes[0]));
+  EXPECT_EQ(SplitOf(panes[0]), panes);
+  std::vector<std::string> tree;
+  for (const uw::Page& page : organizer->tree().pages()) {
+    tree.push_back(page.id.value());
+  }
+  std::vector<std::string> strip;
+  for (int i = tabs()->IndexOfFirstNonPinnedTab(); i < tabs()->count(); ++i) {
+    if (const std::optional<PageId> id =
+            organizer->IdFor(tabs()->GetTabAtIndex(i))) {
+      strip.push_back(id->value());
+    }
+  }
+  EXPECT_EQ(strip, tree);
+}
+
 // After a restart the split comes back with its panes and their directions
 // and sizes. The session keeps the pane that had focus as the window's
 // selected tab, which a launch selects again; a test opens a blank tab in
