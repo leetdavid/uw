@@ -544,10 +544,14 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
                (visuals->is_collapsed() ? " folded" : "");
       }
       const std::optional<PageId> id = organizer->IdFor(tab);
+      const std::string split =
+          tab->GetSplit() ? " split " + tab->GetSplit()->ToString().substr(0, 6)
+                          : std::string();
       rows.push_back(base::StringPrintf(
-          "%s %s %d%s", id ? id->value().c_str() : "?", task.c_str(),
+          "%s %s %d%s%s", id ? id->value().c_str() : "?", task.c_str(),
           organizer->DepthFor(tab),
-          TabOrganizationController::IsCopy(tab) ? " copy" : ""));
+          TabOrganizationController::IsCopy(tab) ? " copy" : "",
+          split.c_str()));
     }
     return rows;
   }
@@ -557,7 +561,9 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
   // windows on one workspace list the same tabs.
   std::string Trouble() {
     std::map<std::string, std::vector<std::string>> shown;
+    int number = 0;
     for (Browser* window : Windows()) {
+      ++number;
       TabOrganizationController* organizer =
           TabOrganizationController::From(window);
       if (organizer->dragging()) {
@@ -584,11 +590,17 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
         }
       }
       if (tree != strip) {
-        return "a sidebar's tabs are not in its tree's order";
+        std::string order;
+        for (const PageId& id : tree) {
+          order += "\n  " + id.value();
+        }
+        return "a sidebar's tabs are not in its tree's order, in window " +
+               base::NumberToString(number) + " below. The tree:" + order;
       }
       std::vector<std::string> layout = Layout(window);
       for (std::string& row : layout) {
         base::ReplaceSubstringsAfterOffset(&row, 0, " copy", "");
+        row = row.substr(0, row.find(" split "));
       }
       const WorkspaceWindow* workspace = WorkspaceWindow::From(window);
       const auto [known, added] = shown.try_emplace(

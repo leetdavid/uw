@@ -7,12 +7,14 @@
 #include <string_view>
 #include <vector>
 
+#include "base/callback_list.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/test/bind.h"
 #include "base/test/run_until.h"
 #include "base/threading/thread_restrictions.h"
 #include "build/build_config.h"
@@ -667,6 +669,38 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   EXPECT_FALSE(panes[1]->IsSplit());
   EXPECT_FALSE(panes[2]->IsSplit());
   EXPECT_FALSE(panes[2]->GetGroup().has_value());
+}
+
+// A split moved into a window with its selected pane takes over from the tab
+// selected there, which is told it no longer is before the pane is told it
+// is. Chromium did not tell it, so that tab's cookie controls kept watching
+// its window, and crashed uw once the window had closed (T417).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       ASplitMovedInTellsTheSelectedTabFirst) {
+  tabs::TabInterface* left = tabs()->GetActiveTab();
+  Show(left, 1);
+  Run(kSplitRight);
+  tabs::TabInterface* right = tabs()->GetActiveTab();
+  Show(right, 2);
+  OpenOther();
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  tabs::TabInterface* selected = second->tab_strip_model()->GetActiveTab();
+  ASSERT_TRUE(selected);
+  bool told = false;
+  bool told_first = false;
+  const base::CallbackListSubscription deactivated =
+      selected->RegisterWillDeactivate(base::BindLambdaForTesting(
+          [&](tabs::TabInterface*) { told = true; }));
+  const base::CallbackListSubscription activated =
+      right->RegisterDidActivate(base::BindLambdaForTesting(
+          [&](tabs::TabInterface*) { told_first = told; }));
+
+  chrome::MoveTabsToExistingWindow(
+      browser(), second,
+      {tabs()->GetIndexOfTab(left), tabs()->GetIndexOfTab(right)});
+  EXPECT_EQ(second->tab_strip_model()->GetActiveTab(), right);
+  EXPECT_TRUE(told);
+  EXPECT_TRUE(told_first);
 }
 
 // A pane that is not selected shows the page its tab has now. uw moves a
