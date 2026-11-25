@@ -127,6 +127,33 @@ class CommandBarBrowserTest : public headless::HeadlessModeBrowserTest {
                            key, with.empty() ? "none" : with)));
   }
 
+  // A "keydown" or "keyup" of `key` in the field, with the modifiers in `held`,
+  // such as "metaKey,shiftKey", down.
+  void KeyInField(std::string_view type,
+                  std::string_view key,
+                  std::string_view held = "") {
+    ASSERT_TRUE(
+        content::ExecJs(bar()->page(), content::JsReplace(R"(
+            const init = {key: $2, bubbles: true};
+            for (const modifier of $3.split(',').filter(Boolean)) {
+              init[modifier] = true;
+            }
+            document.querySelector('#field').dispatchEvent(
+                new KeyboardEvent($1, init));
+        )",
+                                                          type, key, held)));
+  }
+
+  // The footer hint lit for a held key, then the opacity of the ↵ hint, as
+  // "tab|0.5", or "|1" with nothing held.
+  std::string Lit() {
+    return content::EvalJs(bar()->page(), R"(
+        (document.querySelector('#keys .lit')?.dataset.key ?? '') + '|' +
+            getComputedStyle(document.querySelector('#keys .pick')).opacity
+    )")
+        .ExtractString();
+  }
+
   std::string FieldAndSelection() {
     return content::EvalJs(bar()->page(),
                            "(f => `${f.value}|${f.selectionStart}-"
@@ -851,6 +878,43 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest,
   }));
 }
 
+// Holding Shift, Cmd, or Option lights what Return would do with the keys
+// held, and fades the other hints. A letter or a lost focus puts it out, and
+// with `>` nothing lights.
+IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, HoldingAKeyShowsWhatReturnDoes) {
+  ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
+  Press(ui::VKEY_T, NSEventModifierFlagCommand);
+  Type("lisbon");
+  EXPECT_EQ("|1", Lit());
+
+  KeyInField("keydown", "Shift", "shiftKey");
+  EXPECT_EQ("tab|0.5", Lit());
+  KeyInField("keyup", "Shift");
+  EXPECT_EQ("|1", Lit());
+
+  KeyInField("keydown", "Meta", "metaKey");
+  EXPECT_EQ("ask|0.5", Lit());
+  KeyInField("keydown", "Shift", "metaKey,shiftKey");
+  EXPECT_EQ("ask|0.5", Lit());
+  KeyInField("keyup", "Meta", "shiftKey");
+  EXPECT_EQ("tab|0.5", Lit());
+  KeyInField("keydown", "L", "shiftKey");
+  EXPECT_EQ("|1", Lit());
+  KeyInField("keyup", "Shift");
+
+  KeyInField("keydown", "Alt", "altKey");
+  EXPECT_EQ("terminal|0.5", Lit());
+  ASSERT_TRUE(content::ExecJs(bar()->page(),
+                              "window.dispatchEvent(new Event('blur'))"));
+  EXPECT_EQ("|1", Lit());
+
+  Type("");
+  Type(">");
+  Type("ls");
+  KeyInField("keydown", "Shift", "shiftKey");
+  EXPECT_EQ("|1", Lit());
+}
+
 // Shift+Return searches a sum instead of copying its answer.
 IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, ShiftReturnSearchesASum) {
   ASSERT_TRUE(content::WaitForLoadStop(bar()->page()));
@@ -1147,6 +1211,12 @@ IN_PROC_BROWSER_TEST_F(CommandBarBrowserTest, MANUAL_TheBarAsYouType) {
   SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
                            bar()->page()->GetNativeView()),
                        "command-bar-panel");
+  KeyInField("keydown", "Shift", "shiftKey");
+  Wait(base::Milliseconds(300));
+  SaveWidgetScreenshot(views::Widget::GetTopLevelWidgetForNativeView(
+                           bar()->page()->GetNativeView()),
+                       "command-bar-shift-held");
+  KeyInField("keyup", "Shift");
 
   Type(">");
   Type("ls -la ~/dev");

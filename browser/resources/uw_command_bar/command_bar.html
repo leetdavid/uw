@@ -467,6 +467,30 @@
       #keys.moving .rows:not(.pick) {
         display: none;
       }
+
+      /* Holding Shift, Cmd, or Option lights what Return will do with it. */
+      body.held #keys .typed:not(.lit) {
+        opacity: 0.5;
+      }
+
+      #keys .lit {
+        color: var(--primary);
+        font-weight: 500;
+      }
+
+      #keys .lit kbd {
+        background: color-mix(in srgb, var(--primary) 12%, transparent);
+        color: var(--primary);
+      }
+
+      body.held #results li.selected {
+        background: color-mix(in srgb, var(--selected) 50%, transparent);
+      }
+
+      body.held #calc.selected {
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--primary) 50%, transparent);
+      }
     </style>
   </head>
   <body>
@@ -530,13 +554,13 @@
         <kbd><svg><use href="#enter"/></svg></kbd>
         <span id="action">Open</span>
       </span>
-      <span class="typed rows">
+      <span class="typed rows" data-key="ask">
         <kbd id="askKey">Cmd <svg><use href="#enter"/></svg></kbd> Ask uw
       </span>
-      <span id="terminalKey" class="typed rows">
+      <span id="terminalKey" class="typed rows" data-key="terminal">
         <kbd>Option <svg><use href="#enter"/></svg></kbd> Run in terminal
       </span>
-      <span class="typed rows">
+      <span class="typed rows" data-key="tab">
         <kbd>Shift <svg><use href="#enter"/></svg></kbd> New tab
       </span>
       <span class="run">

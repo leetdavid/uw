@@ -865,6 +865,41 @@ document.addEventListener('keydown', event => {
   }
 });
 
+// Holding Shift, Cmd, or Option lights the footer's hint for what Return would
+// do with the keys held, in the order Return reads them, and fades the rest.
+// Any other key, such as a capital's letter, puts it out.
+const MODIFIERS = ['Shift', 'Meta', 'Alt', 'Control'];
+
+function heldKey(event: KeyboardEvent): string {
+  if (moving || page || shell || !field.value) {
+    return '';
+  }
+  if (isMac ? event.metaKey : event.ctrlKey) {
+    return 'ask';
+  }
+  if (hasTerminal && event.altKey) {
+    return 'terminal';
+  }
+  return event.shiftKey ? 'tab' : '';
+}
+
+function showHeld(key: string) {
+  document.body.classList.toggle('held', !!key);
+  for (const hint of keys.querySelectorAll<HTMLElement>('[data-key]')) {
+    hint.classList.toggle('lit', hint.dataset['key'] === key);
+  }
+}
+
+document.addEventListener('keydown', event => {
+  showHeld(MODIFIERS.includes(event.key) ? heldKey(event) : '');
+});
+
+document.addEventListener('keyup', event => {
+  if (MODIFIERS.includes(event.key)) {
+    showHeld(heldKey(event));
+  }
+});
+
 // The browser holds keys until the field takes focus, so the field gives it up
 // whenever the panel goes and takes it again each time the panel shows. It
 // waits one task: during the window's focus event the browser has not yet heard
@@ -878,7 +913,10 @@ window.addEventListener('focus', () => {
   refreshLists();
 });
 
-window.addEventListener('blur', () => field.blur());
+window.addEventListener('blur', () => {
+  field.blur();
+  showHeld('');
+});
 // Moving the caret off the end of what was typed drops the completion.
 field.addEventListener('selectionchange', () => {
   if (completion &&
