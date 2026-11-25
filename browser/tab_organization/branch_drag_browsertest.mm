@@ -38,6 +38,7 @@
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
+#include "uw/browser/tab_organization/commands.h"
 #include "uw/browser/tab_organization/tab_organization_controller.h"
 #include "uw/browser/tab_organization/window_screenshot.h"
 
@@ -292,6 +293,54 @@ IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
   EXPECT_TRUE(
       BrowserView::GetBrowserViewForBrowser(browser())->IsTabStripEditable());
   EXPECT_TRUE(tab->IsPinned());
+}
+
+// A row whose tab is split while its mouse button is held, from the menu bar,
+// ends its drag once the button is up. The split moves the row, so the
+// release never reaches it. For a tab that is a whole task, the new pane's tab
+// also ends Chromium's drag of the task in a way that did not tell uw, so the
+// window stayed in a drag (T414, found by T404's random runs with splits).
+IN_PROC_BROWSER_TEST_F(BranchDragBrowserTest,
+                       ARowSplitUnderAHeldButtonEndsItsDrag) {
+  for (const bool in_task : {false, true}) {
+    tabs::TabInterface* tab = tabs()->GetTabForWebContents(
+        chrome::AddAndReturnTabAt(browser(), GURL("about:blank"), -1,
+                                  /*foreground=*/true));
+    chrome::AddAndReturnTabAt(browser(), GURL("about:blank"), -1,
+                              /*foreground=*/false);
+    if (in_task) {
+      tabs()->AddToNewGroup({tabs()->GetIndexOfTab(tab)});
+    }
+    Wait(base::Milliseconds(500));
+    views::View* row = RowOf(tab);
+    ASSERT_TRUE(row);
+    base::WeakPtr<views::Widget> widget = row->GetWidget()->GetWeakPtr();
+    const gfx::Point on_screen = row->GetBoundsInScreen().CenterPoint();
+    gfx::Point at = row->GetLocalBounds().CenterPoint();
+    views::View::ConvertPointToWidget(row, &at);
+    ui::MouseEvent press(ui::EventType::kMousePressed, at, on_screen,
+                         ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                         ui::EF_LEFT_MOUSE_BUTTON);
+    widget->OnMouseEvent(&press);
+    ASSERT_TRUE(controller()->dragging());
+
+    chrome::ExecuteCommand(browser(), kSplitRight);
+    ui::MouseEvent release(ui::EventType::kMouseReleased, at, on_screen,
+                           ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
+                           ui::EF_LEFT_MOUSE_BUTTON);
+    if (widget) {
+      widget->OnMouseEvent(&release);
+    }
+    Wait(base::Milliseconds(300));
+    EXPECT_FALSE(controller()->dragging()) << "in task " << in_task;
+    EXPECT_TRUE(
+        BrowserView::GetBrowserViewForBrowser(browser())->IsTabStripEditable())
+        << "in task " << in_task;
+    EXPECT_TRUE(tab->IsSplit()) << "in task " << in_task;
+    if (controller()->dragging()) {
+      return;
+    }
+  }
 }
 
 // A dragged parent takes its children with it, still nested under it, and

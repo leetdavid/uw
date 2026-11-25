@@ -2721,7 +2721,7 @@ index b35f686251462c443d02dcd284f9b4fc46b610ad..f4e64cf0ee6b540950b665178e635a12
    raw_ptr<views::FlexLayout> flex_layout_ = nullptr;
  
 diff --git a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
-index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..6024d59c3d0afe38abd42ffe31ab9ff60663c8ce 100644
+index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..6256b869ca0ec9e9d6637172356633ea3377a81d 100644
 --- a/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 +++ b/chrome/browser/ui/views/tabs/dragging/tab_drag_controller.cc
 @@ -84,6 +84,7 @@
@@ -2732,26 +2732,28 @@ index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..6024d59c3d0afe38abd42ffe31ab9ff6
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/public/cpp/window_properties.h"  // nogncheck
-@@ -824,6 +825,18 @@ void TabDragController::EndDrag(EndDragReason reason) {
-   }
-   drag_start_time_.reset();
+@@ -1948,6 +1949,20 @@ void TabDragController::EndDragImpl(EndDragType type) {
+   VLOG(1) << __func__ << " type=" << static_cast<int>(type)
+           << " state=" << static_cast<int>(current_state_);
  
-+  // uw: the window the drag began in ends it too, wherever it ended. A
-+  // cancelled drag's tabs go back to their depths as well.
++  // uw: the window the drag began in ends it too, wherever and however it
++  // ended, as when a tab added while a task is held ends that drag here. A
++  // cancelled drag that had started puts its tabs back at their depths too.
 +  if (source_context_) {
 +    if (auto* organizer = uw::TabOrganizationController::From(
 +            source_context_->GetTabStripModel())) {
-+      if (reason == EndDragReason::kComplete) {
-+        organizer->EndTabDrag();
-+      } else {
++      if (type == EndDragType::kCanceled && started_drag()) {
 +        organizer->CancelTabDrag();
++      } else {
++        organizer->EndTabDrag();
 +      }
 +    }
 +  }
-   EndDragImpl(reason != EndDragReason::kComplete && source_context_
-                   ? EndDragType::kCanceled
-                   : EndDragType::kNormal);
-@@ -2831,6 +2844,16 @@ TabDragController::Liveness TabDragController::GetLocalProcessWindow(
++
+   DragState previous_state = current_state_;
+   current_state_ = DragState::kStopped;
+   attached_context_tabs_closed_tracker_.reset();
+@@ -2831,6 +2846,16 @@ TabDragController::Liveness TabDragController::GetLocalProcessWindow(
      const gfx::Point& screen_point,
      bool exclude_dragged_view,
      gfx::NativeWindow* window) {
@@ -2768,7 +2770,7 @@ index 4a462e7afe9c38181f0cc560f7cc9eb160dc46d2..6024d59c3d0afe38abd42ffe31ab9ff6
    std::set<gfx::NativeWindow> exclude;
    if (exclude_dragged_view) {
      gfx::NativeWindow dragged_window =
-@@ -2987,6 +3010,12 @@ void TabDragController::NotifyEventIfTabAddedToGroup() {
+@@ -2987,6 +3012,12 @@ void TabDragController::NotifyEventIfTabAddedToGroup() {
        continue;
      }
  
