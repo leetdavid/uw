@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <optional>
@@ -206,13 +207,14 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
   bool Chance(int percent) { return Pick(100) < static_cast<size_t>(percent); }
 
   // The windows a person sees.
-  std::vector<Browser*> Windows() {
+  std::vector<Browser*> Windows(bool hidden = false) {
     std::vector<Browser*> shown;
     for (BrowserWindowInterface* window : GetAllBrowserWindowInterfaces()) {
       Browser* browser = window->GetBrowserForMigrationOnly();
       if (window->GetProfile() == profile_ &&
           window->GetType() == BrowserWindowInterface::TYPE_NORMAL &&
-          !browser->IsDeleteScheduled() && window->GetWindow()->IsVisible() &&
+          !browser->IsDeleteScheduled() &&
+          window->GetWindow()->IsVisible() != hidden &&
           TabOrganizationController::From(window) &&
           !window->GetTabStripModel()->empty()) {
         shown.push_back(browser);
@@ -612,12 +614,17 @@ class RandomWalkBrowserTest : public headless::HeadlessModeBrowserTest {
     return std::string();
   }
 
+  // The shown windows, then the hidden ones, which keep a workspace's tabs.
   std::string Layouts() {
     std::string text;
-    for (Browser* window : Windows()) {
+    std::vector<Browser*> windows = Windows();
+    const size_t shown = windows.size();
+    std::ranges::copy(Windows(/*hidden=*/true), std::back_inserter(windows));
+    for (size_t i = 0; i < windows.size(); ++i) {
+      Browser* window = windows[i];
       const WorkspaceWindow* workspace = WorkspaceWindow::From(window);
       text +=
-          "window on workspace " +
+          std::string(i < shown ? "" : "hidden ") + "window on workspace " +
           (workspace ? workspace->workspace() : std::string("?")) +
           (TabOrganizationController::From(window)->dragging() ? ", dragging"
                                                                : "") +
