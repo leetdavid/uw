@@ -2400,7 +2400,7 @@ index 6ecb49a239f704f61442eee7d14a0454553aea4f..c739689eb9bf507b8e25e0d64cad1dca
    // the user drags a link to the edge of the contents view.
    raw_ptr<MultiContentsDropTargetView> drop_target_view_ = nullptr;
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
-index b1024f94e9934909db7e44972b6482085b490cd9..c442fd7f5fba54385b45bd02b9c1a37d0651050f 100644
+index b1024f94e9934909db7e44972b6482085b490cd9..01bae8d2c093cf8039ad3712d81f8df290f40f5b 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view_delegate.cc
 @@ -22,6 +22,14 @@
@@ -2418,7 +2418,7 @@ index b1024f94e9934909db7e44972b6482085b490cd9..c442fd7f5fba54385b45bd02b9c1a37d
  MultiContentsViewDelegateImpl::MultiContentsViewDelegateImpl(
      BrowserWindowInterface& browser)
      : browser_(browser), tab_strip_model_(*browser.GetTabStripModel()) {}
-@@ -33,6 +41,11 @@ void MultiContentsViewDelegateImpl::WebContentsFocused(
+@@ -33,6 +41,17 @@ void MultiContentsViewDelegateImpl::WebContentsFocused(
    if (!tab || !tab->IsSplit()) {
      return;
    }
@@ -2427,10 +2427,16 @@ index b1024f94e9934909db7e44972b6482085b490cd9..c442fd7f5fba54385b45bd02b9c1a37d
 +  if (!tab_strip_model_->ListSplits().contains(tab->GetSplit().value())) {
 +    return;
 +  }
++  // uw: a pane can take focus while the tab strip reports a change, as when
++  // the page of a pane that is not selected is replaced. Its tab is not
++  // selected then, as the tab strip may not change during its report (T417).
++  if (tab_strip_model_->IsChanging()) {
++    return;
++  }
  
    std::vector<tabs::TabInterface*> tabs =
        tab_strip_model_->GetSplitData(tab->GetSplit().value())->ListTabs();
-@@ -60,12 +73,18 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
+@@ -60,12 +79,18 @@ void MultiContentsViewDelegateImpl::ReverseWebContents() {
  
  void MultiContentsViewDelegateImpl::ResizeWebContents(double start_ratio,
                                                        bool done_resizing) {

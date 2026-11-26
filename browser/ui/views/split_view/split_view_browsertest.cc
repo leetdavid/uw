@@ -11,6 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
+#include "base/memory/raw_ptr.h"
 #include "base/run_loop.h"
 #include "base/strings/strcat.h"
 #include "base/strings/string_number_conversions.h"
@@ -32,8 +33,10 @@
 #include "chrome/browser/ui/tabs/split_tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_group_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/frame/contents_container_view.h"
+#include "chrome/browser/ui/views/frame/contents_web_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_resize_area.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view.h"
 #include "chrome/browser/ui/views/frame/multi_contents_view_mini_toolbar.h"
@@ -77,6 +80,26 @@
 
 namespace uw {
 namespace {
+
+// Gives `pane` focus when the tab strip reports that a tab's page was
+// replaced, as a pane can take focus during that report.
+class FocusOnReplace : public TabStripModelObserver {
+ public:
+  FocusOnReplace(TabStripModel* tabs, views::View* pane) : pane_(pane) {
+    tabs->AddObserver(this);
+  }
+
+  void OnTabStripModelChanged(TabStripModel*,
+                              const TabStripModelChange& change,
+                              const TabStripSelectionChange&) override {
+    if (change.type() == TabStripModelChange::kReplaced) {
+      pane_->RequestFocus();
+    }
+  }
+
+ private:
+  raw_ptr<views::View> pane_;
+};
 
 class SplitViewBrowserTest : public headless::HeadlessModeBrowserTest {
  protected:
@@ -721,6 +744,33 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   })) << "tree: "
       << tree() << "\nfirst window: " << strip(here)
       << "\nsecond window: " << strip(there);
+}
+
+// A pane that takes focus while the tab strip reports a change selects
+// nothing. A pane that another window's live page came back to took focus
+// with it during that report, and the split selected its tab then, which
+// Chromium forbids and which stopped uw (T417).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       APaneFocusedDuringAChangeSelectsNothing) {
+  tabs::TabInterface* left = tabs()->GetActiveTab();
+  Show(left, 1);
+  Run(kSplitRight);
+  tabs::TabInterface* right = tabs()->GetActiveTab();
+  Show(right, 2);
+  tabs()->ActivateTabAt(tabs()->GetIndexOfTab(left));
+  content::WebContents* live = right->GetContents();
+  std::unique_ptr<content::WebContents> taken =
+      tabs()->DiscardWebContents(live, uw::SharedTree::MakeCopy(live));
+  ContentsWebView* pane = BrowserView::GetBrowserViewForBrowser(browser())
+                              ->multi_contents_view()
+                              ->GetInactiveContentsView();
+  ASSERT_EQ(pane->web_contents(), right->GetContents());
+
+  FocusOnReplace focus(tabs(), pane);
+  std::unique_ptr<content::WebContents> copy =
+      tabs()->DiscardWebContents(right->GetContents(), std::move(taken));
+  EXPECT_EQ(right->GetContents(), live);
+  EXPECT_EQ(tabs()->GetActiveTab(), left);
 }
 
 // A split moved into a window with its selected pane takes over from the tab
