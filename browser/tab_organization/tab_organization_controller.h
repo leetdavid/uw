@@ -386,6 +386,10 @@ class TabOrganizationController : public TabStripModelObserver,
                               tabs::TabInterface* tab,
                               int index) override;
   void OnSplitTabChanged(const SplitTabChange& change) override;
+  // A page is in one split on its workspace, since the windows list its pages
+  // in one order. `split`, just made or changed here, ends each split another
+  // window has with one of its pages (T407).
+  void EndOtherSplits(split_tabs::SplitTabId split);
   void OnTabChangedAt(tabs::TabInterface* tab,
                       TabChangeType change_type) override;
 
