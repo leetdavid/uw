@@ -671,6 +671,58 @@ IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
   EXPECT_FALSE(panes[2]->GetGroup().has_value());
 }
 
+// A page is in one split on its workspace. Splitting it in a second window
+// ends the split the first window had with it, whose panes become ordinary
+// tabs, and both windows list the tabs in the tree's order. Two splits of one
+// page put a sidebar out of the tree's order (T407).
+IN_PROC_BROWSER_TEST_F(SplitViewBrowserTest,
+                       SplittingAPageInAnotherWindowEndsItsSplitHere) {
+  tabs::TabInterface* left = tabs()->GetActiveTab();
+  Show(left, 1);
+  Run(kSplitRight);
+  tabs::TabInterface* right = tabs()->GetActiveTab();
+  Show(right, 2);
+  Browser* second = CreateBrowser(browser()->GetProfile());
+  TabOrganizationController* here = TabOrganizationController::From(browser());
+  TabOrganizationController* there = TabOrganizationController::From(second);
+  const PageId page = here->IdFor(left).value();
+  ASSERT_TRUE(base::test::RunUntil([&] { return there->TabFor(page); }));
+  tabs::TabInterface* copy = there->TabFor(page);
+  ASSERT_FALSE(copy->IsSplit());
+
+  second->tab_strip_model()->ActivateTabAt(
+      second->tab_strip_model()->GetIndexOfTab(copy));
+  chrome::ExecuteCommand(second, kSplitRight);
+  ASSERT_TRUE(copy->IsSplit());
+  EXPECT_TRUE(base::test::RunUntil(
+      [&] { return !left->IsSplit() && !right->IsSplit(); }));
+  EXPECT_TRUE(copy->IsSplit());
+
+  const auto strip = [](TabOrganizationController* window) {
+    TabStripModel* model = window->window()->GetTabStripModel();
+    std::string ids;
+    for (int i = model->IndexOfFirstNonPinnedTab(); i < model->count(); ++i) {
+      if (const std::optional<PageId> id =
+              window->IdFor(model->GetTabAtIndex(i))) {
+        ids += id->value().substr(0, 8) + " ";
+      }
+    }
+    return ids;
+  };
+  const auto tree = [&] {
+    std::string ids;
+    for (const uw::Page& tree_page : here->tree().pages()) {
+      ids += tree_page.id.value().substr(0, 8) + " ";
+    }
+    return ids;
+  };
+  EXPECT_TRUE(base::test::RunUntil([&] {
+    return strip(here) == tree() && strip(there) == tree();
+  })) << "tree: "
+      << tree() << "\nfirst window: " << strip(here)
+      << "\nsecond window: " << strip(there);
+}
+
 // A split moved into a window with its selected pane takes over from the tab
 // selected there, which is told it no longer is before the pane is told it
 // is. Chromium did not tell it, so that tab's cookie controls kept watching

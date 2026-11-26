@@ -92,6 +92,7 @@ Asked for on 2026-11-05 while testing T332, and agreed in a grilling session the
 ### Shared tabs
 
 - With the `UwSharedTabs` switch on, a split shows in every window on its workspace with the same layout, per [ADR 0024](../adr/0024-a-workspaces-tabs-show-in-every-window.md). Selecting it in a window moves all its panes' live pages there, and the other window shows them hazed.
+- Until then (T335), a split shows only in the window that made it, and a page is in one split per workspace: splitting a page ends any split another window on the workspace has with it, and that window's panes become ordinary tabs in the tree's order. The windows list a workspace's pages in one order, which two splits of one page with different partners cannot both follow. The owner chose this on 2026-11-26, over refusing the second split and over building T335 first (T407).
 
 ### Unchanged
 

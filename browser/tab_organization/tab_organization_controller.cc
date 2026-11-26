@@ -157,6 +157,35 @@ void LeaveSplits(TabStripModel* model, std::vector<int>& indices) {
   std::ranges::sort(indices);
 }
 
+// A page is in one split on its workspace, since the windows list its pages
+// in one order. `split`, just made or changed in `self`'s window, ends each
+// split another window has with one of its pages (T407).
+void EndOtherSplits(base::WeakPtr<TabOrganizationController> self,
+                    split_tabs::SplitTabId split) {
+  if (!self) {
+    return;
+  }
+  TabStripModel* model = self->window()->GetTabStripModel();
+  if (!model->ListSplits().contains(split)) {
+    return;
+  }
+  for (const tabs::TabInterface* tab : model->GetSplitData(split)->ListTabs()) {
+    const std::optional<PageId> id = self->IdFor(tab);
+    if (!id) {
+      continue;
+    }
+    for (BrowserWindowInterface* window : self->Windows()) {
+      const TabOrganizationController* other =
+          window == self->window() ? nullptr
+                                   : TabOrganizationController::From(window);
+      const tabs::TabInterface* there = other ? other->TabFor(*id) : nullptr;
+      if (there && there->IsSplit()) {
+        window->GetTabStripModel()->RemoveSplit(*there->GetSplit());
+      }
+    }
+  }
+}
+
 }  // namespace
 
 DEFINE_USER_DATA(TabOrganizationController);
@@ -2171,7 +2200,15 @@ void TabOrganizationController::TabGroupedStateChanged(
   ScheduleApply();
 }
 
-void TabOrganizationController::OnSplitTabChanged(const SplitTabChange&) {
+void TabOrganizationController::OnSplitTabChanged(
+    const SplitTabChange& change) {
+  // Once this tab strip may change again.
+  if (change.type == SplitTabChange::Type::kAdded ||
+      change.type == SplitTabChange::Type::kContentsChanged) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&EndOtherSplits, weak_factory_.GetWeakPtr(),
+                                  change.split_id));
+  }
   if (applying_) {
     return;
   }
